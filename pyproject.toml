@@ -1,0 +1,57 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "fuzzyrust"
+version = "0.1.0"
+description = "High-performance string similarity library for Python, written in Rust"
+readme = "README.md"
+license = { text = "MIT OR Apache-2.0" }
+requires-python = ">=3.9"
+keywords = ["fuzzy", "string", "similarity", "search", "levenshtein", "jaro-winkler"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Text Processing",
+    "Topic :: Text Processing :: Indexing",
+    "Typing :: Typed",
+]
+authors = [{name = "Tomislav Suhina", email = "tomislav.suhina@gmail.com"}]
+# No runtime dependencies - pure Rust extension module
+
+[project.urls]
+Homepage = "https://github.com/tsuhina/fuzzyrust"
+Documentation = "https://github.com/tsuhina/fuzzyrust#readme"
+Repository = "https://github.com/tsuhina/fuzzyrust"
+Issues = "https://github.com/tsuhina/fuzzyrust/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-benchmark>=4.0",
+    "hypothesis>=6.0",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "fuzzyrust._core"
+strip = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "benchmark: marks tests as benchmarks",
+]
