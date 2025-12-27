@@ -8,12 +8,6 @@
 //! - Parallel batch processing
 //! - Unicode support
 
-// Use mimalloc for better allocation performance
-use mimalloc::MiMalloc;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 pub mod algorithms;
 pub mod indexing;
 pub mod dedup;
