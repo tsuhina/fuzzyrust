@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/fuzzyrust.svg)](https://pypi.org/project/fuzzyrust/)
 [![CI](https://github.com/tsuhina/fuzzyrust/actions/workflows/ci.yml/badge.svg)](https://github.com/tsuhina/fuzzyrust/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tsuhina/d34009f65419835921756ae6457f91fa/raw/coverage.json)](https://github.com/tsuhina/fuzzyrust/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
 **High-performance string similarity library for Python, written in Rust.**
 
@@ -475,4 +475,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-Dual-licensed under MIT or Apache-2.0 at your option.
+BSD-3-Clause License. See [LICENSE](LICENSE) for details.
