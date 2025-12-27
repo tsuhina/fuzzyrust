@@ -382,6 +382,93 @@ print(f"Total duplicates removed: {result.total_duplicates}")
 # 3
 ```
 
+## Polars Integration
+
+FuzzyRust integrates with [Polars](https://pola.rs/) for DataFrame-based fuzzy matching workflows.
+
+```bash
+# Install with Polars support
+pip install fuzzyrust[polars]
+```
+
+### Fuzzy Join DataFrames
+
+Match records across DataFrames with typos and variations:
+
+```python
+import polars as pl
+import fuzzyrust as fr
+
+# Customer database
+customers = pl.DataFrame({
+    "id": [1, 2, 3],
+    "name": ["Apple Inc.", "Microsoft Corporation", "Google LLC"]
+})
+
+# Orders with messy company names (typos!)
+orders = pl.DataFrame({
+    "order_id": [101, 102, 103],
+    "company": ["Apple", "Microsft Corp", "Googl"],
+    "amount": [5000, 3000, 7000]
+})
+
+# Fuzzy join to match orders to customers
+result = fr.fuzzy_join(
+    orders, customers,
+    left_on="company",
+    right_on="name",
+    min_similarity=0.6
+)
+
+print(result)
+# shape: (3, 6)
+# ┌──────────┬───────────────┬────────┬─────┬───────────────────────┬─────────────┐
+# │ order_id ┆ company       ┆ amount ┆ id  ┆ name                  ┆ fuzzy_score │
+# │ ---      ┆ ---           ┆ ---    ┆ --- ┆ ---                   ┆ ---         │
+# │ i64      ┆ str           ┆ i64    ┆ i64 ┆ str                   ┆ f64         │
+# ╞══════════╪═══════════════╪════════╪═════╪═══════════════════════╪═════════════╡
+# │ 101      ┆ Apple         ┆ 5000   ┆ 1   ┆ Apple Inc.            ┆ 0.95        │
+# │ 102      ┆ Microsft Corp ┆ 3000   ┆ 2   ┆ Microsoft Corporation ┆ 0.761538    │
+# │ 103      ┆ Googl         ┆ 7000   ┆ 3   ┆ Google LLC            ┆ 0.9         │
+# └──────────┴───────────────┴────────┴─────┴───────────────────────┴─────────────┘
+```
+
+### Deduplicate a Series
+
+Find and group duplicate values with variations:
+
+```python
+import polars as pl
+import fuzzyrust as fr
+
+names = pl.Series([
+    "John Smith",
+    "Jon Smith",      # typo
+    "John Smyth",     # variation
+    "Jane Doe",
+    "Jane M. Doe",    # middle initial
+])
+
+result = fr.dedupe_series(names, min_similarity=0.85)
+print(result)
+# shape: (5, 3)
+# ┌─────────────┬──────────┬──────────────┐
+# │ value       ┆ group_id ┆ is_canonical │
+# │ ---         ┆ ---      ┆ ---          │
+# │ str         ┆ i64      ┆ bool         │
+# ╞═════════════╪══════════╪══════════════╡
+# │ John Smith  ┆ 0        ┆ true         │
+# │ Jon Smith   ┆ 0        ┆ false        │
+# │ John Smyth  ┆ 0        ┆ false        │
+# │ Jane Doe    ┆ 1        ┆ true         │
+# │ Jane M. Doe ┆ 1        ┆ false        │
+# └─────────────┴──────────┴──────────────┘
+
+# Get canonical (deduplicated) names
+canonical = result.filter(pl.col("is_canonical"))["value"].to_list()
+# ['John Smith', 'Jane Doe']
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
