@@ -27,9 +27,14 @@ pub struct NgramIndex {
     entries: Vec<IndexEntry>,
     /// Minimum similarity threshold for candidates
     min_similarity: f64,
+    /// Minimum ratio of query n-grams that must match for candidate filtering
+    min_ngram_ratio: f64,
     /// Map from string hash to entry ID for O(1) exact match lookup.
     /// Uses hash of text to avoid duplicating string storage.
     exact_lookup: AHashMap<u64, usize>,
+    /// Whether to normalize (lowercase) text before indexing and querying.
+    /// When true, n-gram extraction uses lowercased text for case-insensitive matching.
+    normalize: bool,
 }
 
 /// Maximum valid n-gram size for index construction
@@ -48,7 +53,9 @@ impl NgramIndex {
             index: AHashMap::new(),
             entries: Vec::new(),
             min_similarity: 0.0,
+            min_ngram_ratio: 0.0,
             exact_lookup: AHashMap::new(),
+            normalize: false,
         }
     }
 
@@ -65,7 +72,30 @@ impl NgramIndex {
             index: AHashMap::new(),
             entries: Vec::new(),
             min_similarity,
+            min_ngram_ratio: 0.0,
             exact_lookup: AHashMap::new(),
+            normalize: false,
+        }
+    }
+
+    /// Create with all parameters
+    ///
+    /// # Arguments
+    /// * `n` - N-gram size (1-32). Values of 0 are treated as 1, values >32 are clamped to 32.
+    /// * `min_similarity` - Minimum similarity score for search results
+    /// * `min_ngram_ratio` - Minimum ratio of query n-grams that must match (0.0 to 1.0)
+    /// * `normalize` - Whether to lowercase text for case-insensitive n-gram matching
+    pub fn with_params(n: usize, min_similarity: f64, min_ngram_ratio: f64, normalize: bool) -> Self {
+        // Validate and clamp n-gram size
+        let n = if n == 0 { 1 } else { n.min(MAX_NGRAM_SIZE) };
+        Self {
+            n,
+            index: AHashMap::new(),
+            entries: Vec::new(),
+            min_similarity,
+            min_ngram_ratio: min_ngram_ratio.clamp(0.0, 1.0),
+            exact_lookup: AHashMap::new(),
+            normalize,
         }
     }
 
@@ -88,22 +118,31 @@ impl NgramIndex {
         let text = text.into();
         let id = self.entries.len();
 
+        // Normalize text for n-gram extraction if enabled (for case-insensitive indexing)
+        let normalized = if self.normalize {
+            text.to_lowercase()
+        } else {
+            text.clone()
+        };
+
         // Deduplicate n-grams to avoid adding same ID multiple times
         // (e.g., "aaa" with n=2 produces ["aa", "aa"])
-        let ngrams: AHashSet<String> = extract_ngrams(&text, self.n).into_iter().collect();
+        let ngrams: AHashSet<String> = extract_ngrams(&normalized, self.n).into_iter().collect();
 
         for ngram in ngrams {
             let hash = Self::hash_string(&ngram);
             self.index
                 .entry(hash)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id);
         }
 
-        // Store hash -> id mapping for O(1) contains lookup (avoids duplicate storage)
-        let hash = Self::hash_string(&text);
+        // Store hash -> id mapping for O(1) contains lookup
+        // Use normalized text for consistent lookup when normalize is enabled
+        let hash = Self::hash_string(&normalized);
         self.exact_lookup.insert(hash, id);
 
+        // Store original text in entry (preserves case for display)
         self.entries.push(IndexEntry { id, text, data });
         id
     }
@@ -121,7 +160,13 @@ impl NgramIndex {
     
     /// Get candidates that share at least one n-gram with the query
     pub fn get_candidates(&self, query: &str) -> Vec<usize> {
-        let query_ngrams = extract_ngrams(query, self.n);
+        // Normalize query to match indexed n-grams when normalize is enabled
+        let normalized_query = if self.normalize {
+            query.to_lowercase()
+        } else {
+            query.to_string()
+        };
+        let query_ngrams = extract_ngrams(&normalized_query, self.n);
         let mut candidate_ids = AHashSet::new();
 
         for ngram in &query_ngrams {
@@ -136,7 +181,13 @@ impl NgramIndex {
     
     /// Get candidates with a minimum n-gram overlap ratio
     pub fn get_candidates_with_min_ratio(&self, query: &str, min_ratio: f64) -> Vec<usize> {
-        let query_ngrams: AHashSet<String> = extract_ngrams(query, self.n).into_iter().collect();
+        // Normalize query to match indexed n-grams when normalize is enabled
+        let normalized_query = if self.normalize {
+            query.to_lowercase()
+        } else {
+            query.to_string()
+        };
+        let query_ngrams: AHashSet<String> = extract_ngrams(&normalized_query, self.n).into_iter().collect();
         let query_ngram_count = query_ngrams.len();
 
         if query_ngram_count == 0 {
@@ -178,7 +229,11 @@ impl NgramIndex {
         min_similarity: f64,
         limit: Option<usize>,
     ) -> Vec<SearchMatch> {
-        let candidates = self.get_candidates(query);
+        let candidates = if self.min_ngram_ratio > 0.0 {
+            self.get_candidates_with_min_ratio(query, self.min_ngram_ratio)
+        } else {
+            self.get_candidates(query)
+        };
         
         let mut matches: Vec<SearchMatch> = candidates
             .into_iter()
@@ -223,7 +278,11 @@ impl NgramIndex {
         min_similarity: f64,
         limit: Option<usize>,
     ) -> Vec<SearchMatch> {
-        let candidates = self.get_candidates(query);
+        let candidates = if self.min_ngram_ratio > 0.0 {
+            self.get_candidates_with_min_ratio(query, self.min_ngram_ratio)
+        } else {
+            self.get_candidates(query)
+        };
         
         let mut matches: Vec<SearchMatch> = candidates
             .into_par_iter()
@@ -285,10 +344,25 @@ impl NgramIndex {
 
     /// Check if the index contains an exact match for the query
     pub fn contains(&self, query: &str) -> bool {
-        let hash = Self::hash_string(query);
+        // Normalize query to match indexed text when normalize is enabled
+        let normalized_query = if self.normalize {
+            query.to_lowercase()
+        } else {
+            query.to_string()
+        };
+        let hash = Self::hash_string(&normalized_query);
         // Check if hash exists and verify the actual text matches (handle hash collisions)
+        // Compare normalized versions when normalize is enabled
         self.exact_lookup.get(&hash)
-            .map(|&id| self.entries.get(id).map(|e| e.text == query).unwrap_or(false))
+            .map(|&id| {
+                self.entries.get(id).map(|e| {
+                    if self.normalize {
+                        e.text.to_lowercase() == normalized_query
+                    } else {
+                        e.text == query
+                    }
+                }).unwrap_or(false)
+            })
             .unwrap_or(false)
     }
 
@@ -345,7 +419,26 @@ impl HybridIndex {
             ngram_index: NgramIndex::new(ngram_size),
         }
     }
-    
+
+    /// Create with minimum n-gram ratio for candidate filtering
+    pub fn with_min_ngram_ratio(ngram_size: usize, min_ngram_ratio: f64) -> Self {
+        Self {
+            ngram_index: NgramIndex::with_params(ngram_size, 0.0, min_ngram_ratio, false),
+        }
+    }
+
+    /// Create with all parameters including normalization
+    ///
+    /// # Arguments
+    /// * `ngram_size` - Size of n-grams for indexing
+    /// * `min_ngram_ratio` - Minimum ratio of query n-grams that must match (0.0 to 1.0)
+    /// * `normalize` - Whether to lowercase text for case-insensitive n-gram matching
+    pub fn with_params(ngram_size: usize, min_ngram_ratio: f64, normalize: bool) -> Self {
+        Self {
+            ngram_index: NgramIndex::with_params(ngram_size, 0.0, min_ngram_ratio, normalize),
+        }
+    }
+
     pub fn add(&mut self, text: impl Into<String>) -> usize {
         self.ngram_index.add(text)
     }

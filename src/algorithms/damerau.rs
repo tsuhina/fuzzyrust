@@ -16,6 +16,7 @@
 
 use super::EditDistance;
 use ahash::AHashMap;
+use smallvec::SmallVec;
 
 /// Maximum string length for O(m*n) space algorithms.
 /// Strings longer than this will use space-efficient fallback algorithms.
@@ -37,10 +38,12 @@ pub struct DamerauLevenshtein {
 }
 
 impl DamerauLevenshtein {
+    #[must_use]
     pub fn new() -> Self {
         Self { max_distance: None }
     }
 
+    #[must_use]
     pub fn with_max_distance(max_distance: usize) -> Self {
         Self { max_distance: Some(max_distance) }
     }
@@ -48,6 +51,7 @@ impl DamerauLevenshtein {
     /// Compute distance with proper Option semantics.
     /// Returns `None` if distance exceeds max_distance threshold.
     /// Returns `Some(distance)` otherwise.
+    #[must_use]
     pub fn compute(&self, a: &str, b: &str) -> Option<usize> {
         damerau_levenshtein_distance_bounded(a, b, self.max_distance)
     }
@@ -76,14 +80,17 @@ impl EditDistance for DamerauLevenshtein {
 ///
 /// This version doesn't allow multiple edits on the same substring.
 #[inline]
+#[must_use]
 pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Option<usize>) -> Option<usize> {
-    let a_chars: Vec<char> = a.chars().collect();
-    let b_chars: Vec<char> = b.chars().collect();
+    if a == b { return Some(0); }
+
+    // Use SmallVec to avoid heap allocation for typical string lengths
+    let a_chars: SmallVec<[char; 64]> = a.chars().collect();
+    let b_chars: SmallVec<[char; 64]> = b.chars().collect();
 
     let m = a_chars.len();
     let n = b_chars.len();
 
-    if a == b { return Some(0); }
     if m == 0 { return Some(n); }
     if n == 0 { return Some(m); }
 
@@ -93,10 +100,10 @@ pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Opti
         }
     }
 
-    // Need 3 rows for transposition detection
-    let mut prev2_row: Vec<usize> = vec![0; n + 1];
-    let mut prev_row: Vec<usize> = (0..=n).collect();
-    let mut curr_row: Vec<usize> = vec![0; n + 1];
+    // Need 3 rows for transposition detection - use SmallVec
+    let mut prev2_row: SmallVec<[usize; 64]> = smallvec::smallvec![0; n + 1];
+    let mut prev_row: SmallVec<[usize; 64]> = (0..=n).collect();
+    let mut curr_row: SmallVec<[usize; 64]> = smallvec::smallvec![0; n + 1];
 
     for i in 1..=m {
         curr_row[0] = i;
@@ -139,6 +146,7 @@ pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Opti
 /// **Deprecated**: Use `damerau_levenshtein_distance_bounded` for proper Option semantics.
 /// This function returns `usize::MAX` when threshold is exceeded.
 #[inline]
+#[must_use]
 #[deprecated(since = "0.2.0", note = "Use damerau_levenshtein_distance_bounded for proper Option semantics")]
 pub fn damerau_levenshtein_distance(a: &str, b: &str, max_distance: Option<usize>) -> usize {
     damerau_levenshtein_distance_bounded(a, b, max_distance).unwrap_or(usize::MAX)
@@ -150,6 +158,7 @@ pub fn damerau_levenshtein_distance(a: &str, b: &str, max_distance: Option<usize
 /// Note: For strings longer than 10,000 characters, this falls back to the
 /// space-efficient restricted Damerau-Levenshtein algorithm to prevent
 /// excessive memory allocation.
+#[must_use]
 pub fn true_damerau_levenshtein(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -213,6 +222,7 @@ pub fn true_damerau_levenshtein(a: &str, b: &str) -> usize {
 
 /// Convenience function
 #[inline]
+#[must_use]
 pub fn damerau_levenshtein(a: &str, b: &str) -> usize {
     // This never fails because there's no threshold
     damerau_levenshtein_distance_bounded(a, b, None).unwrap_or(0)
@@ -220,6 +230,7 @@ pub fn damerau_levenshtein(a: &str, b: &str) -> usize {
 
 /// Normalized similarity (0.0 to 1.0)
 #[inline]
+#[must_use]
 pub fn damerau_levenshtein_similarity(a: &str, b: &str) -> f64 {
     let dist = damerau_levenshtein(a, b);
     let max_len = a.chars().count().max(b.chars().count());

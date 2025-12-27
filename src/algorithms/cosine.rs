@@ -24,24 +24,28 @@ pub struct CosineSimilarity {
 }
 
 impl CosineSimilarity {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
-    
+
+    #[must_use]
     pub fn character_based() -> Self {
         Self {
             ngram_size: None,
             word_level: false,
         }
     }
-    
+
+    #[must_use]
     pub fn word_based() -> Self {
         Self {
             ngram_size: None,
             word_level: true,
         }
     }
-    
+
+    #[must_use]
     pub fn ngram_based(n: usize) -> Self {
         Self {
             ngram_size: Some(n),
@@ -125,6 +129,7 @@ fn cosine_from_maps<T: std::hash::Hash + Eq>(
 }
 
 /// Character-level cosine similarity.
+#[must_use]
 pub fn cosine_similarity_chars(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
@@ -137,6 +142,7 @@ pub fn cosine_similarity_chars(a: &str, b: &str) -> f64 {
 }
 
 /// Word-level cosine similarity.
+#[must_use]
 pub fn cosine_similarity_words(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
@@ -168,7 +174,7 @@ fn build_ngram_frequency_map_direct(s: &str, n: usize, pad: bool, pad_char: char
     let n = n.min(MAX_NGRAM_SIZE);
 
     let chars: Vec<char> = if pad {
-        let padding: String = std::iter::repeat(pad_char).take(n - 1).collect();
+        let padding: String = std::iter::repeat_n(pad_char, n - 1).collect();
         format!("{}{}{}", padding, s, padding).chars().collect()
     } else {
         s.chars().collect()
@@ -188,6 +194,7 @@ fn build_ngram_frequency_map_direct(s: &str, n: usize, pad: bool, pad_char: char
 
 /// N-gram-level cosine similarity.
 /// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+#[must_use]
 pub fn cosine_similarity_ngrams(a: &str, b: &str, n: usize) -> f64 {
     if n == 0 {
         return 0.0;
@@ -205,18 +212,18 @@ pub fn cosine_similarity_ngrams(a: &str, b: &str, n: usize) -> f64 {
 
 /// TF-IDF weighted cosine similarity for a corpus.
 ///
-/// This is an internal implementation not currently exposed via Python bindings.
-/// It provides corpus-based TF-IDF weighting for more sophisticated document
-/// similarity. May be exposed in a future version.
+/// Provides corpus-based TF-IDF weighting for more sophisticated document
+/// similarity. Words that appear in fewer documents get higher weight.
 ///
-/// # Usage (Rust only)
-/// ```ignore
+/// # Usage
+/// ```
+/// use fuzzyrust::algorithms::cosine::TfIdfCosine;
+///
 /// let mut tfidf = TfIdfCosine::new();
 /// tfidf.add_document("first document");
 /// tfidf.add_document("second document");
 /// let sim = tfidf.similarity("first doc", "second doc");
 /// ```
-#[allow(dead_code)]
 pub struct TfIdfCosine {
     /// Document frequency for each term
     df: AHashMap<String, usize>,
@@ -225,13 +232,20 @@ pub struct TfIdfCosine {
 }
 
 impl TfIdfCosine {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             df: AHashMap::new(),
             num_docs: 0,
         }
     }
-    
+
+    /// Get the number of documents in the corpus.
+    #[must_use]
+    pub fn num_documents(&self) -> usize {
+        self.num_docs
+    }
+
     /// Add a document to build the IDF scores.
     pub fn add_document(&mut self, doc: &str) {
         let terms: std::collections::HashSet<String> = doc
@@ -246,6 +260,7 @@ impl TfIdfCosine {
     }
     
     /// Calculate TF-IDF weighted cosine similarity.
+    #[must_use]
     pub fn similarity(&self, a: &str, b: &str) -> f64 {
         if a == b {
             return 1.0;

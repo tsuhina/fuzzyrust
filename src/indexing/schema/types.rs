@@ -1,10 +1,10 @@
-///! Field type definitions and algorithm selection for schema-based multi-field matching
-///!
-///! This module defines the type system for schema fields, including:
-///! - FieldType: Different kinds of data (text, tokens, numeric, dates)
-///! - Algorithm: Fuzzy matching algorithms for each field type
-///!
-///! The type system enables type-safe schema definition and optimal index selection.
+//! Field type definitions and algorithm selection for schema-based multi-field matching
+//!
+//! This module defines the type system for schema fields, including:
+//! - FieldType: Different kinds of data (text, tokens, numeric, dates)
+//! - Algorithm: Fuzzy matching algorithms for each field type
+//!
+//! The type system enables type-safe schema definition and optimal index selection.
 
 use serde::{Deserialize, Serialize};
 

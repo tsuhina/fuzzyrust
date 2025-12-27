@@ -1,6 +1,8 @@
 # FuzzyRust 🔍
 
 [![PyPI](https://img.shields.io/pypi/v/fuzzyrust.svg)](https://pypi.org/project/fuzzyrust/)
+[![CI](https://github.com/tsuhina/fuzzyrust/actions/workflows/ci.yml/badge.svg)](https://github.com/tsuhina/fuzzyrust/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tsuhina/d34009f65419835921756ae6457f91fa/raw/coverage.json)](https://github.com/tsuhina/fuzzyrust/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
 **High-performance string similarity library for Python, written in Rust.**

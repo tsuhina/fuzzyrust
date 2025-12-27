@@ -25,90 +25,128 @@ Example usage:
 """
 
 from fuzzyrust._core import (
-    # Result types
-    SearchResult,
-    MatchResult,
-    DeduplicationResult,
     AlgorithmComparison,
-    SchemaSearchResult,
-
-    # Distance functions
-    levenshtein,
-    levenshtein_similarity,
-    damerau_levenshtein,
-    damerau_levenshtein_similarity,
-    jaro_similarity,
-    jaro_winkler_similarity,
-    hamming,
-    ngram_similarity,
-    ngram_jaccard,
-    extract_ngrams,
-    soundex,
-    soundex_match,
-    metaphone,
-    metaphone_match,
-    lcs_length,
-    lcs_string,
-    lcs_similarity,
-    longest_common_substring_length,
-    longest_common_substring,
-    cosine_similarity_chars,
-    cosine_similarity_words,
-    cosine_similarity_ngrams,
-
-    # Case-insensitive variants
-    levenshtein_ci,
-    levenshtein_similarity_ci,
-    damerau_levenshtein_ci,
-    damerau_levenshtein_similarity_ci,
-    jaro_similarity_ci,
-    jaro_winkler_similarity_ci,
-    ngram_similarity_ci,
-
-    # Normalization
-    normalize_string,
-    normalize_pair,
-
-    # Batch processing
-    batch_levenshtein,
-    batch_jaro_winkler,
-    find_best_matches,
-
-    # Deduplication
-    find_duplicates,
-
-    # Multi-algorithm comparison
-    compare_algorithms,
-
-    # Index classes
-    PyBkTree as BkTree,
-    PyNgramIndex as NgramIndex,
-    PyHybridIndex as HybridIndex,
-
+    # Evaluation metrics
+    ConfusionMatrixResult,
+    DeduplicationResult,
+    MatchResult,
     # Schema-based multi-field matching
     Schema,
     SchemaBuilder,
     SchemaIndex,
+    SchemaSearchResult,
+    # Result types
+    SearchResult,
+    # Similarity classes
+    TfIdfCosine,
+    batch_jaro_winkler,
+    # Batch processing
+    batch_levenshtein,
+    bigram_similarity,
+    # Multi-algorithm comparison
+    compare_algorithms,
+    confusion_matrix,
+    cosine_similarity_chars,
+    cosine_similarity_chars_ci,
+    cosine_similarity_ngrams,
+    cosine_similarity_ngrams_ci,
+    cosine_similarity_words,
+    cosine_similarity_words_ci,
+    damerau_levenshtein,
+    damerau_levenshtein_ci,
+    damerau_levenshtein_similarity,
+    damerau_levenshtein_similarity_ci,
+    extract,
+    extract_ngrams,
+    extract_one,
+    f_score,
+    find_best_matches,
+    # Deduplication
+    find_duplicates,
+    hamming,
+    hamming_distance_padded,
+    hamming_similarity,
+    jaro_similarity,
+    jaro_similarity_ci,
+    jaro_winkler_similarity,
+    jaro_winkler_similarity_ci,
+    lcs_length,
+    lcs_similarity,
+    lcs_similarity_max,
+    lcs_string,
+    # Distance functions
+    levenshtein,
+    # Case-insensitive variants
+    levenshtein_ci,
+    levenshtein_similarity,
+    levenshtein_similarity_ci,
+    longest_common_substring,
+    longest_common_substring_length,
+    metaphone,
+    metaphone_match,
+    metaphone_similarity,
+    ngram_jaccard,
+    ngram_jaccard_ci,
+    ngram_profile_similarity,
+    ngram_similarity,
+    ngram_similarity_ci,
+    normalize_pair,
+    # Normalization
+    normalize_string,
+    # RapidFuzz-compatible convenience functions
+    partial_ratio,
+    precision,
+    ratio,
+    recall,
+    soundex,
+    soundex_match,
+    soundex_similarity,
+    token_set_ratio,
+    token_sort_ratio,
+    trigram_similarity,
+    wratio,
 )
-
+from fuzzyrust._core import (
+    # Index classes
+    PyBkTree as BkTree,
+)
+from fuzzyrust._core import (
+    PyHybridIndex as HybridIndex,
+)
+from fuzzyrust._core import (
+    PyNgramIndex as NgramIndex,
+)
 from fuzzyrust.enums import Algorithm, NormalizationMode
 
-__version__ = "0.1.0"  # Initial PyPI release
+# Polars integration (optional)
+try:
+    from fuzzyrust.polars_ext import (
+        POLARS_AVAILABLE,
+        dedupe_series,
+        fuzzy_join,
+        match_dataframe,
+        match_series,
+    )
+except ImportError:
+    POLARS_AVAILABLE = False
+    match_series = None  # type: ignore
+    dedupe_series = None  # type: ignore
+    match_dataframe = None  # type: ignore
+    fuzzy_join = None  # type: ignore
+
+__version__ = "0.1.1"
 __all__ = [
     # Version
     "__version__",
-
     # Result types
     "SearchResult",
     "MatchResult",
     "DeduplicationResult",
     "AlgorithmComparison",
     "SchemaSearchResult",
-
     # Enums
     "Algorithm",
     "NormalizationMode",
-
     # Distance/similarity functions
     "levenshtein",
     "levenshtein_similarity",
@@ -117,22 +155,29 @@ __all__ = [
     "jaro_similarity",
     "jaro_winkler_similarity",
     "hamming",
+    "hamming_distance_padded",
+    "hamming_similarity",
     "ngram_similarity",
     "ngram_jaccard",
+    "bigram_similarity",
+    "trigram_similarity",
+    "ngram_profile_similarity",
     "extract_ngrams",
     "soundex",
     "soundex_match",
+    "soundex_similarity",
     "metaphone",
     "metaphone_match",
+    "metaphone_similarity",
     "lcs_length",
     "lcs_string",
     "lcs_similarity",
+    "lcs_similarity_max",
     "longest_common_substring_length",
     "longest_common_substring",
     "cosine_similarity_chars",
     "cosine_similarity_words",
     "cosine_similarity_ngrams",
-
     # Case-insensitive variants
     "levenshtein_ci",
     "levenshtein_similarity_ci",
@@ -141,31 +186,51 @@ __all__ = [
     "jaro_similarity_ci",
     "jaro_winkler_similarity_ci",
     "ngram_similarity_ci",
-
+    "ngram_jaccard_ci",
+    "cosine_similarity_chars_ci",
+    "cosine_similarity_words_ci",
+    "cosine_similarity_ngrams_ci",
     # Normalization
     "normalize_string",
     "normalize_pair",
-
+    # RapidFuzz-compatible convenience functions
+    "partial_ratio",
+    "token_sort_ratio",
+    "token_set_ratio",
+    "wratio",
+    "ratio",
+    "extract",
+    "extract_one",
     # Batch processing
     "batch_levenshtein",
     "batch_jaro_winkler",
     "find_best_matches",
-
     # Deduplication
     "find_duplicates",
-
+    # Evaluation metrics
+    "ConfusionMatrixResult",
+    "precision",
+    "recall",
+    "f_score",
+    "confusion_matrix",
     # Multi-algorithm comparison
     "compare_algorithms",
-
+    # Similarity classes
+    "TfIdfCosine",
     # Index classes
     "BkTree",
     "NgramIndex",
     "HybridIndex",
-
     # Schema-based multi-field matching
     "Schema",
     "SchemaBuilder",
     "SchemaIndex",
+    # Polars integration (optional)
+    "POLARS_AVAILABLE",
+    "match_series",
+    "dedupe_series",
+    "match_dataframe",
+    "fuzzy_join",
 ]
 
 

@@ -1,12 +1,258 @@
 //! Levenshtein (edit) distance implementation
 //!
 //! Optimized with:
-//! - Single-row DP for O(min(m,n)) space
+//! - Myers bit-parallel algorithm for O(⌈m/64⌉n) time complexity
+//! - Single-row DP fallback for strings > 64 chars
 //! - Early termination with max distance threshold
 //! - Unicode-aware character handling
 
 use super::EditDistance;
+use ahash::AHashMap;
 use smallvec::SmallVec;
+
+/// Maximum pattern length for Myers bit-parallel algorithm (64 bits per block)
+const MYERS_BLOCK_SIZE: usize = 64;
+
+// ============================================================================
+// Myers Bit-Parallel Algorithm
+// ============================================================================
+
+/// Myers bit-parallel Levenshtein distance for patterns up to 64 characters.
+///
+/// This is the fastest known algorithm for edit distance, running in O(⌈m/64⌉n) time.
+/// For patterns <= 64 chars, it processes the entire pattern in a single 64-bit word.
+///
+/// Based on: Myers, G. (1999). "A fast bit-vector algorithm for approximate string matching"
+#[inline]
+fn myers_64(pattern: &[char], text: &[char]) -> usize {
+    let m = pattern.len();
+    let n = text.len();
+
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+    if m > MYERS_BLOCK_SIZE {
+        return dp_distance(pattern, text);
+    }
+
+    // Build pattern character masks (Peq)
+    // For each character c, Peq[c] has bit i set if pattern[i] == c
+    let mut peq: AHashMap<char, u64> = AHashMap::with_capacity(m.min(26));
+    for (i, &c) in pattern.iter().enumerate() {
+        *peq.entry(c).or_insert(0) |= 1u64 << i;
+    }
+
+    // Initialize bit vectors
+    // Vp = all 1s (vertical positive: all increases by 1)
+    // Vn = all 0s (vertical negative: no decreases)
+    let mut vp: u64 = !0u64;
+    let mut vn: u64 = 0u64;
+    let mut score = m;
+
+    // Mask for the m-th bit (0-indexed, so bit m-1)
+    let mask = 1u64 << (m - 1);
+
+    // Process each character in text
+    for &tc in text.iter() {
+        // Get character match vector
+        let eq = peq.get(&tc).copied().unwrap_or(0);
+
+        // Standard Myers algorithm
+        let xv = eq | vn;
+        let eq_and_vp = eq & vp;
+        let xh = ((eq_and_vp.wrapping_add(vp)) ^ vp) | eq;
+
+        let hp = vn | !(xh | vp);
+        let hn = vp & xh;
+
+        // Update score based on carry out at position m-1
+        if (hp & mask) != 0 {
+            score += 1;
+        } else if (hn & mask) != 0 {
+            score -= 1;
+        }
+
+        // Update vertical vectors for next iteration
+        // Shift hp and hn left by 1 (with implicit 0 at position 0)
+        // This is correct because the first row is 0,1,2,3... so hp[0] and hn[0] are fixed
+        let hp_shifted = (hp << 1) | 1;  // Set bit 0 to 1 (first column always increases)
+        let hn_shifted = hn << 1;
+
+        vp = hn_shifted | !(xv | hp_shifted);
+        vn = hp_shifted & xv;
+    }
+
+    score
+}
+
+/// Myers bit-parallel with max_distance threshold for early termination.
+/// Returns None if distance exceeds threshold.
+#[inline]
+fn myers_64_bounded(pattern: &[char], text: &[char], max_distance: usize) -> Option<usize> {
+    let m = pattern.len();
+    let n = text.len();
+
+    if m == 0 {
+        return if n <= max_distance { Some(n) } else { None };
+    }
+    if n == 0 {
+        return if m <= max_distance { Some(m) } else { None };
+    }
+
+    // Early exit if length difference exceeds threshold
+    if m.abs_diff(n) > max_distance {
+        return None;
+    }
+
+    if m > MYERS_BLOCK_SIZE {
+        return dp_distance_bounded(pattern, text, max_distance);
+    }
+
+    // Build pattern character masks
+    let mut peq: AHashMap<char, u64> = AHashMap::with_capacity(m.min(26));
+    for (i, &c) in pattern.iter().enumerate() {
+        *peq.entry(c).or_insert(0) |= 1u64 << i;
+    }
+
+    let mut vp: u64 = !0u64;
+    let mut vn: u64 = 0u64;
+    let mut score = m;
+
+    let mask = 1u64 << (m - 1);
+    let threshold = max_distance;
+
+    for (j, &tc) in text.iter().enumerate() {
+        let eq = peq.get(&tc).copied().unwrap_or(0);
+
+        let xv = eq | vn;
+        let eq_and_vp = eq & vp;
+        let xh = ((eq_and_vp.wrapping_add(vp)) ^ vp) | eq;
+
+        let hp = vn | !(xh | vp);
+        let hn = vp & xh;
+
+        if (hp & mask) != 0 {
+            score += 1;
+        } else if (hn & mask) != 0 {
+            score -= 1;
+        }
+
+        // Early termination: if current score minus remaining potential improvements
+        // still exceeds threshold, we can stop
+        let remaining = n - j - 1;
+        if score > threshold + remaining {
+            return None;
+        }
+
+        let hp_shifted = (hp << 1) | 1;
+        let hn_shifted = hn << 1;
+
+        vp = hn_shifted | !(xv | hp_shifted);
+        vn = hp_shifted & xv;
+    }
+
+    if score <= threshold {
+        Some(score)
+    } else {
+        None
+    }
+}
+
+/// Standard DP distance for char slices (fallback for long strings)
+#[inline]
+fn dp_distance(a: &[char], b: &[char]) -> usize {
+    let m = a.len();
+    let n = b.len();
+
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+
+    // Ensure shorter string is on the column axis
+    let (target, source) = if m < n { (a, b) } else { (b, a) };
+    let n_target = target.len();
+
+    let mut row: SmallVec<[usize; 64]> = (0..=n_target).collect();
+
+    for (i, &sc) in source.iter().enumerate() {
+        let mut prev = row[0];
+        row[0] = i + 1;
+
+        for j in 0..n_target {
+            let cost = if sc == target[j] { 0 } else { 1 };
+            let deletion = row[j + 1] + 1;
+            let insertion = row[j] + 1;
+            let substitution = prev + cost;
+
+            prev = row[j + 1];
+            row[j + 1] = substitution.min(deletion).min(insertion);
+        }
+    }
+
+    row[n_target]
+}
+
+/// Standard DP distance with max_distance threshold (fallback for long strings)
+#[inline]
+fn dp_distance_bounded(a: &[char], b: &[char], max_distance: usize) -> Option<usize> {
+    let m = a.len();
+    let n = b.len();
+
+    if m == 0 {
+        return if n <= max_distance { Some(n) } else { None };
+    }
+    if n == 0 {
+        return if m <= max_distance { Some(m) } else { None };
+    }
+
+    if m.abs_diff(n) > max_distance {
+        return None;
+    }
+
+    let (target, source) = if m < n { (a, b) } else { (b, a) };
+    let n_target = target.len();
+
+    let mut row: SmallVec<[usize; 64]> = (0..=n_target).collect();
+
+    for (i, &sc) in source.iter().enumerate() {
+        let mut prev = row[0];
+        row[0] = i + 1;
+        let mut row_min = row[0];
+
+        for j in 0..n_target {
+            let cost = if sc == target[j] { 0 } else { 1 };
+            let deletion = row[j + 1] + 1;
+            let insertion = row[j] + 1;
+            let substitution = prev + cost;
+
+            prev = row[j + 1];
+            let cell = substitution.min(deletion).min(insertion);
+            row[j + 1] = cell;
+            row_min = row_min.min(cell);
+        }
+
+        if row_min > max_distance {
+            return None;
+        }
+    }
+
+    let result = row[n_target];
+    if result <= max_distance {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
 
 /// Levenshtein distance calculator with optional early termination
 ///
@@ -20,10 +266,12 @@ pub struct Levenshtein {
 }
 
 impl Levenshtein {
+    #[must_use]
     pub fn new() -> Self {
         Self { max_distance: None }
     }
 
+    #[must_use]
     pub fn with_max_distance(max_distance: usize) -> Self {
         Self { max_distance: Some(max_distance) }
     }
@@ -31,6 +279,7 @@ impl Levenshtein {
     /// Compute distance with proper Option semantics.
     /// Returns `None` if distance exceeds max_distance threshold.
     /// Returns `Some(distance)` otherwise.
+    #[must_use]
     pub fn compute(&self, a: &str, b: &str) -> Option<usize> {
         levenshtein_distance_bounded(a, b, self.max_distance)
     }
@@ -54,6 +303,9 @@ impl EditDistance for Levenshtein {
 
 /// Compute Levenshtein distance with optional max threshold.
 ///
+/// Uses Myers bit-parallel algorithm for strings <= 64 chars (O(n) time),
+/// falls back to standard DP for longer strings.
+///
 /// Returns `None` if distance exceeds `max_distance` (early termination).
 /// Returns `Some(distance)` if distance is within threshold or no threshold set.
 ///
@@ -71,84 +323,105 @@ impl EditDistance for Levenshtein {
 /// assert_eq!(levenshtein_distance_bounded("abcdef", "ghijkl", Some(3)), None);
 /// ```
 #[inline]
+#[must_use]
 pub fn levenshtein_distance_bounded(a: &str, b: &str, max_distance: Option<usize>) -> Option<usize> {
-    if a == b { return Some(0); }
-
-    let m_count = a.chars().count();
-    let n_count = b.chars().count();
-
-    if m_count == 0 { return Some(n_count); }
-    if n_count == 0 { return Some(m_count); }
-
-    // Early termination check based on length difference
-    if let Some(max_d) = max_distance {
-        if m_count.abs_diff(n_count) > max_d {
-            return None;
-        }
+    if a == b {
+        return Some(0);
     }
 
-    // Ensure we iterate over the shorter string in the inner loop (columns)
-    // to minimize space usage and cache misses.
-    // target = columns (inner loop), source = rows (outer loop)
-    let (target_str, source_str, n_target) = if m_count < n_count {
-        (a, b, m_count)
+    // Collect chars once
+    let a_chars: SmallVec<[char; 64]> = a.chars().collect();
+    let b_chars: SmallVec<[char; 64]> = b.chars().collect();
+
+    let m = a_chars.len();
+    let n = b_chars.len();
+
+    if m == 0 {
+        return match max_distance {
+            Some(max_d) if n > max_d => None,
+            _ => Some(n),
+        };
+    }
+    if n == 0 {
+        return match max_distance {
+            Some(max_d) if m > max_d => None,
+            _ => Some(m),
+        };
+    }
+
+    // Use Myers bit-parallel for the shorter string as pattern
+    // This gives best performance since Myers is O(⌈m/64⌉n)
+    let (pattern, text) = if m <= n {
+        (&a_chars[..], &b_chars[..])
     } else {
-        (b, a, n_count) // target is b (shorter)
+        (&b_chars[..], &a_chars[..])
     };
 
-    let target_chars: Vec<char> = target_str.chars().collect();
-    
-    // Single-row DP with O(min(m,n)) space.
-    // Use SmallVec to avoid heap allocation for common string lengths.
-    // Size 64 covers most names, words, and short phrases.
-    let mut row: SmallVec<[usize; 64]> = (0..=n_target).collect();
+    match max_distance {
+        Some(max_d) => myers_64_bounded(pattern, text, max_d),
+        None => Some(myers_64(pattern, text)),
+    }
+}
 
-    for (i, sc) in source_str.chars().enumerate() {
-        let mut prev_substitution_cost = row[0];
-        
-        // Update first cell of new row (distance for empty target prefix)
-        row[0] = i + 1;
-        
-        let mut row_min = row[0];
-
-        for j in 0..n_target {
-            let tc = target_chars[j];
-            let cost = if sc == tc { 0 } else { 1 };
-            
-            // deletion: row[j+1] (value from previous row, same col) + 1
-            // insertion: row[j] (value from current row, prev col) + 1
-            // substitution: prev_substitution_cost (value from prev row, prev col) + cost
-            
-            let deletion = row[j + 1] + 1;
-            let insertion = row[j] + 1;
-            let substitution = prev_substitution_cost + cost;
-            
-            // Save current cell value before overwriting it (it becomes prev_sub_cost for next col)
-            prev_substitution_cost = row[j + 1];
-            
-            let cell_cost = substitution.min(deletion).min(insertion);
-            row[j + 1] = cell_cost;
-            
-            if cell_cost < row_min {
-                row_min = cell_cost;
-            }
-        }
-        
-        // Early termination if optimal path exceeds max_distance
-        if let Some(max_d) = max_distance {
-            if row_min > max_d {
-                return None;
-            }
-        }
+/// Compute Levenshtein distance using exponential search.
+///
+/// This is faster than the standard algorithm when the expected edit distance
+/// is small relative to the string length. It works by trying progressively
+/// larger thresholds (1, 2, 4, 8, ...) until the actual distance is found.
+///
+/// Use this when you expect strings to be similar (small edit distance).
+///
+/// # Example
+/// ```
+/// use fuzzyrust::algorithms::levenshtein::levenshtein_exp;
+///
+/// // For similar strings, exponential search is faster
+/// assert_eq!(levenshtein_exp("kitten", "kittens"), 1);
+/// assert_eq!(levenshtein_exp("hello", "hallo"), 1);
+/// ```
+#[inline]
+#[must_use]
+pub fn levenshtein_exp(a: &str, b: &str) -> usize {
+    if a == b {
+        return 0;
     }
 
-    let result = row[n_target];
-    if let Some(max_d) = max_distance {
-        if result > max_d {
-            return None;
+    let a_chars: SmallVec<[char; 64]> = a.chars().collect();
+    let b_chars: SmallVec<[char; 64]> = b.chars().collect();
+
+    let m = a_chars.len();
+    let n = b_chars.len();
+
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+
+    // Start with threshold of 1 and double until we find the distance
+    let mut threshold = 1usize;
+    let max_possible = m.max(n);
+
+    let (pattern, text) = if m <= n {
+        (&a_chars[..], &b_chars[..])
+    } else {
+        (&b_chars[..], &a_chars[..])
+    };
+
+    loop {
+        if let Some(dist) = myers_64_bounded(pattern, text, threshold) {
+            return dist;
+        }
+
+        // Double the threshold
+        threshold = threshold.saturating_mul(2);
+
+        // If threshold exceeds max possible distance, compute without bound
+        if threshold >= max_possible {
+            return myers_64(pattern, text);
         }
     }
-    Some(result)
 }
 
 /// Compute Levenshtein distance with optional max threshold.
@@ -159,6 +432,7 @@ pub fn levenshtein_distance_bounded(a: &str, b: &str, max_distance: Option<usize
 ///
 /// Returns `usize::MAX` if distance exceeds max_distance (when provided).
 #[inline]
+#[must_use]
 #[deprecated(since = "0.2.0", note = "Use levenshtein_distance_bounded for proper Option semantics")]
 pub fn levenshtein_distance(a: &str, b: &str, max_distance: Option<usize>) -> usize {
     levenshtein_distance_bounded(a, b, max_distance).unwrap_or(usize::MAX)
@@ -166,6 +440,7 @@ pub fn levenshtein_distance(a: &str, b: &str, max_distance: Option<usize>) -> us
 
 /// Convenience function for simple distance calculation
 #[inline]
+#[must_use]
 pub fn levenshtein(a: &str, b: &str) -> usize {
     // This never fails because there's no threshold
     levenshtein_distance_bounded(a, b, None).unwrap_or(0)
@@ -173,6 +448,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 
 /// Convenience function for normalized similarity (0.0 to 1.0)
 #[inline]
+#[must_use]
 pub fn levenshtein_similarity(a: &str, b: &str) -> f64 {
     let dist = levenshtein(a, b);
     let max_len = a.chars().count().max(b.chars().count());
@@ -237,5 +513,26 @@ mod tests {
         // Backward compatibility: deprecated function still works
         assert_eq!(levenshtein_distance("abcdef", "ghijkl", Some(3)), usize::MAX);
         assert_eq!(levenshtein_distance("abc", "abd", Some(2)), 1);
+    }
+
+    #[test]
+    fn test_levenshtein_exp() {
+        // Exponential search should give same results as regular
+        assert_eq!(levenshtein_exp("", ""), 0);
+        assert_eq!(levenshtein_exp("abc", "abc"), 0);
+        assert_eq!(levenshtein_exp("kitten", "sitting"), 3);
+        assert_eq!(levenshtein_exp("kitten", "kittens"), 1);
+        assert_eq!(levenshtein_exp("hello", "hallo"), 1);
+        assert_eq!(levenshtein_exp("abc", ""), 3);
+        assert_eq!(levenshtein_exp("", "xyz"), 3);
+    }
+
+    #[test]
+    fn test_myers_algorithm() {
+        // Test that Myers gives correct results
+        assert_eq!(levenshtein("algorithm", "altruistic"), 6);
+        assert_eq!(levenshtein("intention", "execution"), 5);
+        assert_eq!(levenshtein("a", "b"), 1);
+        assert_eq!(levenshtein("ab", "ba"), 2);  // swap is 2 edits in Levenshtein
     }
 }

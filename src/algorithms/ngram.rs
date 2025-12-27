@@ -73,11 +73,13 @@ impl Default for Ngram {
 }
 
 impl Ngram {
+    #[must_use]
     pub fn new(n: usize) -> Self {
         Self { n, ..Default::default() }
     }
 
     /// Create from configuration
+    #[must_use]
     pub fn from_config(config: NgramConfig) -> Self {
         Self {
             n: config.n,
@@ -87,6 +89,7 @@ impl Ngram {
     }
 
     /// Get current configuration
+    #[must_use]
     pub fn config(&self) -> NgramConfig {
         NgramConfig {
             n: self.n,
@@ -95,20 +98,24 @@ impl Ngram {
         }
     }
 
+    #[must_use]
     pub fn bigram() -> Self {
         Self::new(2)
     }
 
+    #[must_use]
     pub fn trigram() -> Self {
         Self::new(3)
     }
 
+    #[must_use]
     pub fn with_padding(mut self, pad: bool) -> Self {
         self.pad = pad;
         self
     }
 
     /// Extract n-grams from a string
+    #[must_use]
     pub fn extract(&self, s: &str) -> Vec<String> {
         extract_ngrams(s, self.n, self.pad, self.pad_char)
     }
@@ -128,6 +135,7 @@ impl Similarity for Ngram {
 ///
 /// # Arguments
 /// * `n` - N-gram size (1-32). Values of 0 return empty vec, values >32 are clamped.
+#[must_use]
 pub fn extract_ngrams(s: &str, n: usize, pad: bool, pad_char: char) -> Vec<String> {
     let n = validate_ngram_size(n);
     if n == 0 {
@@ -135,7 +143,7 @@ pub fn extract_ngrams(s: &str, n: usize, pad: bool, pad_char: char) -> Vec<Strin
     }
 
     let chars: Vec<char> = if pad {
-        let padding: String = std::iter::repeat(pad_char).take(n - 1).collect();
+        let padding: String = std::iter::repeat_n(pad_char, n - 1).collect();
         format!("{}{}{}", padding, s, padding).chars().collect()
     } else {
         s.chars().collect()
@@ -151,12 +159,14 @@ pub fn extract_ngrams(s: &str, n: usize, pad: bool, pad_char: char) -> Vec<Strin
 }
 
 /// Extract n-grams as a set for fast comparison
+#[must_use]
 pub fn extract_ngram_set(s: &str, n: usize, pad: bool, pad_char: char) -> AHashSet<String> {
     extract_ngrams(s, n, pad, pad_char).into_iter().collect()
 }
 
 /// Calculate n-gram similarity (Sørensen-Dice coefficient).
 /// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+#[must_use]
 pub fn ngram_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -> f64 {
     if n == 0 {
         return 0.0;
@@ -184,6 +194,7 @@ pub fn ngram_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -
 
 /// Jaccard similarity based on n-grams.
 /// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+#[must_use]
 pub fn ngram_jaccard_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -> f64 {
     if n == 0 {
         return 0.0;
@@ -211,11 +222,13 @@ pub fn ngram_jaccard_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char:
 
 /// Convenience functions for common n-gram sizes
 #[inline]
+#[must_use]
 pub fn bigram_similarity(a: &str, b: &str) -> f64 {
     ngram_similarity(a, b, 2, true, ' ')
 }
 
 #[inline]
+#[must_use]
 pub fn trigram_similarity(a: &str, b: &str) -> f64 {
     ngram_similarity(a, b, 3, true, ' ')
 }
@@ -223,6 +236,7 @@ pub fn trigram_similarity(a: &str, b: &str) -> f64 {
 /// Profile-based n-gram similarity for multiset comparison.
 /// Counts n-gram frequencies instead of just presence.
 /// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+#[must_use]
 pub fn ngram_profile_similarity(a: &str, b: &str, n: usize) -> f64 {
     use ahash::AHashMap;
 

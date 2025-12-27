@@ -74,7 +74,7 @@ impl UnionFind {
 
         for (i, item) in items.iter().enumerate() {
             let root = self.find(i);
-            groups.entry(root).or_insert_with(Vec::new).push(item.clone());
+            groups.entry(root).or_default().push(item.clone());
         }
 
         groups.into_values().collect()
@@ -181,7 +181,7 @@ where
     }
 
     // Sort groups by size (largest first) for better readability
-    groups.sort_by(|a, b| b.len().cmp(&a.len()));
+    groups.sort_by_key(|g| std::cmp::Reverse(g.len()));
 
     let total_duplicates = groups.iter().map(|g| g.len() - 1).sum();
 
@@ -287,7 +287,7 @@ where
         }
     }
 
-    groups.sort_by(|a, b| b.len().cmp(&a.len()));
+    groups.sort_by_key(|g| std::cmp::Reverse(g.len()));
     let total_duplicates = groups.iter().map(|g| g.len() - 1).sum();
 
     DeduplicationResult {
@@ -362,7 +362,7 @@ mod tests {
 
         // "hello", "helo", and "hello" should be grouped
         // "world" should be unique
-        assert!(result.groups.len() > 0);
+        assert!(!result.groups.is_empty());
         assert!(result.unique.contains(&"world".to_string()));
     }
 

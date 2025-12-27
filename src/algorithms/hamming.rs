@@ -34,6 +34,7 @@ use super::{FallibleEditDistance, Similarity};
 pub struct Hamming;
 
 impl Hamming {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -75,6 +76,7 @@ impl Similarity for Hamming {
 
 /// Calculate Hamming distance between two strings.
 /// Returns None if strings have different lengths.
+#[must_use]
 pub fn hamming_distance(a: &str, b: &str) -> Option<usize> {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -91,6 +93,7 @@ pub fn hamming_distance(a: &str, b: &str) -> Option<usize> {
 
 /// Hamming distance that pads shorter string with spaces.
 /// Useful when you want Hamming-like behavior on unequal strings.
+#[must_use]
 pub fn hamming_distance_padded(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -112,6 +115,7 @@ pub fn hamming_distance_padded(a: &str, b: &str) -> usize {
 
 /// Normalized Hamming similarity (0.0 to 1.0)
 /// Returns None for strings of different lengths.
+#[must_use]
 pub fn hamming_similarity(a: &str, b: &str) -> Option<f64> {
     let dist = hamming_distance(a, b)?;
     let len = a.chars().count();

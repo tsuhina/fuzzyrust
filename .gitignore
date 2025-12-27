@@ -93,3 +93,4 @@ $RECYCLE.BIN/
 *.log
 *.bak
 *~
+data/

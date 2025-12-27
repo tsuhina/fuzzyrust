@@ -1,11 +1,11 @@
-///! Schema definition and builder for multi-field fuzzy matching
-///!
-///! A Schema defines the structure of records in a multi-field index.
-///! It specifies:
-///! - Which fields exist and their types
-///! - How each field should be matched (algorithm, weight)
-///! - Validation rules (required fields, constraints)
-///! - Scoring strategy for combining field matches
+//! Schema definition and builder for multi-field fuzzy matching
+//!
+//! A Schema defines the structure of records in a multi-field index.
+//! It specifies:
+//! - Which fields exist and their types
+//! - How each field should be matched (algorithm, weight)
+//! - Validation rules (required fields, constraints)
+//! - Scoring strategy for combining field matches
 
 use super::field::Field;
 use super::scoring::ScoringStrategy;
@@ -288,7 +288,6 @@ impl Default for SchemaBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::algorithms::normalize::NormalizationMode;
     use crate::indexing::schema::types::{Algorithm, FieldType};
 
     #[test]

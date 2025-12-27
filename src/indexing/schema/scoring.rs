@@ -1,11 +1,11 @@
-///! Scoring strategies for combining multi-field similarity scores
-///!
-///! This module provides different strategies for combining individual field scores
-///! into a single overall similarity score for a multi-field match.
-///!
-///! Available strategies:
-///! - WeightedAverage: Normalize and weight field scores
-///! - MinMaxScaling: Scale scores to 0-1 before weighting
+//! Scoring strategies for combining multi-field similarity scores
+//!
+//! This module provides different strategies for combining individual field scores
+//! into a single overall similarity score for a multi-field match.
+//!
+//! Available strategies:
+//! - WeightedAverage: Normalize and weight field scores
+//! - MinMaxScaling: Scale scores to 0-1 before weighting
 
 use serde::{Deserialize, Serialize};
 

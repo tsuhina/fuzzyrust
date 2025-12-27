@@ -1,10 +1,10 @@
 [package]
 name = "fuzzyrust"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Tomislav Suhina <tomislav.suhina@gmail.com>"]
 description = "High-performance string similarity library for Python, written in Rust"
-license = "MIT OR Apache-2.0"
+license = "BSD-3-Clause"
 repository = "https://github.com/tsuhina/fuzzyrust"
 keywords = ["fuzzy", "string", "similarity", "search", "python"]
 categories = ["text-processing", "algorithms"]
@@ -24,12 +24,14 @@ smallvec = "1.13"
 itertools = "0.13"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+mimalloc = { version = "0.1", default-features = false }
 
 [profile.release]
-lto = true
+lto = "fat"
 codegen-units = 1
 opt-level = 3
 strip = true
+panic = "abort"
 
 [profile.release.build-override]
 opt-level = 3

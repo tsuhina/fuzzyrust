@@ -1,11 +1,11 @@
-///! Field definition for schema-based multi-field matching
-///!
-///! A Field represents a single named column in a schema with configuration for:
-///! - Data type (FieldType)
-///! - Fuzzy matching algorithm
-///! - Weight for scoring (0-10 scale, higher = more important)
-///! - Required/optional flag
-///! - Normalization mode
+//! Field definition for schema-based multi-field matching
+//!
+//! A Field represents a single named column in a schema with configuration for:
+//! - Data type (FieldType)
+//! - Fuzzy matching algorithm
+//! - Weight for scoring (0-10 scale, higher = more important)
+//! - Required/optional flag
+//! - Normalization mode
 
 use super::types::{Algorithm, FieldType};
 use crate::algorithms::normalize::NormalizationMode;

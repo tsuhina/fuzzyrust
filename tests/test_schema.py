@@ -11,6 +11,7 @@ Tests cover:
 """
 
 import pytest
+
 import fuzzyrust as fr
 
 
@@ -27,10 +28,7 @@ class TestSchemaBuilder:
         """Should successfully build schema with one field."""
         builder = fr.SchemaBuilder()
         builder.add_field(
-            name="title",
-            field_type="short_text",
-            algorithm="jaro_winkler",
-            weight=1.0
+            name="title", field_type="short_text", algorithm="jaro_winkler", weight=1.0
         )
         schema = builder.build()
         assert "title" in schema.field_names()
@@ -100,10 +98,7 @@ class TestFieldTypes:
         """Test ShortText field type."""
         builder = fr.SchemaBuilder()
         builder.add_field(
-            name="name",
-            field_type="short_text",
-            algorithm="jaro_winkler",
-            max_length=100
+            name="name", field_type="short_text", algorithm="jaro_winkler", max_length=100
         )
         schema = builder.build()
         index = fr.SchemaIndex(schema)
@@ -114,7 +109,7 @@ class TestFieldTypes:
         index.add({"name": "John Smith"})
 
         # Search
-        results = index.search({"name": "Jon Doe"}, min_score=0.7)
+        results = index.search({"name": "Jon Doe"}, min_similarity=0.7)
 
         assert len(results) > 0
         # Should find "John Doe" as best match
@@ -123,11 +118,7 @@ class TestFieldTypes:
     def test_long_text_field(self):
         """Test LongText field type."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="description",
-            field_type="long_text",
-            algorithm="ngram"
-        )
+        builder.add_field(name="description", field_type="long_text", algorithm="ngram")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
@@ -137,10 +128,7 @@ class TestFieldTypes:
         index.add({"description": "Python is a high-level programming language"})
 
         # Search
-        results = index.search(
-            {"description": "quick brown fox"},
-            min_score=0.3
-        )
+        results = index.search({"description": "quick brown fox"}, min_similarity=0.3)
 
         assert len(results) >= 2
         # First two should match better than third
@@ -149,11 +137,7 @@ class TestFieldTypes:
     def test_token_set_field(self):
         """Test TokenSet field type."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="tags",
-            field_type="token_set",
-            separator=","
-        )
+        builder.add_field(name="tags", field_type="token_set", separator=",")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
@@ -163,10 +147,7 @@ class TestFieldTypes:
         index.add({"tags": "rust,c,assembly"})
 
         # Search for overlap
-        results = index.search(
-            {"tags": "python,rust"},
-            min_score=0.3
-        )
+        results = index.search({"tags": "python,rust"}, min_similarity=0.3)
 
         assert len(results) >= 1
         # Should find the item with both tags (may have spaces after tokenization)
@@ -185,52 +166,54 @@ class TestMultiFieldSearch:
             field_type="short_text",
             algorithm="jaro_winkler",
             weight=10.0,
-            required=True
+            required=True,
         )
-        builder.add_field(
-            name="description",
-            field_type="long_text",
-            algorithm="ngram",
-            weight=5.0
-        )
-        builder.add_field(
-            name="tags",
-            field_type="token_set",
-            separator=",",
-            weight=7.0
-        )
+        builder.add_field(name="description", field_type="long_text", algorithm="ngram", weight=5.0)
+        builder.add_field(name="tags", field_type="token_set", separator=",", weight=7.0)
 
         self.schema = builder.build()
         self.index = fr.SchemaIndex(self.schema)
 
         # Add sample products
-        self.index.add({
-            "name": "MacBook Pro 14",
-            "description": "High-performance laptop with M3 chip",
-            "tags": "laptop,apple,computing"
-        }, data=1)
+        self.index.add(
+            {
+                "name": "MacBook Pro 14",
+                "description": "High-performance laptop with M3 chip",
+                "tags": "laptop,apple,computing",
+            },
+            data=1,
+        )
 
-        self.index.add({
-            "name": "MacBook Air",
-            "description": "Lightweight laptop perfect for everyday use",
-            "tags": "laptop,apple,portable"
-        }, data=2)
+        self.index.add(
+            {
+                "name": "MacBook Air",
+                "description": "Lightweight laptop perfect for everyday use",
+                "tags": "laptop,apple,portable",
+            },
+            data=2,
+        )
 
-        self.index.add({
-            "name": "ThinkPad X1",
-            "description": "Business laptop with excellent keyboard",
-            "tags": "laptop,lenovo,business"
-        }, data=3)
+        self.index.add(
+            {
+                "name": "ThinkPad X1",
+                "description": "Business laptop with excellent keyboard",
+                "tags": "laptop,lenovo,business",
+            },
+            data=3,
+        )
 
-        self.index.add({
-            "name": "iPad Pro",
-            "description": "Powerful tablet with M2 chip",
-            "tags": "tablet,apple,portable"
-        }, data=4)
+        self.index.add(
+            {
+                "name": "iPad Pro",
+                "description": "Powerful tablet with M2 chip",
+                "tags": "tablet,apple,portable",
+            },
+            data=4,
+        )
 
     def test_single_field_query(self):
         """Query with single field."""
-        results = self.index.search({"name": "Macbook"}, min_score=0.5)
+        results = self.index.search({"name": "Macbook"}, min_similarity=0.5)
 
         assert len(results) >= 2
         # Should find both MacBook models
@@ -239,10 +222,7 @@ class TestMultiFieldSearch:
 
     def test_multi_field_query(self):
         """Query with multiple fields."""
-        results = self.index.search({
-            "name": "Macbook",
-            "tags": "laptop,apple"
-        }, min_score=0.5)
+        results = self.index.search({"name": "Macbook", "tags": "laptop,apple"}, min_similarity=0.5)
 
         assert len(results) >= 2
         # MacBook models should score higher due to matching both fields
@@ -250,10 +230,7 @@ class TestMultiFieldSearch:
 
     def test_field_scores_included(self):
         """Results should include per-field scores."""
-        results = self.index.search({
-            "name": "Macbook",
-            "tags": "laptop"
-        }, min_score=0.3)
+        results = self.index.search({"name": "Macbook", "tags": "laptop"}, min_similarity=0.3)
 
         assert len(results) > 0
 
@@ -270,10 +247,14 @@ class TestMultiFieldSearch:
         """Higher weight fields should influence overall score more."""
         # Name has weight 10, description has weight 5
         # Query that matches name well but description poorly
-        results = self.index.search({
-            "name": "MacBook Pro",  # Should match well
-            "description": "unrelated text"  # Should match poorly
-        }, min_score=0.0, limit=5)
+        results = self.index.search(
+            {
+                "name": "MacBook Pro",  # Should match well
+                "description": "unrelated text",  # Should match poorly
+            },
+            min_similarity=0.0,
+            limit=5,
+        )
 
         # Should still get results because name has high weight
         assert len(results) > 0
@@ -287,8 +268,8 @@ class TestMultiFieldSearch:
     def test_min_score_threshold(self):
         """Should filter results by minimum score."""
         # High threshold should return fewer results
-        high_threshold = self.index.search({"name": "laptop"}, min_score=0.9)
-        low_threshold = self.index.search({"name": "laptop"}, min_score=0.1)
+        high_threshold = self.index.search({"name": "laptop"}, min_similarity=0.9)
+        low_threshold = self.index.search({"name": "laptop"}, min_similarity=0.1)
 
         assert len(high_threshold) <= len(low_threshold)
 
@@ -307,16 +288,12 @@ class TestNormalization:
     def test_lowercase_normalization(self):
         """Lowercase normalization should make search case-insensitive."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="title",
-            field_type="short_text",
-            normalize="lowercase"
-        )
+        builder.add_field(name="title", field_type="short_text", normalize="lowercase")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
         index.add({"title": "HELLO WORLD"})
-        results = index.search({"title": "hello world"}, min_score=0.9)
+        results = index.search({"title": "hello world"}, min_similarity=0.9)
 
         assert len(results) == 1
         assert results[0].score > 0.9
@@ -324,16 +301,12 @@ class TestNormalization:
     def test_strict_normalization(self):
         """Strict normalization should remove punctuation and whitespace."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="text",
-            field_type="short_text",
-            normalize="strict"
-        )
+        builder.add_field(name="text", field_type="short_text", normalize="strict")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
         index.add({"text": "Hello, World!"})
-        results = index.search({"text": "helloworld"}, min_score=0.9)
+        results = index.search({"text": "helloworld"}, min_similarity=0.9)
 
         # Should match well despite different formatting
         assert len(results) == 1
@@ -345,16 +318,8 @@ class TestValidation:
     def test_required_field_validation(self):
         """Missing required fields should raise error."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="name",
-            field_type="short_text",
-            required=True
-        )
-        builder.add_field(
-            name="optional",
-            field_type="short_text",
-            required=False
-        )
+        builder.add_field(name="name", field_type="short_text", required=True)
+        builder.add_field(name="optional", field_type="short_text", required=False)
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
@@ -393,32 +358,24 @@ class TestAlgorithms:
     def test_levenshtein_algorithm(self):
         """Test Levenshtein algorithm."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="text",
-            field_type="short_text",
-            algorithm="levenshtein"
-        )
+        builder.add_field(name="text", field_type="short_text", algorithm="levenshtein")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
         index.add({"text": "kitten"})
-        results = index.search({"text": "sitting"}, min_score=0.0)
+        results = index.search({"text": "sitting"}, min_similarity=0.0)
 
         assert len(results) == 1
 
     def test_damerau_levenshtein_algorithm(self):
         """Test Damerau-Levenshtein algorithm."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="text",
-            field_type="short_text",
-            algorithm="damerau_levenshtein"
-        )
+        builder.add_field(name="text", field_type="short_text", algorithm="damerau_levenshtein")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
         index.add({"text": "abcd"})
-        results = index.search({"text": "abdc"}, min_score=0.0)
+        results = index.search({"text": "abdc"}, min_similarity=0.0)
 
         # Transposition should be handled better than pure Levenshtein
         assert len(results) == 1
@@ -426,43 +383,31 @@ class TestAlgorithms:
     def test_ngram_algorithm(self):
         """Test N-gram algorithm."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="text",
-            field_type="long_text",
-            algorithm="ngram"
-        )
+        builder.add_field(name="text", field_type="long_text", algorithm="ngram")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
         index.add({"text": "hello world"})
-        results = index.search({"text": "helo wrld"}, min_score=0.3)
+        results = index.search({"text": "helo wrld"}, min_similarity=0.3)
 
         assert len(results) == 1
 
     def test_cosine_algorithm(self):
         """Test Cosine similarity algorithm."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="text",
-            field_type="long_text",
-            algorithm="cosine"
-        )
+        builder.add_field(name="text", field_type="long_text", algorithm="cosine")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
         index.add({"text": "the quick brown fox"})
-        results = index.search({"text": "quick brown"}, min_score=0.3)
+        results = index.search({"text": "quick brown"}, min_similarity=0.3)
 
         assert len(results) == 1
 
     def test_exact_match_algorithm(self):
         """Test exact match algorithm."""
         builder = fr.SchemaBuilder()
-        builder.add_field(
-            name="id",
-            field_type="short_text",
-            algorithm="exact_match"
-        )
+        builder.add_field(name="id", field_type="short_text", algorithm="exact_match")
         schema = builder.build()
         index = fr.SchemaIndex(schema)
 
@@ -470,7 +415,7 @@ class TestAlgorithms:
         index.add({"id": "ABC124"})
 
         # Exact match should return only exact match
-        results = index.search({"id": "ABC123"}, min_score=0.9)
+        results = index.search({"id": "ABC123"}, min_similarity=0.9)
 
         assert len(results) == 1
         assert results[0].record["id"] == "ABC123"
@@ -532,7 +477,7 @@ class TestEdgeCases:
         index.add({"text": "日本語"})
 
         # Search should work with Unicode
-        results = index.search({"text": "café"}, min_score=0.8)
+        results = index.search({"text": "café"}, min_similarity=0.8)
         assert len(results) >= 1
 
     def test_very_long_text(self):
@@ -546,7 +491,7 @@ class TestEdgeCases:
         long_text = "lorem ipsum " * 100
         index.add({"content": long_text})
 
-        results = index.search({"content": "lorem ipsum"}, min_score=0.1)
+        results = index.search({"content": "lorem ipsum"}, min_similarity=0.1)
         assert len(results) == 1
 
 
@@ -564,18 +509,14 @@ class TestPerformance:
 
         # Add 1000 records
         for i in range(1000):
-            index.add({
-                "name": f"Product {i}",
-                "tags": f"tag{i % 10},tag{i % 20},category{i % 5}"
-            }, data=i)
+            index.add(
+                {"name": f"Product {i}", "tags": f"tag{i % 10},tag{i % 20},category{i % 5}"}, data=i
+            )
 
         assert len(index) == 1000
 
         # Search should still be fast
-        results = index.search({
-            "name": "Product 42",
-            "tags": "tag2"
-        }, limit=10)
+        results = index.search({"name": "Product 42", "tags": "tag2"}, limit=10)
 
         assert len(results) <= 10
         assert len(results) > 0
@@ -623,7 +564,7 @@ class TestMinMaxScalingStrategy:
         index.add({"name": "iPad Pro", "tags": "tablet,apple"}, data=2)
         index.add({"name": "iPhone", "tags": "phone,apple"}, data=3)
 
-        results = index.search({"name": "Macbook", "tags": "laptop"}, min_score=0.3)
+        results = index.search({"name": "Macbook", "tags": "laptop"}, min_similarity=0.3)
 
         assert len(results) > 0
         # Verify scores are in valid 0-1 range
@@ -726,7 +667,7 @@ class TestTokenSetEdgeCases:
         index = fr.SchemaIndex(schema)
 
         index.add({"tags": ""})
-        results = index.search({"tags": "test"}, min_score=0.0)
+        results = index.search({"tags": "test"}, min_similarity=0.0)
         # Empty tag set shouldn't match
         assert len(results) == 0
 
@@ -738,7 +679,7 @@ class TestTokenSetEdgeCases:
         index = fr.SchemaIndex(schema)
 
         index.add({"tags": "  ,  ,  "})
-        results = index.search({"tags": "test"}, min_score=0.0)
+        results = index.search({"tags": "test"}, min_similarity=0.0)
         # Whitespace-only tokens should be filtered out
         assert len(results) == 0
 
@@ -750,7 +691,7 @@ class TestTokenSetEdgeCases:
         index = fr.SchemaIndex(schema)
 
         index.add({"tags": "solo"})
-        results = index.search({"tags": "solo"}, min_score=0.5)
+        results = index.search({"tags": "solo"}, min_similarity=0.5)
         assert len(results) == 1
         assert results[0].field_scores["tags"] == 1.0
 
@@ -763,7 +704,7 @@ class TestTokenSetEdgeCases:
             index = fr.SchemaIndex(schema)
 
             index.add({"tags": f"a{sep}b{sep}c"})
-            results = index.search({"tags": f"a{sep}b"}, min_score=0.5)
+            results = index.search({"tags": f"a{sep}b"}, min_similarity=0.5)
             assert len(results) >= 1, f"Failed with separator: {sep}"
 
     def test_token_set_with_spaces(self):
@@ -774,7 +715,7 @@ class TestTokenSetEdgeCases:
         index = fr.SchemaIndex(schema)
 
         index.add({"tags": " apple , banana , cherry "})
-        results = index.search({"tags": "apple,banana"}, min_score=0.5)
+        results = index.search({"tags": "apple,banana"}, min_similarity=0.5)
         assert len(results) == 1
 
 

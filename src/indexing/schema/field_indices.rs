@@ -1,7 +1,7 @@
-///! Field-specific index implementations for schema-based multi-field matching
-///!
-///! This module provides specialized index implementations for different field types.
-///! Each field type uses an optimal index structure and algorithm.
+//! Field-specific index implementations for schema-based multi-field matching
+//!
+//! This module provides specialized index implementations for different field types.
+//! Each field type uses an optimal index structure and algorithm.
 
 use super::types::{Algorithm, FieldType};
 use crate::algorithms::{self, Similarity};
@@ -280,7 +280,7 @@ impl FieldIndex for TokenSetIndex {
         for token in &tokens {
             self.inverted_index
                 .entry(token.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(self.entries.len());
         }
 

@@ -32,6 +32,7 @@ const MAX_QUADRATIC_STRING_LENGTH: usize = 10_000;
 pub struct Lcs;
 
 impl Lcs {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -48,6 +49,7 @@ impl Similarity for Lcs {
 }
 
 /// Calculate the length of the Longest Common Subsequence.
+#[must_use]
 pub fn lcs_length(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -83,6 +85,7 @@ pub fn lcs_length(a: &str, b: &str) -> usize {
 /// Note: For strings longer than 10,000 characters, this returns an empty
 /// string to prevent excessive memory allocation (O(m*n) space required).
 /// Use `lcs_length` for a space-efficient length-only computation.
+#[must_use]
 pub fn lcs_string(a: &str, b: &str) -> String {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -135,6 +138,7 @@ pub fn lcs_string(a: &str, b: &str) -> String {
 
 /// Calculate LCS-based similarity (0.0 to 1.0).
 /// Uses the formula: 2 * LCS_length / (len(a) + len(b))
+#[must_use]
 pub fn lcs_similarity(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
@@ -158,6 +162,7 @@ pub fn lcs_similarity(a: &str, b: &str) -> f64 {
 }
 
 /// Alternative similarity using max length as denominator
+#[must_use]
 pub fn lcs_similarity_max(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
@@ -175,6 +180,7 @@ pub fn lcs_similarity_max(a: &str, b: &str) -> f64 {
 }
 
 /// Longest Common Substring (contiguous, not subsequence)
+#[must_use]
 pub fn longest_common_substring_length(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -211,6 +217,7 @@ pub fn longest_common_substring_length(a: &str, b: &str) -> usize {
 /// Note: For strings longer than 10,000 characters, this returns an empty
 /// string to prevent excessive memory allocation (O(m*n) space required).
 /// Use `longest_common_substring_length` for a space-efficient length-only computation.
+#[must_use]
 pub fn longest_common_substring(a: &str, b: &str) -> String {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();

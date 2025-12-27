@@ -17,11 +17,13 @@ use super::Similarity;
 pub struct Soundex;
 
 impl Soundex {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
-    
+
     /// Encode a string to its Soundex code
+    #[must_use]
     pub fn encode(&self, s: &str) -> String {
         soundex(s)
     }
@@ -54,15 +56,18 @@ impl Default for Metaphone {
 }
 
 impl Metaphone {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
-    
+
+    #[must_use]
     pub fn with_max_length(max_length: usize) -> Self {
         Self { max_length }
     }
-    
+
     /// Encode a string to its Metaphone code
+    #[must_use]
     pub fn encode(&self, s: &str) -> String {
         metaphone(s, self.max_length)
     }
@@ -80,6 +85,7 @@ impl Similarity for Metaphone {
 
 /// Encode a string using the Soundex algorithm.
 /// Returns a 4-character code: first letter + 3 digits.
+#[must_use]
 pub fn soundex(s: &str) -> String {
     let s = s.trim().to_uppercase();
     
@@ -148,12 +154,14 @@ pub fn soundex(s: &str) -> String {
 }
 
 /// Check if two strings have the same Soundex code.
+#[must_use]
 pub fn soundex_match(a: &str, b: &str) -> bool {
     soundex(a) == soundex(b)
 }
 
 /// Soundex similarity: 1.0 if codes match, 0.0 otherwise.
 /// For partial matching, compare individual code positions.
+#[must_use]
 pub fn soundex_similarity(a: &str, b: &str) -> f64 {
     let code_a = soundex(a);
     let code_b = soundex(b);
@@ -180,6 +188,7 @@ pub fn soundex_similarity(a: &str, b: &str) -> f64 {
 /// Note: TH is encoded as '0' representing the theta sound. This is a common
 /// convention in phonetic algorithms where '0' serves as a placeholder for
 /// sounds that don't map directly to consonant codes.
+#[must_use]
 pub fn metaphone(s: &str, max_length: usize) -> String {
     let s = s.trim().to_uppercase();
     let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
@@ -261,7 +270,7 @@ pub fn metaphone(s: &str, max_length: usize) -> String {
                         i += 1;
                     }
                 } else if next == Some('N') {
-                    if i + 2 >= len || (i + 2 < len && chars[i + 2] != 'E' && chars[i + 2] != 'D') {
+                    if i + 2 >= len || (chars[i + 2] != 'E' && chars[i + 2] != 'D') {
                         // Silent G
                     } else {
                         result.push('K');
@@ -273,10 +282,8 @@ pub fn metaphone(s: &str, max_length: usize) -> String {
                 }
             }
             'H' => {
-                if i == 0 || !is_vowel(prev.unwrap_or(' ')) {
-                    if next.map_or(false, |ch| is_vowel(ch)) {
-                        result.push('H');
-                    }
+                if (i == 0 || !is_vowel(prev.unwrap_or(' '))) && next.is_some_and(is_vowel) {
+                    result.push('H');
                 }
             }
             'J' => result.push('J'),
@@ -322,7 +329,7 @@ pub fn metaphone(s: &str, max_length: usize) -> String {
             }
             'V' => result.push('F'),
             'W' | 'Y' => {
-                if next.map_or(false, |ch| is_vowel(ch)) {
+                if next.is_some_and(is_vowel) {
                     result.push(c);
                 }
             }
@@ -350,11 +357,13 @@ fn is_vowel(c: char) -> bool {
 }
 
 /// Check if two strings have the same Metaphone code.
+#[must_use]
 pub fn metaphone_match(a: &str, b: &str) -> bool {
     metaphone(a, 4) == metaphone(b, 4)
 }
 
 /// Metaphone similarity based on code matching.
+#[must_use]
 pub fn metaphone_similarity(a: &str, b: &str, max_length: usize) -> f64 {
     let code_a = metaphone(a, max_length);
     let code_b = metaphone(b, max_length);

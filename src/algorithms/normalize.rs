@@ -21,6 +21,7 @@ pub enum NormalizationMode {
 }
 
 /// Normalize a string according to the specified mode
+#[must_use]
 pub fn normalize_string(s: &str, mode: NormalizationMode) -> String {
     match mode {
         NormalizationMode::Lowercase => s.to_lowercase(),
@@ -51,6 +52,7 @@ pub fn normalize_string(s: &str, mode: NormalizationMode) -> String {
 }
 
 /// Normalize both strings according to the specified mode
+#[must_use]
 pub fn normalize_pair(a: &str, b: &str, mode: NormalizationMode) -> (String, String) {
     (normalize_string(a, mode), normalize_string(b, mode))
 }

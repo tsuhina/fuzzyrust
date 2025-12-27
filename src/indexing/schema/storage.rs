@@ -1,10 +1,10 @@
-///! Column-oriented storage for multi-field records
-///!
-///! This module provides optimized storage structures for multi-field records.
-///! Key features:
-///! - Column-oriented layout for better cache locality
-///! - Efficient field access without full record deserialization
-///! - Support for different field types (text, tokens)
+//! Column-oriented storage for multi-field records
+//!
+//! This module provides optimized storage structures for multi-field records.
+//! Key features:
+//! - Column-oriented layout for better cache locality
+//! - Efficient field access without full record deserialization
+//! - Support for different field types (text, tokens)
 
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,7 @@
-///! Main SchemaIndex implementation for multi-field fuzzy matching
-///!
-///! This is the primary entry point for using schema-based multi-field matching.
-///! It coordinates field indices, storage, and scoring strategies.
+//! Main SchemaIndex implementation for multi-field fuzzy matching
+//!
+//! This is the primary entry point for using schema-based multi-field matching.
+//! It coordinates field indices, storage, and scoring strategies.
 
 use super::field_indices::{create_field_index, FieldIndex};
 use super::schema::{Schema, SchemaError};
@@ -243,7 +243,7 @@ impl SchemaIndex {
                 for field_match in field_matches {
                     candidate_scores
                         .entry(field_match.id)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(FieldScore::new(
                             field.name.clone(),
                             field_match.score,
