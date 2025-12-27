@@ -469,6 +469,47 @@ canonical = result.filter(pl.col("is_canonical"))["value"].to_list()
 # ['John Smith', 'Jane Doe']
 ```
 
+### Multi-Field Deduplication
+
+Find duplicate records using different algorithms for each field:
+
+```python
+import polars as pl
+import fuzzyrust as fr
+
+# Customer records with potential duplicates
+customers = pl.DataFrame({
+    "name": ["John Smith", "Jon Smyth", "Jane Doe", "John Smith Jr"],
+    "email": ["john@example.com", "jon@exmple.com", "jane@example.com", "john.jr@example.com"],
+    "phone": ["555-1234", "555-1234", "555-9999", "555-1234"]
+})
+
+# Find duplicates with different algorithms per field
+duplicates = fr.match_dataframe(
+    customers,
+    columns=["name", "email", "phone"],
+    algorithms={
+        "name": "jaro_winkler",    # Best for name typos
+        "email": "levenshtein",    # Best for email typos
+        "phone": "exact_match"     # Exact matching for phone
+    },
+    weights={"name": 2.0, "email": 1.5, "phone": 1.0},
+    min_similarity=0.5
+)
+
+print(duplicates)
+# shape: (3, 9)
+# ┌───────┬───────┬──────────┬───────────────┬───────────┬──────────────────┬─────────────────────┬──────────┬──────────┐
+# │ idx_a ┆ idx_b ┆ score    ┆ name_a        ┆ name_b    ┆ email_a          ┆ email_b             ┆ phone_a  ┆ phone_b  │
+# │ ---   ┆ ---   ┆ ---      ┆ ---           ┆ ---       ┆ ---              ┆ ---                 ┆ ---      ┆ ---      │
+# │ i64   ┆ i64   ┆ f64      ┆ str           ┆ str       ┆ str              ┆ str                 ┆ str      ┆ str      │
+# ╞═══════╪═══════╪══════════╪═══════════════╪═══════════╪══════════════════╪═════════════════════╪══════════╪══════════╡
+# │ 0     ┆ 3     ┆ 0.926856 ┆ John Smith    ┆ John S... ┆ john@example.com ┆ john.jr@example.com ┆ 555-1234 ┆ 555-1234 │
+# │ 0     ┆ 1     ┆ 0.921461 ┆ John Smith    ┆ Jon Smyth ┆ john@example.com ┆ jon@exmple.com      ┆ 555-1234 ┆ 555-1234 │
+# │ 1     ┆ 3     ┆ 0.853528 ┆ Jon Smyth     ┆ John S... ┆ jon@exmple.com   ┆ john.jr@example.com ┆ 555-1234 ┆ 555-1234 │
+# └───────┴───────┴──────────┴───────────────┴───────────┴──────────────────┴─────────────────────┴──────────┴──────────┘
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

@@ -154,6 +154,7 @@ def match_dataframe(
     algorithm: str = "jaro_winkler",
     min_similarity: float = 0.0,
     weights: Optional[Dict[str, float]] = None,
+    algorithms: Optional[Dict[str, str]] = None,
 ) -> "pl.DataFrame":
     """
     Find similar rows within a DataFrame based on multiple columns.
@@ -164,9 +165,13 @@ def match_dataframe(
     Args:
         df: DataFrame to search for duplicates
         columns: List of column names to use for matching
-        algorithm: Similarity algorithm (default: "jaro_winkler")
+        algorithm: Default similarity algorithm (default: "jaro_winkler")
         min_similarity: Minimum combined score (0.0 to 1.0)
         weights: Optional dict mapping column names to weights
+        algorithms: Optional dict mapping column names to algorithms.
+            Overrides the default algorithm for specific columns.
+            Options: "levenshtein", "damerau_levenshtein", "jaro_winkler",
+            "ngram", "jaccard", "cosine", "exact_match"
 
     Returns:
         DataFrame with columns:
@@ -178,21 +183,30 @@ def match_dataframe(
     Example:
         >>> df = pl.DataFrame({
         ...     "name": ["John Smith", "Jon Smith", "Jane Doe"],
-        ...     "city": ["NYC", "New York", "Boston"]
+        ...     "email": ["john@test.com", "jon@test.com", "jane@test.com"],
+        ...     "phone": ["555-1234", "555-1234", "555-9999"]
         ... })
-        >>> result = match_dataframe(df, ["name", "city"], min_similarity=0.7)
+        >>> # Use different algorithms for different fields
+        >>> result = match_dataframe(
+        ...     df,
+        ...     columns=["name", "email", "phone"],
+        ...     algorithms={"name": "jaro_winkler", "email": "levenshtein", "phone": "exact_match"},
+        ...     weights={"name": 2.0, "email": 1.0, "phone": 1.0},
+        ...     min_similarity=0.7
+        ... )
     """
     _check_polars()
     import fuzzyrust as fr
 
-    # Build schema
+    # Build schema with per-column algorithms
     builder = fr.SchemaBuilder()
     for col in columns:
         weight = (weights or {}).get(col, 1.0)
+        col_algorithm = (algorithms or {}).get(col, algorithm)
         builder.add_field(
             name=col,
             field_type="short_text",
-            algorithm=algorithm,
+            algorithm=col_algorithm,
             weight=weight,
         )
     schema = builder.build()

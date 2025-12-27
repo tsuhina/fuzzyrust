@@ -1040,6 +1040,60 @@ print(f"  Recall:    {cm.recall():.0%}")
 print(f"  F1:        {cm.f_score():.0%}")
 
 # %% [markdown]
+# ### 8D: Polars Integration (Optional)
+#
+# If you have Polars installed (`pip install fuzzyrust[polars]`), you can use
+# DataFrame-native fuzzy matching with per-field algorithm selection.
+
+# %%
+# Check if Polars is available
+try:
+    import polars as pl
+    from fuzzyrust import match_dataframe
+
+    POLARS_AVAILABLE = True
+except ImportError:
+    POLARS_AVAILABLE = False
+    print("Polars not installed. Install with: pip install fuzzyrust[polars]")
+
+# %%
+if POLARS_AVAILABLE:
+    print("Polars Multi-Field Deduplication:")
+    print()
+
+    # Customer records with potential duplicates
+    customers = pl.DataFrame({
+        "name": ["John Smith", "Jon Smyth", "Jane Doe", "John Smith Jr"],
+        "email": ["john@example.com", "jon@exmple.com", "jane@example.com", "john.jr@example.com"],
+        "phone": ["555-1234", "555-1234", "555-9999", "555-1234"]
+    })
+
+    print("  Customer data:")
+    print(customers)
+    print()
+
+    # Find duplicates using DIFFERENT algorithms per field
+    duplicates = match_dataframe(
+        customers,
+        columns=["name", "email", "phone"],
+        algorithms={
+            "name": "jaro_winkler",    # Best for name typos
+            "email": "levenshtein",    # Best for email typos
+            "phone": "exact_match"     # Exact matching for phone numbers
+        },
+        weights={"name": 2.0, "email": 1.5, "phone": 1.0},
+        min_similarity=0.5
+    )
+
+    print("  Potential duplicates (with per-field algorithms):")
+    print(duplicates)
+    print()
+    print("  Each row shows a pair of similar records:")
+    print("  - idx_a/idx_b: Row indices in original DataFrame")
+    print("  - score: Combined similarity (weighted)")
+    print("  - name_a/name_b, email_a/email_b, phone_a/phone_b: Field values")
+
+# %% [markdown]
 # ---
 # ## Part 9: Production Patterns
 #
