@@ -29,7 +29,7 @@ class TestBkTreeMemory:
             del tree
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         # Peak should be reasonable (< 50MB for this workload)
@@ -52,7 +52,7 @@ class TestBkTreeMemory:
             results = tree.search("item_500", 2)
             del results
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         # Memory growth should be minimal for search operations
@@ -80,7 +80,7 @@ class TestBkTreeMemory:
             del tree
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 30_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 30MB limit"
@@ -105,7 +105,7 @@ class TestBkTreeMemory:
             del restored
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 20_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 20MB limit"
@@ -129,7 +129,7 @@ class TestNgramIndexMemory:
             del index
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 50_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 50MB limit"
@@ -150,7 +150,7 @@ class TestNgramIndexMemory:
             results = index.search("item_500", min_similarity=0.5)
             del results
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 10_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 10MB limit"
@@ -174,7 +174,7 @@ class TestNgramIndexMemory:
             del restored
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 20_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 20MB limit"
@@ -198,7 +198,7 @@ class TestHybridIndexMemory:
             del index
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 100_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 100MB limit"
@@ -222,7 +222,7 @@ class TestBatchOperationsMemory:
             del results
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 20_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 20MB limit"
@@ -242,7 +242,7 @@ class TestBatchOperationsMemory:
             del results
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 20_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 20MB limit"
@@ -272,7 +272,7 @@ class TestSearchResultMemory:
             del results
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 30_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 30MB limit"
@@ -295,7 +295,7 @@ class TestStringMemory:
             _ = fr.ngram_similarity("München", "Muenchen", 2)
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 5_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 5MB limit"
@@ -316,7 +316,7 @@ class TestStringMemory:
             _ = fr.jaro_winkler_similarity(long_a, long_b)
             gc.collect()
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         assert peak < 10_000_000, f"Peak memory {peak / 1_000_000:.1f}MB exceeds 10MB limit"

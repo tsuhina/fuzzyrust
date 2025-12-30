@@ -395,7 +395,7 @@ class TestPluginPerformance:
         df = pl.DataFrame(
             {
                 "left": [f"string_{i}" for i in range(n)],
-                "right": [f"string_{i+1}" for i in range(n)],
+                "right": [f"string_{i + 1}" for i in range(n)],
             }
         )
 
@@ -411,7 +411,7 @@ class TestPluginPerformance:
         df = pl.DataFrame(
             {
                 "left": [f"test_{i}" for i in range(100)],
-                "right": [f"test_{i+5}" for i in range(100)],
+                "right": [f"test_{i + 5}" for i in range(100)],
             }
         )
 

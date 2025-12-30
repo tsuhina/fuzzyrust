@@ -828,7 +828,7 @@ class TestFindDuplicatePairs:
                 len(pairs) >= 1
             ), f"Algorithm {algo} with threshold {threshold} should find at least 1 pair"
             # Verify the pair is valid
-            idx1, idx2, score = pairs[0]
+            _idx1, _idx2, score = pairs[0]
             assert (
                 threshold <= score <= 1.0
             ), f"Algorithm {algo}: score {score} below threshold {threshold}"

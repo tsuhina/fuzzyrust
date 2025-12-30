@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from enum import Enum
-from typing import List, Optional, Tuple, TypeAlias, Union
+from typing import TypeAlias
 
 __version__: str
 
@@ -31,16 +31,16 @@ class SearchResult:
     id: int
     text: str
     score: float
-    distance: Optional[int]
-    data: Optional[UserData]
+    distance: int | None
+    data: UserData | None
 
     def __init__(
         self,
         id: int,
         text: str,
         score: float,
-        distance: Optional[int] = None,
-        data: Optional[UserData] = None,
+        distance: int | None = None,
+        data: UserData | None = None,
     ) -> None: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
@@ -54,23 +54,23 @@ class MatchResult:
 
     text: str
     score: float
-    id: Optional[int]
+    id: int | None
 
-    def __init__(self, text: str, score: float, id: Optional[int] = None) -> None: ...
+    def __init__(self, text: str, score: float, id: int | None = None) -> None: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
 class DeduplicationResult:
     """Result from deduplication operation."""
 
-    groups: List[List[str]]
-    unique: List[str]
+    groups: list[list[str]]
+    unique: list[str]
     total_duplicates: int
 
     def __init__(
         self,
-        groups: List[List[str]],
-        unique: List[str],
+        groups: list[list[str]],
+        unique: list[str],
         total_duplicates: int,
     ) -> None: ...
 
@@ -79,13 +79,13 @@ class AlgorithmComparison:
 
     algorithm: str
     score: float
-    matches: List[MatchResult]
+    matches: list[MatchResult]
 
     def __init__(
         self,
         algorithm: str,
         score: float,
-        matches: List[MatchResult],
+        matches: list[MatchResult],
     ) -> None: ...
 
 # =============================================================================
@@ -189,8 +189,8 @@ class NormalizationMode(str, Enum):
 def levenshtein(
     a: str,
     b: str,
-    max_distance: Optional[int] = None,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    max_distance: int | None = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> int:
     """
     Compute Levenshtein (edit) distance between two strings.
@@ -227,8 +227,8 @@ def levenshtein_bounded(
     a: str,
     b: str,
     max_distance: int,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
-) -> Optional[int]:
+    normalize: (str | NormalizationMode) | None = None,
+) -> int | None:
     """
     Compute Levenshtein distance with explicit None return when threshold exceeded.
 
@@ -252,7 +252,7 @@ def levenshtein_bounded(
 def levenshtein_similarity(
     a: str,
     b: str,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute normalized Levenshtein similarity (0.0 to 1.0).
@@ -278,8 +278,8 @@ def levenshtein_similarity(
 def damerau_levenshtein(
     a: str,
     b: str,
-    max_distance: Optional[int] = None,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    max_distance: int | None = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> int:
     """
     Compute Damerau-Levenshtein distance (includes transpositions).
@@ -314,8 +314,8 @@ def damerau_levenshtein_bounded(
     a: str,
     b: str,
     max_distance: int,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
-) -> Optional[int]:
+    normalize: (str | NormalizationMode) | None = None,
+) -> int | None:
     """
     Compute Damerau-Levenshtein distance with explicit None return when threshold exceeded.
 
@@ -339,7 +339,7 @@ def damerau_levenshtein_bounded(
 def damerau_levenshtein_similarity(
     a: str,
     b: str,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute normalized Damerau-Levenshtein similarity (0.0 to 1.0).
@@ -356,7 +356,7 @@ def damerau_levenshtein_similarity(
 def jaro_similarity(
     a: str,
     b: str,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute Jaro similarity (0.0 to 1.0).
@@ -381,7 +381,7 @@ def jaro_winkler_similarity(
     b: str,
     prefix_weight: float = 0.1,
     max_prefix_length: int = 4,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute Jaro-Winkler similarity (0.0 to 1.0).
@@ -458,7 +458,7 @@ def ngram_similarity(
     b: str,
     ngram_size: int = 3,
     pad: bool = True,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute n-gram similarity (Sørensen-Dice coefficient).
@@ -485,7 +485,7 @@ def ngram_jaccard(
     b: str,
     ngram_size: int = 3,
     pad: bool = True,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute n-gram Jaccard similarity.
@@ -539,7 +539,7 @@ def ngram_profile_similarity(a: str, b: str, ngram_size: int = 3) -> float:
     """
     ...
 
-def extract_ngrams(s: str, ngram_size: int = 3, pad: bool = True) -> List[str]:
+def extract_ngrams(s: str, ngram_size: int = 3, pad: bool = True) -> list[str]:
     """
     Extract n-grams from a string.
 
@@ -617,7 +617,7 @@ def metaphone_similarity(a: str, b: str, max_length: int = 4) -> float:
     """
     ...
 
-def double_metaphone(text: str, max_length: int = 4) -> Tuple[str, str]:
+def double_metaphone(text: str, max_length: int = 4) -> tuple[str, str]:
     """
     Encode a string using Double Metaphone algorithm.
 
@@ -818,7 +818,7 @@ def levenshtein_simd(a: str, b: str) -> int:
     """
     ...
 
-def levenshtein_simd_bounded(a: str, b: str, max_distance: int) -> Optional[int]:
+def levenshtein_simd_bounded(a: str, b: str, max_distance: int) -> int | None:
     """
     SIMD-accelerated Levenshtein distance with max threshold.
 
@@ -948,7 +948,7 @@ def longest_common_substring(a: str, b: str) -> str:
 def cosine_similarity_chars(
     a: str,
     b: str,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute character-level cosine similarity.
@@ -965,7 +965,7 @@ def cosine_similarity_chars(
 def cosine_similarity_words(
     a: str,
     b: str,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute word-level cosine similarity.
@@ -983,7 +983,7 @@ def cosine_similarity_ngrams(
     a: str,
     b: str,
     ngram_size: int = 3,
-    normalize: Optional[Union[str, NormalizationMode]] = None,
+    normalize: (str | NormalizationMode) | None = None,
 ) -> float:
     """
     Compute n-gram cosine similarity.
@@ -1001,7 +1001,7 @@ def cosine_similarity_ngrams(
 # Case-Insensitive Variants (Aliases for base functions with normalize="lowercase")
 # =============================================================================
 
-def levenshtein_ci(a: str, b: str, max_distance: Optional[int] = None) -> int:
+def levenshtein_ci(a: str, b: str, max_distance: int | None = None) -> int:
     """Case-insensitive Levenshtein distance. Equivalent to levenshtein(a, b, normalize="lowercase")."""
     ...
 
@@ -1009,7 +1009,7 @@ def levenshtein_similarity_ci(a: str, b: str) -> float:
     """Case-insensitive Levenshtein similarity. Equivalent to levenshtein_similarity(a, b, normalize="lowercase")."""
     ...
 
-def damerau_levenshtein_ci(a: str, b: str, max_distance: Optional[int] = None) -> int:
+def damerau_levenshtein_ci(a: str, b: str, max_distance: int | None = None) -> int:
     """Case-insensitive Damerau-Levenshtein distance. Equivalent to damerau_levenshtein(a, b, normalize="lowercase")."""
     ...
 
@@ -1138,7 +1138,7 @@ def metaphone_similarity_ci(a: str, b: str, max_length: int = 4) -> float:
 # String Normalization
 # =============================================================================
 
-def normalize_string(s: str, mode: Union[str, NormalizationMode]) -> str:
+def normalize_string(s: str, mode: str | NormalizationMode) -> str:
     """
     Normalize a string according to the specified mode.
 
@@ -1160,7 +1160,7 @@ def normalize_string(s: str, mode: Union[str, NormalizationMode]) -> str:
     """
     ...
 
-def normalize_pair(a: str, b: str, mode: Union[str, NormalizationMode]) -> tuple[str, str]:
+def normalize_pair(a: str, b: str, mode: str | NormalizationMode) -> tuple[str, str]:
     """
     Normalize both strings according to the specified mode.
 
@@ -1372,10 +1372,10 @@ def qwratio(
 
 def extract(
     query: str,
-    choices: List[str],
+    choices: list[str],
     limit: int = 10,
     min_similarity: float = 0.0,
-) -> List[MatchResult]:
+) -> list[MatchResult]:
     """
     Find top N matches from a list (RapidFuzz-compatible).
 
@@ -1400,9 +1400,9 @@ def extract(
 
 def extract_one(
     query: str,
-    choices: List[str],
+    choices: list[str],
     min_similarity: float = 0.0,
-) -> Optional[MatchResult]:
+) -> MatchResult | None:
     """
     Find the single best match from a list (RapidFuzz-compatible).
 
@@ -1431,10 +1431,10 @@ def extract_one(
 # =============================================================================
 
 def batch_levenshtein(
-    strings: List[str],
+    strings: list[str],
     query: str,
-    normalize: Optional[str] = None,
-) -> List[MatchResult]:
+    normalize: str | None = None,
+) -> list[MatchResult]:
     """
     Compute Levenshtein distances for all strings against a query in parallel.
 
@@ -1449,10 +1449,10 @@ def batch_levenshtein(
     ...
 
 def batch_jaro_winkler(
-    strings: List[str],
+    strings: list[str],
     query: str,
-    normalize: Optional[str] = None,
-) -> List[MatchResult]:
+    normalize: str | None = None,
+) -> list[MatchResult]:
     """
     Compute Jaro-Winkler similarities for all strings in parallel.
 
@@ -1467,13 +1467,13 @@ def batch_jaro_winkler(
     ...
 
 def find_best_matches(
-    strings: List[str],
+    strings: list[str],
     query: str,
     algorithm: str = "jaro_winkler",
     limit: int = 10,
     min_similarity: float = 0.0,
-    normalize: Optional[str] = None,
-) -> List[MatchResult]:
+    normalize: str | None = None,
+) -> list[MatchResult]:
     """
     Find best matching strings from a list.
 
@@ -1497,11 +1497,11 @@ def find_best_matches(
     ...
 
 def batch_similarity_pairs(
-    left: List[str],
-    right: List[str],
+    left: list[str],
+    right: list[str],
     algorithm: str = "jaro_winkler",
-    normalize: Optional[str] = None,
-) -> List[Optional[float]]:
+    normalize: str | None = None,
+) -> list[float | None]:
     """
     Compute similarity scores for pairs of strings in parallel.
 
@@ -1535,12 +1535,12 @@ def batch_similarity_pairs(
     ...
 
 def cdist(
-    queries: List[str],
-    choices: List[str],
+    queries: list[str],
+    choices: list[str],
     scorer: str = "levenshtein",
     workers: int = -1,
-    normalize: Optional[str] = None,
-) -> List[List[float]]:
+    normalize: str | None = None,
+) -> list[list[float]]:
     """
     Compute pairwise distance/similarity matrix between two lists of strings.
 
@@ -1576,11 +1576,11 @@ def cdist(
     ...
 
 def batch_similarity(
-    strings: List[str],
+    strings: list[str],
     query: str,
     algorithm: str = "jaro_winkler",
-    normalize: Optional[str] = None,
-) -> List[MatchResult]:
+    normalize: str | None = None,
+) -> list[MatchResult]:
     """
     Compute similarity scores for all strings against a query using any algorithm.
 
@@ -1616,12 +1616,12 @@ def batch_similarity(
 # =============================================================================
 
 def find_duplicate_pairs(
-    items: List[str],
+    items: list[str],
     algorithm: str = "jaro_winkler",
     min_similarity: float = 0.85,
     window_size: int = 50,
     normalize: str = "lowercase",
-) -> List[tuple[int, int, float]]:
+) -> list[tuple[int, int, float]]:
     """
     Find duplicate pairs using Sorted Neighborhood Method (SNM).
 
@@ -1657,7 +1657,7 @@ def find_duplicate_pairs(
     ...
 
 def find_duplicates(
-    items: List[str],
+    items: list[str],
     algorithm: str = "jaro_winkler",
     min_similarity: float = 0.85,
     normalize: str = "lowercase",
@@ -1732,8 +1732,8 @@ class ConfusionMatrixResult:
         ...
 
 def precision(
-    true_matches: List[tuple[int, int]],
-    predicted_matches: List[tuple[int, int]],
+    true_matches: list[tuple[int, int]],
+    predicted_matches: list[tuple[int, int]],
 ) -> float:
     """
     Compute precision: TP / (TP + FP).
@@ -1757,8 +1757,8 @@ def precision(
     ...
 
 def recall(
-    true_matches: List[tuple[int, int]],
-    predicted_matches: List[tuple[int, int]],
+    true_matches: list[tuple[int, int]],
+    predicted_matches: list[tuple[int, int]],
 ) -> float:
     """
     Compute recall: TP / (TP + FN).
@@ -1782,8 +1782,8 @@ def recall(
     ...
 
 def f_score(
-    true_matches: List[tuple[int, int]],
-    predicted_matches: List[tuple[int, int]],
+    true_matches: list[tuple[int, int]],
+    predicted_matches: list[tuple[int, int]],
     beta: float = 1.0,
 ) -> float:
     """
@@ -1812,8 +1812,8 @@ def f_score(
     ...
 
 def confusion_matrix(
-    true_matches: List[tuple[int, int]],
-    predicted_matches: List[tuple[int, int]],
+    true_matches: list[tuple[int, int]],
+    predicted_matches: list[tuple[int, int]],
     total_pairs: int,
 ) -> ConfusionMatrixResult:
     """
@@ -1849,11 +1849,11 @@ def confusion_matrix(
 # =============================================================================
 
 def compare_algorithms(
-    strings: List[str],
+    strings: list[str],
     query: str,
-    algorithms: Optional[List[str]] = None,
+    algorithms: list[str] | None = None,
     limit: int = 3,
-) -> List[AlgorithmComparison]:
+) -> list[AlgorithmComparison]:
     """
     Compare query against strings using multiple similarity algorithms.
 
@@ -1912,7 +1912,7 @@ class TfIdfCosine:
         """
         ...
 
-    def add_documents(self, docs: List[str]) -> None:
+    def add_documents(self, docs: list[str]) -> None:
         """
         Add multiple documents to build IDF scores.
 
@@ -2007,11 +2007,11 @@ class BkTree:
     def search(
         self,
         query: str,
-        max_distance: Optional[int] = None,
-        min_similarity: Optional[float] = None,
-        limit: Optional[int] = None,
-        normalize: Optional[str] = None,
-    ) -> List[SearchResult]:
+        max_distance: int | None = None,
+        min_similarity: float | None = None,
+        limit: int | None = None,
+        normalize: str | None = None,
+    ) -> list[SearchResult]:
         """
         Search for strings within a given edit distance or above a similarity threshold.
 
@@ -2035,9 +2035,9 @@ class BkTree:
         self,
         queries: Sequence[str],
         max_distance: int,
-        limit: Optional[int] = None,
-        normalize: Optional[str] = None,
-    ) -> List[List[SearchResult]]:
+        limit: int | None = None,
+        normalize: str | None = None,
+    ) -> list[list[SearchResult]]:
         """
         Search for multiple queries in parallel.
 
@@ -2056,7 +2056,7 @@ class BkTree:
         self,
         query: str,
         limit: int,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """
         Find the nearest neighbors to the query.
 
@@ -2206,9 +2206,9 @@ class NgramIndex:
         query: str,
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
-        limit: Optional[int] = None,
-        normalize: Optional[str] = "lowercase",
-    ) -> List[SearchResult]:
+        limit: int | None = None,
+        normalize: str | None = "lowercase",
+    ) -> list[SearchResult]:
         """
         Search with similarity scoring.
 
@@ -2230,9 +2230,9 @@ class NgramIndex:
         queries: Sequence[str],
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
-        limit: Optional[int] = None,
-        normalize: Optional[str] = "lowercase",
-    ) -> List[List[SearchResult]]:
+        limit: int | None = None,
+        normalize: str | None = "lowercase",
+    ) -> list[list[SearchResult]]:
         """Search for multiple queries in parallel."""
         ...
 
@@ -2241,8 +2241,8 @@ class NgramIndex:
         query: str,
         limit: int,
         algorithm: str = "jaro_winkler",
-        normalize: Optional[str] = "lowercase",
-    ) -> List[SearchResult]:
+        normalize: str | None = "lowercase",
+    ) -> list[SearchResult]:
         """
         Find the nearest neighbors by similarity.
 
@@ -2262,7 +2262,7 @@ class NgramIndex:
         """Check if the index contains an exact match."""
         ...
 
-    def get_candidates(self, query: str) -> List[tuple[int, str]]:
+    def get_candidates(self, query: str) -> list[tuple[int, str]]:
         """Get all candidates that share n-grams with query."""
         ...
 
@@ -2312,7 +2312,7 @@ class NgramIndex:
         """Check if the index is currently compressed."""
         ...
 
-    def compression_stats(self) -> Optional[tuple[int, int, float]]:
+    def compression_stats(self) -> tuple[int, int, float] | None:
         """
         Get compression statistics.
 
@@ -2397,9 +2397,9 @@ class HybridIndex:
         query: str,
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
-        limit: Optional[int] = None,
-        normalize: Optional[str] = "lowercase",
-    ) -> List[SearchResult]:
+        limit: int | None = None,
+        normalize: str | None = "lowercase",
+    ) -> list[SearchResult]:
         """
         Search for similar strings.
 
@@ -2421,9 +2421,9 @@ class HybridIndex:
         queries: Sequence[str],
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
-        limit: Optional[int] = None,
-        normalize: Optional[str] = "lowercase",
-    ) -> List[List[SearchResult]]:
+        limit: int | None = None,
+        normalize: str | None = "lowercase",
+    ) -> list[list[SearchResult]]:
         """
         Search for multiple queries in parallel.
 
@@ -2443,12 +2443,12 @@ class HybridIndex:
     def find_nearest(
         self,
         query: str,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         algorithm: str = "jaro_winkler",
-        normalize: Optional[str] = "lowercase",
+        normalize: str | None = "lowercase",
         *,
-        k: Optional[int] = None,
-    ) -> List[SearchResult]:
+        k: int | None = None,
+    ) -> list[SearchResult]:
         """
         Find the nearest neighbors by similarity.
 
@@ -2502,7 +2502,7 @@ class SchemaSearchResult:
     score: float
     field_scores: dict[str, float]
     record: dict[str, str]
-    data: Optional[UserData]
+    data: UserData | None
 
     def __init__(
         self,
@@ -2510,7 +2510,7 @@ class SchemaSearchResult:
         score: float,
         field_scores: dict[str, float],
         record: dict[str, str],
-        data: Optional[UserData] = None,
+        data: UserData | None = None,
     ) -> None: ...
 
 class SchemaBuilder:
@@ -2543,10 +2543,10 @@ class SchemaBuilder:
         algorithm: str = "jaro_winkler",
         weight: float = 1.0,
         required: bool = False,
-        normalize: Optional[str] = None,
-        max_length: Optional[int] = None,
-        separator: Optional[str] = None,
-        chunk_size: Optional[int] = None,
+        normalize: str | None = None,
+        max_length: int | None = None,
+        separator: str | None = None,
+        chunk_size: int | None = None,
     ) -> None:
         """
         Add a field to the schema.
@@ -2607,7 +2607,7 @@ class Schema:
         Use SchemaBuilder to create new schemas.
     """
 
-    def field_names(self) -> List[str]:
+    def field_names(self) -> list[str]:
         """Get list of all field names in the schema."""
         ...
 
@@ -2666,7 +2666,7 @@ class SchemaIndex:
     def add(
         self,
         record: dict[str, str],
-        data: Optional[UserData] = None,
+        data: UserData | None = None,
     ) -> int:
         """
         Add a record to the index.
@@ -2691,7 +2691,7 @@ class SchemaIndex:
         """
         ...
 
-    def get(self, id: int) -> Optional[dict[str, str]]:
+    def get(self, id: int) -> dict[str, str] | None:
         """
         Retrieve a record by its ID.
 
@@ -2712,10 +2712,10 @@ class SchemaIndex:
         self,
         query: dict[str, str],
         min_similarity: float = 0.0,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         min_field_similarity: float = 0.0,
-        field_boosts: Optional[dict[str, float]] = None,
-    ) -> List[SchemaSearchResult]:
+        field_boosts: dict[str, float] | None = None,
+    ) -> list[SchemaSearchResult]:
         """
         Search for records matching the query across multiple fields.
 
@@ -2764,12 +2764,12 @@ class SchemaIndex:
 
     def batch_search(
         self,
-        queries: List[dict[str, str]],
+        queries: list[dict[str, str]],
         min_similarity: float = 0.0,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         min_field_similarity: float = 0.0,
-        field_boosts: Optional[dict[str, float]] = None,
-    ) -> List[List[SchemaSearchResult]]:
+        field_boosts: dict[str, float] | None = None,
+    ) -> list[list[SchemaSearchResult]]:
         """
         Search for multiple queries in parallel.
 
@@ -2812,7 +2812,7 @@ class SchemaIndex:
         ...
 
 # Convenience aliases - these are function references, not type aliases
-def edit_distance(a: str, b: str, max_distance: Optional[int] = None) -> int:
+def edit_distance(a: str, b: str, max_distance: int | None = None) -> int:
     """Alias for levenshtein(). Compute edit distance between two strings."""
     ...
 
