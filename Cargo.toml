@@ -34,7 +34,7 @@ triple_accel = "0.4"
 pyo3-polars = { version = "0.20", optional = true, features = ["derive"] }
 polars = { version = "0.46", optional = true, default-features = false, features = ["lazy", "strings", "dtype-struct"] }
 polars-arrow = { version = "0.46", optional = true }
-polars-core = { version = "0.46", optional = true }
+polars-core = { version = "0.52", optional = true }
 
 [features]
 default = []
