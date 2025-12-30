@@ -126,11 +126,61 @@ fr.levenshtein_ci("ABC", "abc")  # 0
 
 ## Choosing an Algorithm
 
-| Use Case | Recommended Algorithm |
-|----------|----------------------|
-| Names | Jaro-Winkler, Soundex |
-| Typo correction | Levenshtein, Damerau-Levenshtein |
-| Product matching | N-gram, Cosine |
-| Address matching | Jaro-Winkler + normalization |
-| DNA sequences | LCS, Hamming |
-| Document similarity | Cosine |
+### Quick Reference
+
+| Use Case | Recommended | Why |
+|----------|-------------|-----|
+| **Person names** | `jaro_winkler` | Handles transpositions, rewards matching prefixes |
+| **Company names** | `ngram_similarity` | Robust to word reordering and abbreviations |
+| **Typo correction** | `levenshtein` | Directly measures edit operations |
+| **Keyboard typos** | `damerau_levenshtein` | Handles swapped characters (transpositions) |
+| **Addresses** | `jaro_winkler` + normalize | Good for variable-length strings |
+| **Product codes** | `hamming` or `jaro` | Fixed-length or prefix-sensitive |
+| **Long text** | `cosine_similarity` | Efficient for documents, ignores length |
+| **Phonetic matching** | `soundex` or `metaphone` | Names that sound alike but spell differently |
+
+### Decision Guide
+
+**Start here:**
+
+1. **Are strings fixed-length?** (e.g., codes, IDs)
+   - Yes → Use `hamming` (fastest, position-sensitive)
+
+2. **Do you need phonetic matching?** (e.g., "Smith" vs "Smyth")
+   - Yes → Use `soundex` or `metaphone`
+
+3. **Are strings short?** (< 20 characters, like names)
+   - Yes → Use `jaro_winkler` (best for names, handles transpositions)
+
+4. **Are strings medium-length?** (words, product names)
+   - Yes → Use `ngram_similarity` or `levenshtein_similarity`
+
+5. **Are strings long?** (sentences, paragraphs)
+   - Yes → Use `cosine_similarity` (efficient, word-based)
+
+### Common Patterns
+
+**Name matching:**
+```python
+# Best for person names
+fr.jaro_winkler("John Smith", "Jon Smyth")
+
+# Add phonetic for sound-alike names
+if fr.soundex("Smith") == fr.soundex("Smyth"):
+    # Likely same name
+```
+
+**Fuzzy search with typos:**
+```python
+# For keyboard typos (adjacent key errors)
+fr.damerau_levenshtein("teh", "the")  # 1 (transposition)
+
+# For general typos
+fr.levenshtein_similarity("recieve", "receive")
+```
+
+**Product/company matching:**
+```python
+# Handles word reordering and partial matches
+fr.ngram_similarity("Apple Inc.", "Inc. Apple", ngram_size=3)
+```

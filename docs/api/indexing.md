@@ -143,7 +143,10 @@ Add strings to the tree.
 search(query: str, max_distance: int) -> list[SearchResult]
 ```
 
-Find strings within edit distance.
+Find strings within edit distance threshold.
+
+!!! note
+    Consider using `search_similarity()` instead for consistency with NgramIndex and HybridIndex APIs.
 
 #### search_similarity
 
@@ -155,7 +158,9 @@ search_similarity(
 ) -> list[SearchResult]
 ```
 
-Find strings above similarity threshold.
+Find strings above similarity threshold. **Recommended over `search()`** for API consistency.
+
+The similarity is computed as: `1 - (distance / max(len(query), len(match)))`
 
 #### save / load
 

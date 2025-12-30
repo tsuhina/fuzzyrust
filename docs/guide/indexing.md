@@ -78,13 +78,38 @@ tree = fr.BkTree(algorithm="levenshtein")
 # Add strings
 tree.add_all(["apple", "apply", "maple", "orange", "banana"])
 
-# Find strings within distance 2
+# Recommended: Use similarity threshold (consistent with other APIs)
+results = tree.search_similarity("aple", min_similarity=0.7)
+
+# Alternative: Use distance threshold (if you need exact edit distance control)
 results = tree.search("aple", max_distance=2)
 # Returns: apple (1), apply (2), maple (2)
-
-# Find strings with similarity threshold
-results = tree.search_similarity("aple", min_similarity=0.7)
 ```
+
+### Distance vs Similarity
+
+BkTree supports two search methods:
+
+| Method | Threshold | Use When |
+|--------|-----------|----------|
+| `search_similarity()` | `min_similarity` (0.0-1.0) | **Recommended** - consistent with other FuzzyRust APIs |
+| `search()` | `max_distance` (integer) | When you need exact edit distance control |
+
+**Conversion formula:**
+```
+similarity ≈ 1 - (distance / max(len(s1), len(s2)))
+```
+
+**Example:**
+```python
+# These are roughly equivalent for strings of length 5:
+tree.search("hello", max_distance=1)      # distance <= 1
+tree.search_similarity("hello", min_similarity=0.8)  # similarity >= 80%
+```
+
+!!! tip "Prefer `search_similarity()`"
+    Use `search_similarity()` for consistency with NgramIndex and HybridIndex.
+    All three indices then use the same `min_similarity` parameter.
 
 ### Parallel Search
 
@@ -95,7 +120,7 @@ tree = fr.BkTree()
 tree.add_all(million_strings)
 
 # Automatically uses parallel search
-results = tree.search("query", max_distance=2)
+results = tree.search_similarity("query", min_similarity=0.8)
 ```
 
 ## HybridIndex
