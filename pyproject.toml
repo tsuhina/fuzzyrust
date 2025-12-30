@@ -43,6 +43,7 @@ dev = [
     "hypothesis>=6.0",
     "ruff>=0.14.10",
     "pytest-cov>=7.0.0",
+    "pre-commit>=4.3.0",
 ]
 benchmarks = [
     "jellyfish>=1.2.1",

@@ -1,0 +1,28 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: cargo-check
+        name: cargo check
+        entry: cargo check --all-features
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --
+        language: system
+        types: [rust]
+        pass_filenames: true
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --all-features -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
