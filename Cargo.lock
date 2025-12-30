@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "fuzzyrust"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ahash",
  "bincode",
@@ -516,7 +516,7 @@ dependencies = [
  "rayon",
  "serde",
  "smallvec",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "triple_accel",
  "unicode-normalization",
  "unicode-segmentation",
