@@ -1,0 +1,53 @@
+site_name: FuzzyRust
+site_description: High-performance string similarity library for Python, written in Rust
+site_url: https://fuzzyrust.readthedocs.io/
+repo_url: https://github.com/tsuhina/fuzzyrust
+repo_name: tsuhina/fuzzyrust
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - User Guide:
+      - Similarity Algorithms: guide/algorithms.md
+      - Index Structures: guide/indexing.md
+      - Polars Integration: guide/polars.md
+      - Multi-Field Matching: guide/schema.md
+  - API Reference:
+      - Core Functions: api/core.md
+      - Index Classes: api/indexing.md
+      - Polars API: api/polars.md
+  - Performance: performance.md
