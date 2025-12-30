@@ -48,9 +48,8 @@ class TestPluginDetection:
             # Check it's disabled
             # Force re-evaluation by resetting the cached value
             import fuzzyrust._plugin as plugin_module
-            from fuzzyrust._plugin import _PLUGIN_AVAILABLE
 
-            plugin_module._PLUGIN_AVAILABLE = None
+            plugin_module._state.available = None
 
             assert not is_plugin_available(), "Plugin should be disabled"
         finally:
