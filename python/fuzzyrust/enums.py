@@ -25,6 +25,9 @@ class Algorithm(str, Enum):
     DAMERAU_LEVENSHTEIN = "damerau_levenshtein"
     """Edit distance including transpositions (e.g., 'ca' -> 'ac' is 1 edit)"""
 
+    DAMERAU = "damerau"
+    """Alias for DAMERAU_LEVENSHTEIN"""
+
     JARO = "jaro"
     """Jaro similarity, good for short strings"""
 

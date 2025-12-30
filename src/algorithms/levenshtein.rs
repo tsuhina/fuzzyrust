@@ -459,6 +459,244 @@ pub fn levenshtein_similarity(a: &str, b: &str) -> f64 {
     }
 }
 
+/// Compute Levenshtein similarity between a string and a char slice.
+///
+/// This is an optimization for cases where you already have a char slice
+/// (e.g., a window into a longer string's chars), avoiding the need to
+/// collect the chars back into a String for comparison.
+///
+/// # Arguments
+/// * `s` - The source string
+/// * `chars` - A char slice to compare against
+///
+/// # Example
+/// ```
+/// use fuzzyrust::algorithms::levenshtein::levenshtein_similarity_with_chars;
+///
+/// let chars: Vec<char> = "hello".chars().collect();
+/// let score = levenshtein_similarity_with_chars("hallo", &chars);
+/// assert!(score > 0.7);
+/// ```
+#[inline]
+#[must_use]
+pub fn levenshtein_similarity_with_chars(s: &str, chars: &[char]) -> f64 {
+    let s_chars: SmallVec<[char; 64]> = s.chars().collect();
+    let s_len = s_chars.len();
+    let chars_len = chars.len();
+
+    if s_len == 0 && chars_len == 0 {
+        return 1.0;
+    }
+    if s_len == 0 || chars_len == 0 {
+        return 0.0;
+    }
+
+    // Use the shorter one as pattern for Myers algorithm
+    let (pattern, text) = if s_len <= chars_len {
+        (&s_chars[..], chars)
+    } else {
+        (chars, &s_chars[..])
+    };
+
+    let dist = if pattern.len() <= MYERS_BLOCK_SIZE {
+        myers_64(pattern, text)
+    } else {
+        dp_distance(pattern, text)
+    };
+
+    let max_len = s_len.max(chars_len);
+    1.0 - (dist as f64 / max_len as f64)
+}
+
+// ============================================================================
+// Grapheme Cluster Mode
+// ============================================================================
+
+use unicode_segmentation::UnicodeSegmentation;
+
+/// Levenshtein distance treating grapheme clusters as single units.
+///
+/// This is useful for text with emoji sequences or combining characters
+/// where a single visual character may be multiple Unicode code points.
+///
+/// # Examples
+/// ```
+/// use fuzzyrust::algorithms::levenshtein::levenshtein_grapheme;
+///
+/// // 👨‍👩‍👧‍👦 is 7 code points but 1 grapheme cluster
+/// let family = "👨‍👩‍👧‍👦";
+/// let man = "👨";
+///
+/// // With graphemes, the family emoji counts as 1 unit
+/// assert_eq!(levenshtein_grapheme(family, man), 1);
+/// ```
+#[must_use]
+pub fn levenshtein_grapheme(a: &str, b: &str) -> usize {
+    if a == b {
+        return 0;
+    }
+
+    // Collect grapheme clusters
+    let a_graphemes: SmallVec<[&str; 64]> = a.graphemes(true).collect();
+    let b_graphemes: SmallVec<[&str; 64]> = b.graphemes(true).collect();
+
+    let m = a_graphemes.len();
+    let n = b_graphemes.len();
+
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+
+    // Use standard DP for grapheme mode (simpler, still fast for typical strings)
+    dp_distance_generic(&a_graphemes, &b_graphemes)
+}
+
+/// DP distance for generic comparable slices (used for grapheme mode)
+fn dp_distance_generic<T: PartialEq>(a: &[T], b: &[T]) -> usize {
+    let m = a.len();
+    let n = b.len();
+
+    // Use single-row DP with two rows optimization
+    let mut prev: SmallVec<[usize; 128]> = (0..=n).collect();
+    let mut curr: SmallVec<[usize; 128]> = SmallVec::with_capacity(n + 1);
+
+    for i in 1..=m {
+        curr.clear();
+        curr.push(i);
+
+        for j in 1..=n {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            let val = (prev[j] + 1) // deletion
+                .min(curr[j - 1] + 1) // insertion
+                .min(prev[j - 1] + cost); // substitution
+            curr.push(val);
+        }
+
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[n]
+}
+
+/// Grapheme-aware Levenshtein similarity (0.0 to 1.0)
+///
+/// Normalizes edit distance by the maximum grapheme cluster count.
+#[inline]
+#[must_use]
+pub fn levenshtein_similarity_grapheme(a: &str, b: &str) -> f64 {
+    let dist = levenshtein_grapheme(a, b);
+    let max_len = a.graphemes(true).count().max(b.graphemes(true).count());
+    if max_len == 0 {
+        1.0
+    } else {
+        1.0 - (dist as f64 / max_len as f64)
+    }
+}
+
+// ============================================================================
+// SIMD-Accelerated Functions (via triple_accel)
+// ============================================================================
+
+/// SIMD-accelerated Levenshtein distance.
+///
+/// Uses triple_accel's SIMD-optimized implementation which can be 20-30x faster
+/// than the scalar implementation for longer strings. Automatically falls back
+/// to scalar on CPUs without SIMD support.
+///
+/// Best for:
+/// - Long strings (>100 characters)
+/// - Batch processing many comparisons
+/// - x86/x86-64 CPUs with AVX2 or SSE4.1
+///
+/// # Examples
+/// ```
+/// use fuzzyrust::algorithms::levenshtein::levenshtein_simd;
+///
+/// assert_eq!(levenshtein_simd("kitten", "sitting"), 3);
+/// assert_eq!(levenshtein_simd("hello", "hallo"), 1);
+/// ```
+#[inline]
+#[must_use]
+pub fn levenshtein_simd(a: &str, b: &str) -> usize {
+    if a == b {
+        return 0;
+    }
+    if a.is_empty() {
+        return b.len();
+    }
+    if b.is_empty() {
+        return a.len();
+    }
+
+    // triple_accel works on bytes, which is fine for ASCII
+    // For Unicode, we still get correct edit distance on byte level
+    triple_accel::levenshtein::levenshtein(a.as_bytes(), b.as_bytes()) as usize
+}
+
+/// SIMD-accelerated Levenshtein distance with max threshold.
+///
+/// Returns `None` if the distance exceeds `max_distance`, enabling early termination.
+/// Uses SIMD acceleration when available for optimal performance.
+///
+/// # Examples
+/// ```
+/// use fuzzyrust::algorithms::levenshtein::levenshtein_simd_bounded;
+///
+/// // Within threshold
+/// assert_eq!(levenshtein_simd_bounded("hello", "hallo", 2), Some(1));
+///
+/// // Exceeds threshold
+/// assert_eq!(levenshtein_simd_bounded("abc", "xyz", 2), None);
+/// ```
+#[inline]
+#[must_use]
+pub fn levenshtein_simd_bounded(a: &str, b: &str, max_distance: usize) -> Option<usize> {
+    if a == b {
+        return Some(0);
+    }
+
+    let a_len = a.len();
+    let b_len = b.len();
+
+    if a_len == 0 {
+        return if b_len <= max_distance { Some(b_len) } else { None };
+    }
+    if b_len == 0 {
+        return if a_len <= max_distance { Some(a_len) } else { None };
+    }
+
+    // Early exit if length difference exceeds threshold
+    if a_len.abs_diff(b_len) > max_distance {
+        return None;
+    }
+
+    // triple_accel's levenshtein_simd_k returns Option<u32>
+    triple_accel::levenshtein::levenshtein_simd_k(
+        a.as_bytes(),
+        b.as_bytes(),
+        max_distance as u32,
+    ).map(|d| d as usize)
+}
+
+/// SIMD-accelerated Levenshtein similarity (0.0 to 1.0).
+///
+/// Uses SIMD acceleration for the distance calculation, providing
+/// significant speedups on x86/x86-64 CPUs.
+#[inline]
+#[must_use]
+pub fn levenshtein_similarity_simd(a: &str, b: &str) -> f64 {
+    let dist = levenshtein_simd(a, b);
+    let max_len = a.len().max(b.len());
+    if max_len == 0 {
+        1.0
+    } else {
+        1.0 - (dist as f64 / max_len as f64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

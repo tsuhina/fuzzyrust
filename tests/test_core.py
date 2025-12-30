@@ -1,528 +1,38 @@
-"""Comprehensive tests for fuzzyrust."""
+"""Core tests for fuzzyrust: property-based, benchmarks, threading, memory, and edge cases.
+
+This module contains cross-cutting tests that don't fit cleanly into algorithm-specific
+test modules:
+- Property-based tests using Hypothesis
+- Performance benchmarks using pytest-benchmark
+- Thread safety tests
+- Memory stress tests
+- Unicode edge cases
+- Error handling tests
+- General edge cases
+
+Algorithm-specific tests are now in separate modules:
+- test_levenshtein.py: Levenshtein, Damerau-Levenshtein, Hamming
+- test_jaro.py: Jaro, Jaro-Winkler
+- test_ngram.py: N-gram, bigram, trigram, cosine similarity
+- test_phonetic.py: Soundex, Metaphone
+- test_lcs.py: Longest Common Subsequence/Substring
+- test_batch.py: Batch processing functions
+- test_indexes.py: BK-tree, N-gram index, Hybrid index
+- test_normalization.py: String normalization modes
+- test_fuzz.py: RapidFuzz-compatible functions
+- test_schema.py: Schema-based multi-field matching
+"""
+
+import concurrent.futures
+import string
+import threading
 
 import pytest
 
 
-class TestLevenshtein:
-    """Tests for Levenshtein distance functions."""
-
-    def test_identical_strings(self):
-        import fuzzyrust as fr
-
-        assert fr.levenshtein("hello", "hello") == 0
-        assert fr.levenshtein("", "") == 0
-
-    def test_empty_strings(self):
-        import fuzzyrust as fr
-
-        assert fr.levenshtein("hello", "") == 5
-        assert fr.levenshtein("", "hello") == 5
-
-    def test_classic_examples(self):
-        import fuzzyrust as fr
-
-        assert fr.levenshtein("kitten", "sitting") == 3
-        assert fr.levenshtein("saturday", "sunday") == 3
-
-    def test_unicode(self):
-        import fuzzyrust as fr
-
-        assert fr.levenshtein("café", "cafe") == 1
-        assert fr.levenshtein("日本語", "日本") == 1
-
-    def test_max_distance(self):
-        import fuzzyrust as fr
-
-        # Should return MAX when distance exceeds threshold
-        # Note: Rust's usize::MAX (2^64-1) differs from Python's sys.maxsize (2^63-1)
-        result = fr.levenshtein("abcdef", "ghijkl", max_distance=3)
-        assert result > 2**63  # Very large value indicating exceeded threshold
-
-        # Should return actual distance when within threshold
-        assert fr.levenshtein("abc", "abd", max_distance=2) == 1
-
-    def test_similarity(self):
-        import fuzzyrust as fr
-
-        assert fr.levenshtein_similarity("hello", "hello") == 1.0
-        assert fr.levenshtein_similarity("hello", "") == 0.0
-        assert 0.5 < fr.levenshtein_similarity("hello", "hallo") < 1.0
-
-
-class TestDamerauLevenshtein:
-    """Tests for Damerau-Levenshtein distance."""
-
-    def test_transposition(self):
-        import fuzzyrust as fr
-
-        # Damerau counts transposition as 1 edit
-        assert fr.damerau_levenshtein("ab", "ba") == 1
-        assert fr.damerau_levenshtein("ca", "ac") == 1
-
-        # Regular Levenshtein would count this as 2
-        assert fr.levenshtein("ab", "ba") == 2
-
-    def test_similarity(self):
-        import fuzzyrust as fr
-
-        sim = fr.damerau_levenshtein_similarity("hello", "ehllo")
-        assert 0.7 < sim < 1.0
-
-
-class TestJaro:
-    """Tests for Jaro and Jaro-Winkler similarity."""
-
-    def test_jaro_identical(self):
-        import fuzzyrust as fr
-
-        assert fr.jaro_similarity("hello", "hello") == 1.0
-        assert fr.jaro_similarity("", "") == 1.0
-
-    def test_jaro_different(self):
-        import fuzzyrust as fr
-
-        assert fr.jaro_similarity("abc", "xyz") == 0.0
-
-    def test_jaro_classic_examples(self):
-        import fuzzyrust as fr
-
-        # Classic MARTHA/MARHTA example
-        sim = fr.jaro_similarity("MARTHA", "MARHTA")
-        assert 0.94 < sim < 0.95
-
-    def test_jaro_winkler_prefix_boost(self):
-        import fuzzyrust as fr
-
-        jaro = fr.jaro_similarity("MARTHA", "MARHTA")
-        jaro_winkler = fr.jaro_winkler_similarity("MARTHA", "MARHTA")
-        # Jaro-Winkler should be higher due to common prefix
-        assert jaro_winkler > jaro
-
-    def test_jaro_winkler_params(self):
-        import fuzzyrust as fr
-
-        # Higher prefix weight should increase similarity for common prefixes
-        default = fr.jaro_winkler_similarity("prefix_test", "prefix_best")
-        higher = fr.jaro_winkler_similarity("prefix_test", "prefix_best", prefix_weight=0.2)
-        assert higher >= default
-
-
-class TestHamming:
-    """Tests for Hamming distance."""
-
-    def test_equal_length(self):
-        import fuzzyrust as fr
-
-        assert fr.hamming("karolin", "kathrin") == 3
-        assert fr.hamming("abc", "abc") == 0
-
-    def test_unequal_length_raises(self):
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError):
-            fr.hamming("abc", "ab")
-
-
-class TestNgram:
-    """Tests for N-gram similarity."""
-
-    def test_extract_ngrams(self):
-        import fuzzyrust as fr
-
-        ngrams = fr.extract_ngrams("abc", ngram_size=2, pad=False)
-        # Use set comparison to avoid order dependency
-        assert set(ngrams) == {"ab", "bc"}
-        assert len(ngrams) == 2
-
-        ngrams_padded = fr.extract_ngrams("abc", ngram_size=2, pad=True)
-        assert len(ngrams_padded) == 4  # " a", "ab", "bc", "c "
-
-    def test_similarity(self):
-        import fuzzyrust as fr
-
-        assert fr.ngram_similarity("abc", "abc") == 1.0
-        assert fr.ngram_similarity("abc", "xyz") == 0.0
-
-        # Partial similarity - "night" and "nacht" with bigram padding:
-        # " n", "ni", "ig", "gh", "ht", "t " vs " n", "na", "ac", "ch", "ht", "t "
-        # Intersection: {" n", "ht", "t "} = 3, Total: 6+6=12
-        # Sørensen-Dice = 2*3/12 = 0.5
-        sim = fr.ngram_similarity("night", "nacht")
-        assert 0.49 < sim < 0.51
-
-
-class TestPhonetic:
-    """Tests for phonetic algorithms."""
-
-    def test_soundex(self):
-        import fuzzyrust as fr
-
-        assert fr.soundex("Robert") == "R163"
-        assert fr.soundex("Rupert") == "R163"
-
-    def test_soundex_match(self):
-        import fuzzyrust as fr
-
-        assert fr.soundex_match("Robert", "Rupert")
-        assert fr.soundex_match("Smith", "Smyth")
-        assert not fr.soundex_match("Robert", "Rubin")
-
-    def test_metaphone(self):
-        import fuzzyrust as fr
-
-        assert fr.metaphone("phone") == "FN"
-
-    def test_metaphone_match(self):
-        import fuzzyrust as fr
-
-        assert fr.metaphone_match("phone", "fone")
-        assert fr.metaphone_match("Stephen", "Steven")
-
-
-class TestLCS:
-    """Tests for Longest Common Subsequence."""
-
-    def test_lcs_length(self):
-        import fuzzyrust as fr
-
-        assert fr.lcs_length("ABCDGH", "AEDFHR") == 3  # ADH
-        assert fr.lcs_length("AGGTAB", "GXTXAYB") == 4  # GTAB
-
-    def test_lcs_string(self):
-        import fuzzyrust as fr
-
-        assert fr.lcs_string("ABCDGH", "AEDFHR") == "ADH"
-
-    def test_longest_common_substring(self):
-        import fuzzyrust as fr
-
-        assert fr.longest_common_substring("abcdef", "zbcdf") == "bcd"
-        assert fr.longest_common_substring_length("abcdef", "zbcdf") == 3
-
-
-class TestCosine:
-    """Tests for Cosine similarity."""
-
-    def test_cosine_chars(self):
-        import fuzzyrust as fr
-
-        assert fr.cosine_similarity_chars("abc", "abc") == 1.0
-        assert fr.cosine_similarity_chars("abc", "def") == 0.0
-
-    def test_cosine_words(self):
-        import fuzzyrust as fr
-
-        a = "the quick brown fox"
-        b = "the quick brown dog"
-        sim = fr.cosine_similarity_words(a, b)
-        assert 0.5 < sim < 1.0
-
-
-class TestBatchProcessing:
-    """Tests for batch processing functions."""
-
-    def test_batch_levenshtein(self):
-        import fuzzyrust as fr
-
-        strings = ["hello", "hallo", "hullo", "world"]
-        results = fr.batch_levenshtein(strings, "hello")
-        # Results are now MatchResult objects
-        assert results[0].score == 1.0  # hello (exact match)
-        assert results[0].text == "hello"
-        assert results[1].text == "hallo"
-        assert results[3].text == "world"
-
-    def test_batch_jaro_winkler(self):
-        import fuzzyrust as fr
-
-        strings = ["hello", "hallo", "world"]
-        results = fr.batch_jaro_winkler(strings, "hello")
-        # Results are now MatchResult objects
-        assert results[0].score == 1.0
-        assert results[1].score > results[2].score
-
-    def test_find_best_matches(self):
-        import fuzzyrust as fr
-
-        strings = ["apple", "apply", "banana", "application"]
-        results = fr.find_best_matches(strings, "appel", limit=2, min_similarity=0.0)
-        assert len(results) == 2
-        # Results are now MatchResult objects
-        assert results[0].text == "apple"  # Best match
-        assert results[0].score >= results[1].score  # Sorted by score
-
-
-class TestBkTree:
-    """Tests for BK-tree index."""
-
-    def test_basic_operations(self):
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add("hello")
-        tree.add("hallo")
-        tree.add("hullo")
-        assert len(tree) == 3
-        assert tree.contains("hello")
-        assert not tree.contains("helloo")
-
-    def test_add_all(self):
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_all(["hello", "world", "test"])
-        assert len(tree) == 3
-
-    def test_search(self):
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_all(["book", "books", "boo", "cook", "cake"])
-        results = tree.search("book", max_distance=1)
-        # Results are now SearchResult objects
-        texts = [r.text for r in results]
-        assert "book" in texts
-        assert "books" in texts
-        assert "boo" in texts
-        assert "cook" in texts
-        assert "cake" not in texts
-
-    def test_find_nearest(self):
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_all(["apple", "application", "apply", "banana"])
-        results = tree.find_nearest("appli", k=2)
-        assert len(results) == 2
-        # Results are SearchResult objects
-        assert all(hasattr(r, "text") and hasattr(r, "score") for r in results)
-
-    def test_with_data(self):
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_with_data("hello", 42)
-        tree.add_with_data("world", 99)
-        results = tree.search("hello", max_distance=0)
-        # Results are SearchResult objects
-        assert results[0].data == 42
-
-    def test_damerau_mode(self):
-        import fuzzyrust as fr
-
-        tree_lev = fr.BkTree(use_damerau=False)
-        tree_dam = fr.BkTree(use_damerau=True)
-
-        tree_lev.add("ab")
-        tree_dam.add("ab")
-
-        # "ba" is distance 2 in Levenshtein, 1 in Damerau
-        results_lev = tree_lev.search("ba", max_distance=1)
-        results_dam = tree_dam.search("ba", max_distance=1)
-
-        assert len(results_lev) == 0
-        assert len(results_dam) == 1
-
-
-class TestNgramIndex:
-    """Tests for N-gram index."""
-
-    def test_basic_operations(self):
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)
-        id1 = index.add("hello")
-        id2 = index.add("world")
-        assert len(index) == 2
-        assert id1 == 0
-        assert id2 == 1
-
-    def test_search(self):
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)
-        index.add_all(["hello", "hallo", "hullo", "world", "help"])
-        results = index.search("hello", algorithm="jaro_winkler", min_similarity=0.8)
-        # Results are now SearchResult objects
-        texts = [r.text for r in results]
-        assert "hello" in texts
-
-    def test_search_algorithms(self):
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)
-        index.add_all(["test", "text", "best"])
-
-        for algo in ["jaro_winkler", "jaro", "levenshtein", "ngram", "trigram"]:
-            results = index.search("test", algorithm=algo)
-            assert len(results) > 0
-
-    def test_batch_search(self):
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)
-        index.add_all(["apple", "banana", "cherry"])
-        results = index.batch_search(["apple", "banan"], algorithm="jaro_winkler")
-        assert len(results) == 2
-        # Each result is a list of SearchResult objects
-        assert all(isinstance(r, list) for r in results)
-
-    def test_with_data(self):
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)
-        index.add_with_data("product-123", 42)
-        results = index.search("product-123", min_similarity=0.9)
-        # Results are SearchResult objects
-        assert results[0].data == 42
-
-
-class TestHybridIndex:
-    """Tests for Hybrid index."""
-
-    def test_basic_operations(self):
-        import fuzzyrust as fr
-
-        index = fr.HybridIndex(ngram_size=3)
-        index.add_all(["hello", "world", "test"])
-        assert len(index) == 3
-
-    def test_search(self):
-        import fuzzyrust as fr
-
-        index = fr.HybridIndex()
-        index.add_all(["apple", "application", "apply", "banana"])
-        results = index.search("appel", min_similarity=0.7, limit=2)
-        assert len(results) <= 2
-
-
-class TestCaseInsensitiveSearch:
-    """Tests for case_insensitive parameter in NgramIndex and HybridIndex."""
-
-    def test_case_insensitive_default(self):
-        """Test that case_insensitive=True is the default."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2, min_ngram_ratio=0.2)
-        index.add_all(["Rain shadow jkt", "Fleece jacket"])
-
-        # Default should be case-insensitive
-        results = index.search("rain jacket", min_similarity=0.5)
-        texts = [r.text for r in results]
-
-        # Should find "Rain shadow jkt" with good score
-        assert "Rain shadow jkt" in texts
-
-    def test_case_sensitive_search(self):
-        """Test that case_insensitive=False gives lower scores for case mismatches."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2, min_ngram_ratio=0.2)
-        index.add_all(["Rain shadow jkt", "rain shadow jkt"])
-
-        # Case-insensitive should score both equally
-        results_ci = index.search("rain jacket", min_similarity=0.5, case_insensitive=True)
-        # Case-sensitive should score lowercase higher
-        results_cs = index.search("rain jacket", min_similarity=0.5, case_insensitive=False)
-
-        # With case-insensitive, "Rain shadow jkt" should have higher score
-        ci_scores = {r.text: r.score for r in results_ci}
-        cs_scores = {r.text: r.score for r in results_cs}
-
-        # Case-insensitive should give same score for both
-        if "Rain shadow jkt" in ci_scores and "rain shadow jkt" in ci_scores:
-            assert abs(ci_scores["Rain shadow jkt"] - ci_scores["rain shadow jkt"]) < 0.01
-
-    def test_hybrid_index_case_insensitive(self):
-        """Test that HybridIndex also supports case_insensitive."""
-        import fuzzyrust as fr
-
-        # Use text with mixed case that shares n-grams with query
-        index = fr.HybridIndex(ngram_size=2, min_ngram_ratio=0.2)
-        index.add_all(["Hello World", "hello there", "goodbye world"])
-
-        # With case-insensitive, "Hello World" should score higher
-        results = index.search("hello world", min_similarity=0.5, case_insensitive=True)
-        texts = [r.text for r in results]
-
-        # Should find matches
-        assert len(results) > 0
-        # The top result should be "Hello World" with case-insensitive matching
-        assert results[0].text in ["Hello World", "hello there"]
-
-
-class TestNgramRatioFiltering:
-    """Tests for min_ngram_ratio parameter in NgramIndex and HybridIndex."""
-
-    def test_ngram_ratio_filters_irrelevant(self):
-        """Test that min_ngram_ratio filters out irrelevant candidates."""
-        import fuzzyrust as fr
-
-        products = [
-            "Fleece jacket full zip",
-            "Rain jacket waterproof",
-            "Hiking pants lightweight",
-            "Sleeveless a/c shirt",
-            "Cotton t-shirt basic",
-        ]
-
-        index = fr.NgramIndex(ngram_size=2, min_ngram_ratio=0.2)
-        index.add_all(products)
-
-        results = index.search("fleece jacket", algorithm="jaro_winkler", min_similarity=0.5)
-        texts = [r.text for r in results]
-
-        # Sleeveless shirt should NOT match - low n-gram overlap
-        assert "Sleeveless a/c shirt" not in texts
-
-    def test_ngram_ratio_validation(self):
-        """Test that invalid min_ngram_ratio raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="min_ngram_ratio"):
-            fr.NgramIndex(ngram_size=2, min_ngram_ratio=-0.1)
-
-        with pytest.raises(ValueError, match="min_ngram_ratio"):
-            fr.NgramIndex(ngram_size=2, min_ngram_ratio=1.5)
-
-    def test_hybrid_index_ngram_ratio(self):
-        """Test that HybridIndex also supports min_ngram_ratio."""
-        import fuzzyrust as fr
-
-        index = fr.HybridIndex(ngram_size=2, min_ngram_ratio=0.3)
-        index.add_all(["hello world", "hello there", "goodbye world"])
-
-        results = index.search("hello", min_similarity=0.5)
-        texts = [r.text for r in results]
-
-        # Should find hello matches
-        assert any("hello" in t for t in texts)
-
-    def test_product_search_use_case(self):
-        """Test the original problem case: product search filtering."""
-        import fuzzyrust as fr
-
-        products = [
-            "Alpine wind jkt",
-            "Rain shadow jkt",
-            "Fleece jacket full zip",
-            "Traverse jkt",
-            "Sleeveless a/c shirt",
-            "Guide jkt",
-        ]
-
-        index = fr.NgramIndex(ngram_size=3, min_ngram_ratio=0.2)
-        index.add_all(products)
-
-        results = index.search("fleece jacket", algorithm="jaro_winkler", min_similarity=0.5)
-        texts = [r.text for r in results]
-
-        # Should find fleece jacket
-        assert any("fleece" in t.lower() or "jacket" in t.lower() for t in texts)
-        # Should NOT find completely unrelated items
-        assert "Sleeveless a/c shirt" not in texts
+# =============================================================================
+# Edge Case Tests
+# =============================================================================
 
 
 class TestEdgeCases:
@@ -563,125 +73,6 @@ class TestEdgeCases:
         assert fr.jaro_winkler_similarity("Hello", "hello") < 1.0
 
 
-class TestNgramEdgeCases:
-    """Tests for n-gram edge cases including validation."""
-
-    def test_ngram_n_zero_raises_error(self):
-        """Test that ngram_size=0 raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.ngram_similarity("hello", "hello", ngram_size=0)
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.ngram_similarity("abc", "xyz", ngram_size=0)
-
-    def test_ngram_short_strings(self):
-        """Test n-gram behavior with strings shorter than ngram_size."""
-        import fuzzyrust as fr
-
-        # Short strings without padding return empty n-grams
-        ngrams = fr.extract_ngrams("a", ngram_size=3, pad=False)
-        assert ngrams == []
-
-    def test_ngram_jaccard_n_zero_raises_error(self):
-        """Test Jaccard similarity with ngram_size=0 raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.ngram_jaccard("hello", "hello", ngram_size=0)
-
-    def test_cosine_ngrams_n_zero_raises_error(self):
-        """Test cosine n-gram similarity with ngram_size=0 raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.cosine_similarity_ngrams("hello", "hello", ngram_size=0)
-
-    def test_extract_ngrams_n_zero_raises_error(self):
-        """Test extract_ngrams with ngram_size=0 raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.extract_ngrams("hello", ngram_size=0)
-
-    def test_ngram_profile_n_zero_raises_error(self):
-        """Test ngram_profile_similarity with ngram_size=0 raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.ngram_profile_similarity("hello", "hello", ngram_size=0)
-
-    def test_ngram_ci_variants_n_zero_raises_error(self):
-        """Test case-insensitive ngram functions with ngram_size=0 raise ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.ngram_similarity_ci("hello", "HELLO", ngram_size=0)
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.ngram_jaccard_ci("hello", "HELLO", ngram_size=0)
-        with pytest.raises(ValueError, match="ngram_size must be at least 1"):
-            fr.cosine_similarity_ngrams_ci("hello", "HELLO", ngram_size=0)
-
-
-class TestJaroWinklerValidation:
-    """Tests for Jaro-Winkler prefix_weight validation."""
-
-    def test_prefix_weight_too_high_raises_error(self):
-        """Test that prefix_weight > 0.25 raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        # Prefix weight > 0.25 should raise ValueError
-        with pytest.raises(ValueError, match="prefix_weight must be in range"):
-            fr.jaro_winkler_similarity("hello", "hello", prefix_weight=1.0)
-        with pytest.raises(ValueError, match="prefix_weight must be in range"):
-            fr.jaro_winkler_similarity("hello", "hello", prefix_weight=0.26)
-
-    def test_prefix_weight_negative_raises_error(self):
-        """Test that negative prefix_weight raises ValueError."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        # Negative weight should raise ValueError
-        with pytest.raises(ValueError, match="prefix_weight must be in range"):
-            fr.jaro_winkler_similarity("hello", "hallo", prefix_weight=-1.0)
-        with pytest.raises(ValueError, match="prefix_weight must be in range"):
-            fr.jaro_winkler_similarity("hello", "hallo", prefix_weight=-0.01)
-
-    def test_prefix_weight_valid_range(self):
-        """Test prefix_weight within valid range produces expected boost."""
-        import fuzzyrust as fr
-
-        jaro = fr.jaro_similarity("prefix_test", "prefix_best")
-        jaro_winkler = fr.jaro_winkler_similarity("prefix_test", "prefix_best", prefix_weight=0.1)
-        # With common prefix, Jaro-Winkler should be higher
-        assert jaro_winkler >= jaro
-
-    def test_prefix_weight_boundary_values(self):
-        """Test prefix_weight at boundary values (0 and 0.25)."""
-        import fuzzyrust as fr
-
-        # Boundary values should work
-        sim_zero = fr.jaro_winkler_similarity("hello", "hello", prefix_weight=0.0)
-        assert 0.0 <= sim_zero <= 1.0
-        sim_max = fr.jaro_winkler_similarity("hello", "hello", prefix_weight=0.25)
-        assert 0.0 <= sim_max <= 1.0
-
-
 class TestUnicodeEdgeCases:
     """Tests for Unicode edge cases."""
 
@@ -690,25 +81,26 @@ class TestUnicodeEdgeCases:
         import fuzzyrust as fr
 
         # Single emoji - should be treated as one character
-        assert fr.levenshtein("👋", "👋") == 0
-        assert fr.levenshtein("👋", "🖐") == 1
+        assert fr.levenshtein("\U0001F44B", "\U0001F44B") == 0
+        assert fr.levenshtein("\U0001F44B", "\U0001F590") == 1
 
         # Emoji in strings
-        assert fr.levenshtein("hello 👋", "hello 👋") == 0
-        assert fr.levenshtein("hello 👋", "hello 🖐") == 1
-        assert fr.levenshtein("hello 👋", "hello") == 2  # space + emoji
+        assert fr.levenshtein("hello \U0001F44B", "hello \U0001F44B") == 0
+        assert fr.levenshtein("hello \U0001F44B", "hello \U0001F590") == 1
+        assert fr.levenshtein("hello \U0001F44B", "hello") == 2  # space + emoji
 
         # Multiple emoji
-        assert fr.levenshtein("😀😃😄", "😀😃😄") == 0
-        assert fr.levenshtein("😀😃😄", "😀😃😁") == 1
+        assert fr.levenshtein("\U0001F600\U0001F603\U0001F604", "\U0001F600\U0001F603\U0001F604") == 0
+        assert fr.levenshtein("\U0001F600\U0001F603\U0001F604", "\U0001F600\U0001F603\U0001F601") == 1
 
-        # Emoji similarity
-        sim = fr.jaro_winkler_similarity("hello 👋", "hello 🖐")
-        assert 0.8 < sim < 1.0  # High similarity, only one char different
+        # Emoji similarity: 7 chars, 6 match = high jaro-winkler score
+        sim = fr.jaro_winkler_similarity("hello \U0001F44B", "hello \U0001F590")
+        # Jaro-Winkler for 6/7 matching chars with common prefix "hello "
+        assert 0.90 <= sim <= 0.95, f"Expected Jaro-Winkler ~0.93 for 6/7 matching chars, got {sim}"
 
         # Complex emoji (with skin tone modifiers) - treated as single unit
         # Note: This tests handling of multi-codepoint emoji
-        assert fr.levenshtein("👋🏻", "👋🏻") == 0
+        assert fr.levenshtein("\U0001F44B\U0001F3FB", "\U0001F44B\U0001F3FB") == 0
 
     def test_combining_characters(self):
         """Test handling of combining characters."""
@@ -716,37 +108,37 @@ class TestUnicodeEdgeCases:
 
         # Precomposed vs decomposed forms may differ
         # This tests that we handle multi-byte UTF-8 correctly
-        # café vs cafe (accented e)
-        assert fr.levenshtein("café", "cafe") == 1
+        # cafe with accent vs without
+        assert fr.levenshtein("caf\u00e9", "cafe") == 1
 
     def test_cjk_characters(self):
         """Test handling of CJK characters."""
         import fuzzyrust as fr
 
-        # Japanese: nihon vs nippon (日本 vs 日本語)
-        assert fr.levenshtein("日本", "日本語") == 1
+        # Japanese: nihon vs nippon (3 chars vs 2 chars)
+        assert fr.levenshtein("\u65e5\u672c\u8a9e", "\u65e5\u672c") == 1
         # Chinese characters
-        assert fr.levenshtein("你好", "你好吗") == 1
+        assert fr.levenshtein("\u4f60\u597d", "\u4f60\u597d\u5417") == 1
 
     def test_rtl_text(self):
         """Test handling of right-to-left text."""
         import fuzzyrust as fr
 
         # Hebrew text: shalom vs shalom
-        assert fr.levenshtein("שלום", "שלום") == 0
+        assert fr.levenshtein("\u05e9\u05dc\u05d5\u05dd", "\u05e9\u05dc\u05d5\u05dd") == 0
         # Arabic text: marhaba vs marhaba with one char different
-        assert fr.levenshtein("مرحبا", "مرحب") == 1
+        assert fr.levenshtein("\u0645\u0631\u062d\u0628\u0627", "\u0645\u0631\u062d\u0628") == 1
 
     def test_zwj_emoji_sequences(self):
         """Test handling of Zero-Width Joiner emoji sequences."""
         import fuzzyrust as fr
 
         # Family emoji (man+woman+girl+boy) is a ZWJ sequence
-        family = "👨‍👩‍👧‍👦"
+        family = "\U0001F468\u200d\U0001F469\u200d\U0001F467\u200d\U0001F466"
         # Same family should have distance 0
         assert fr.levenshtein(family, family) == 0
         # Different family composition
-        couple = "👨‍👩‍👦"
+        couple = "\U0001F468\u200d\U0001F469\u200d\U0001F466"
         # These are different sequences
         assert fr.levenshtein(family, couple) > 0
         # Similarity should still work
@@ -758,8 +150,8 @@ class TestUnicodeEdgeCases:
         import fuzzyrust as fr
 
         # US flag vs UK flag (both are pairs of regional indicators)
-        us_flag = "🇺🇸"
-        uk_flag = "🇬🇧"
+        us_flag = "\U0001F1FA\U0001F1F8"
+        uk_flag = "\U0001F1EC\U0001F1E7"
         assert fr.levenshtein(us_flag, us_flag) == 0
         # Different flags should have some distance
         assert fr.levenshtein(us_flag, uk_flag) > 0
@@ -782,27 +174,27 @@ class TestUnicodeEdgeCases:
 
         import fuzzyrust as fr
 
-        # é as precomposed (NFC) vs decomposed (NFD)
-        nfc = unicodedata.normalize("NFC", "café")
-        nfd = unicodedata.normalize("NFD", "café")
+        # e as precomposed (NFC) vs decomposed (NFD)
+        nfc = unicodedata.normalize("NFC", "caf\u00e9")
+        nfd = unicodedata.normalize("NFD", "caf\u00e9")
         # With unicode_nfkd normalization, these should be identical
         assert fr.levenshtein(nfc, nfd, normalize="unicode_nfkd") == 0
-        # Without normalization, NFD has extra combining character
-        # Similarity is still reasonably high (~0.85)
+        # Without normalization, NFD has extra combining character (5 vs 4 codepoints)
+        # Jaro-Winkler handles this with reasonable similarity (~0.848)
         sim = fr.jaro_winkler_similarity(nfc, nfd)
-        assert sim > 0.8
+        assert 0.84 <= sim <= 0.90, f"Expected Jaro-Winkler 0.84-0.90 for NFC vs NFD forms, got {sim}"
 
     def test_surrogates_and_supplementary_planes(self):
         """Test handling of characters outside BMP (supplementary planes)."""
         import fuzzyrust as fr
 
         # Mathematical symbols from Plane 1
-        math1 = "𝐀𝐁𝐂"  # Mathematical Bold Capital
-        math2 = "𝐀𝐁𝐃"  # One different
+        math1 = "\U0001D400\U0001D401\U0001D402"  # Mathematical Bold Capital
+        math2 = "\U0001D400\U0001D401\U0001D403"  # One different
         assert fr.levenshtein(math1, math1) == 0
         assert fr.levenshtein(math1, math2) == 1
         # Ancient scripts (e.g., Egyptian Hieroglyphs from Plane 1)
-        hieroglyph = "𓀀"
+        hieroglyph = "\U00013000"
         assert fr.levenshtein(hieroglyph, hieroglyph) == 0
 
     def test_mixed_scripts(self):
@@ -810,93 +202,158 @@ class TestUnicodeEdgeCases:
         import fuzzyrust as fr
 
         # Mix of Latin, Cyrillic, Greek
-        mixed1 = "Hello Мир αβγ"
-        mixed2 = "Hello Мир αβδ"
+        mixed1 = "Hello \u041c\u0438\u0440 \u03b1\u03b2\u03b3"
+        mixed2 = "Hello \u041c\u0438\u0440 \u03b1\u03b2\u03b4"
         assert fr.levenshtein(mixed1, mixed2) == 1
-        # Similarity should work across scripts
+        # Similarity: 12/13 chars match with common prefix
         sim = fr.jaro_winkler_similarity(mixed1, mixed2)
-        assert sim > 0.9
+        assert 0.94 <= sim <= 0.98, f"Expected Jaro-Winkler ~0.96 for 12/13 matching chars, got {sim}"
 
 
 class TestErrorHandling:
     """Tests for error handling and invalid inputs."""
 
     def test_invalid_algorithm_find_best_matches(self):
-        """Test that invalid algorithm raises ValueError."""
+        """Test that invalid algorithm raises AlgorithmError."""
         import fuzzyrust as fr
 
-        with pytest.raises(ValueError, match="Unknown algorithm"):
+        with pytest.raises(fr.AlgorithmError, match="Unknown algorithm"):
             fr.find_best_matches(["hello"], "hello", algorithm="invalid_algo")
 
     def test_invalid_algorithm_ngram_index_search(self):
-        """Test that invalid algorithm in NgramIndex.search raises ValueError."""
+        """Test that invalid algorithm in NgramIndex.search raises AlgorithmError."""
         import fuzzyrust as fr
 
         index = fr.NgramIndex(ngram_size=2)
         index.add("test")
-        with pytest.raises(ValueError, match="Unknown algorithm"):
+        with pytest.raises(fr.AlgorithmError, match="Unknown algorithm"):
             index.search("test", algorithm="invalid_algo")
 
     def test_invalid_algorithm_hybrid_index_search(self):
-        """Test that invalid algorithm in HybridIndex.search raises ValueError."""
+        """Test that invalid algorithm in HybridIndex.search raises AlgorithmError."""
         import fuzzyrust as fr
 
         index = fr.HybridIndex()
         index.add("test")
-        with pytest.raises(ValueError, match="Unknown algorithm"):
+        with pytest.raises(fr.AlgorithmError, match="Unknown algorithm"):
             index.search("test", algorithm="invalid_algo")
 
     def test_hamming_unequal_length(self):
-        """Test that Hamming distance raises ValueError for unequal length strings."""
+        """Test that Hamming distance raises ValidationError for unequal length strings."""
         import fuzzyrust as fr
 
-        with pytest.raises(ValueError):
+        with pytest.raises(fr.ValidationError):
             fr.hamming("abc", "ab")
-        with pytest.raises(ValueError):
+        with pytest.raises(fr.ValidationError):
             fr.hamming("a", "abc")
 
 
-class TestLCSEdgeCases:
-    """Tests for LCS edge cases."""
+class TestCaseInsensitiveVariants:
+    """Test cases for new case-insensitive function variants."""
 
-    def test_lcs_empty_strings(self):
-        """Test LCS with empty strings."""
+    def test_hamming_ci_basic(self):
+        """Test case-insensitive Hamming distance."""
         import fuzzyrust as fr
 
-        assert fr.lcs_length("", "") == 0
-        assert fr.lcs_length("abc", "") == 0
-        assert fr.lcs_length("", "abc") == 0
-        assert fr.lcs_string("", "abc") == ""
+        # Same strings with different case should have distance 0
+        assert fr.hamming_ci("ABC", "abc") == 0
+        assert fr.hamming_ci("Hello", "hello") == 0
+        assert fr.hamming_ci("HELLO", "HeLLo") == 0
 
-    def test_lcs_no_common(self):
-        """Test LCS with no common subsequence."""
+        # Actual differences should be detected
+        assert fr.hamming_ci("ABC", "AXC") == 1
+        assert fr.hamming_ci("abc", "AXC") == 1
+
+    def test_hamming_ci_unequal_length(self):
+        """Test that hamming_ci raises ValidationError for unequal length strings."""
         import fuzzyrust as fr
 
-        assert fr.lcs_length("abc", "xyz") == 0
-        assert fr.lcs_string("abc", "xyz") == ""
+        with pytest.raises(fr.ValidationError):
+            fr.hamming_ci("abc", "ab")
+        with pytest.raises(fr.ValidationError):
+            fr.hamming_ci("A", "abc")
 
-    def test_longest_common_substring_empty(self):
-        """Test longest common substring with empty strings."""
+    def test_hamming_similarity_ci_basic(self):
+        """Test case-insensitive Hamming similarity."""
         import fuzzyrust as fr
 
-        assert fr.longest_common_substring_length("", "") == 0
-        assert fr.longest_common_substring("abc", "") == ""
+        # Same strings with different case should have similarity 1.0
+        assert fr.hamming_similarity_ci("ABC", "abc") == 1.0
+        assert fr.hamming_similarity_ci("Hello", "hello") == 1.0
 
+        # Actual differences should reduce similarity
+        sim = fr.hamming_similarity_ci("ABC", "AXC")
+        assert 0.6 < sim < 0.7  # 2/3 match
 
-class TestConvenienceAliases:
-    """Tests for convenience aliases."""
-
-    def test_edit_distance_alias(self):
-        """Test that edit_distance is an alias for levenshtein."""
+    def test_hamming_similarity_ci_unequal_length(self):
+        """Test that hamming_similarity_ci raises ValidationError for unequal length strings."""
         import fuzzyrust as fr
 
-        assert fr.edit_distance("kitten", "sitting") == fr.levenshtein("kitten", "sitting")
+        with pytest.raises(fr.ValidationError):
+            fr.hamming_similarity_ci("abc", "ab")
 
-    def test_similarity_alias(self):
-        """Test that similarity is an alias for jaro_winkler_similarity."""
+    def test_lcs_length_ci_basic(self):
+        """Test case-insensitive LCS length."""
         import fuzzyrust as fr
 
-        assert fr.similarity("hello", "hallo") == fr.jaro_winkler_similarity("hello", "hallo")
+        # Case-insensitive should find LCS regardless of case
+        assert fr.lcs_length_ci("ABCDGH", "aedfhr") == 3  # ADH
+        assert fr.lcs_length_ci("ABC", "abc") == 3
+        assert fr.lcs_length_ci("Hello", "HELLO") == 5
+
+        # Empty strings
+        assert fr.lcs_length_ci("", "") == 0
+        assert fr.lcs_length_ci("abc", "") == 0
+
+    def test_lcs_string_ci_basic(self):
+        """Test case-insensitive LCS string."""
+        import fuzzyrust as fr
+
+        # Results should be lowercase (from lowercase conversion)
+        result = fr.lcs_string_ci("ABCDGH", "aedfhr")
+        assert result == "adh"
+
+        result = fr.lcs_string_ci("Hello", "HELLO")
+        assert result == "hello"
+
+        # Empty strings
+        assert fr.lcs_string_ci("", "") == ""
+        assert fr.lcs_string_ci("abc", "") == ""
+
+    def test_longest_common_substring_ci_basic(self):
+        """Test case-insensitive longest common substring."""
+        import fuzzyrust as fr
+
+        # Should find common substring regardless of case
+        result = fr.longest_common_substring_ci("ABCDEF", "zbcdf")
+        assert result == "bcd"
+
+        result = fr.longest_common_substring_ci("Hello World", "ELLO")
+        assert result == "ello"
+
+        # Empty strings
+        assert fr.longest_common_substring_ci("", "") == ""
+        assert fr.longest_common_substring_ci("abc", "") == ""
+
+    def test_ci_functions_consistency_with_lowercase(self):
+        """CI functions should give same result as calling regular function on lowercase strings."""
+        import fuzzyrust as fr
+
+        a = "Hello"
+        b = "WORLD"
+
+        # Hamming requires equal length
+        a_eq = "HELLO"
+        b_eq = "world"
+
+        # hamming_ci should equal hamming on lowercase
+        assert fr.hamming_ci(a_eq, b_eq) == fr.hamming(a_eq.lower(), b_eq.lower())
+        assert fr.hamming_similarity_ci(a_eq, b_eq) == fr.hamming_similarity(a_eq.lower(), b_eq.lower())
+
+        # LCS functions should be consistent
+        assert fr.lcs_length_ci(a, b) == fr.lcs_length(a.lower(), b.lower())
+        assert fr.lcs_string_ci(a, b) == fr.lcs_string(a.lower(), b.lower())
+        assert fr.longest_common_substring_ci(a, b) == fr.longest_common_substring(a.lower(), b.lower())
 
 
 # =============================================================================
@@ -904,14 +361,43 @@ class TestConvenienceAliases:
 # =============================================================================
 
 try:
-    import string
-
     from hypothesis import assume, given, settings
     from hypothesis import strategies as st
 
     HYPOTHESIS_AVAILABLE = True
 except ImportError:
     HYPOTHESIS_AVAILABLE = False
+    # Provide stub decorators when hypothesis is not installed
+
+    def given(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
+    def settings(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
+    def assume(condition):
+        pass
+
+    class st:
+        @staticmethod
+        def text(*args, **kwargs):
+            return None
+
+        @staticmethod
+        def lists(*args, **kwargs):
+            return None
+
+        @staticmethod
+        def integers(*args, **kwargs):
+            return None
+
+        @staticmethod
+        def floats(*args, **kwargs):
+            return None
 
 
 @pytest.mark.skipif(not HYPOTHESIS_AVAILABLE, reason="hypothesis not installed")
@@ -952,7 +438,7 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.jaro_winkler_similarity(a, b)
-        assert 0.0 <= sim <= 1.0
+        assert 0.0 <= sim <= 1.0, f"Jaro-Winkler({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(alphabet=string.ascii_letters, min_size=1, max_size=50))
     def test_jaro_identity(self, s):
@@ -1029,8 +515,12 @@ class TestPropertyBased:
         """Levenshtein distance is always non-negative."""
         import fuzzyrust as fr
 
-        assert fr.levenshtein(a, b) >= 0
-        assert fr.damerau_levenshtein(a, b) >= 0
+        lev_dist = fr.levenshtein(a, b)
+        dam_dist = fr.damerau_levenshtein(a, b)
+        # Distance is bounded by max string length (at most replace all chars + insert/delete difference)
+        max_dist = max(len(a), len(b))
+        assert 0 <= lev_dist <= max_dist, f"levenshtein({a!r}, {b!r}) = {lev_dist} is outside [0, {max_dist}]"
+        assert 0 <= dam_dist <= max_dist, f"damerau_levenshtein({a!r}, {b!r}) = {dam_dist} is outside [0, {max_dist}]"
 
     @given(st.text(min_size=0, max_size=50), st.text(min_size=0, max_size=50))
     def test_ngram_symmetry(self, a, b):
@@ -1045,7 +535,7 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.ngram_similarity(a, b)
-        assert 0.0 <= sim <= 1.0
+        assert 0.0 <= sim <= 1.0, f"ngram_similarity({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=50), st.text(min_size=0, max_size=50))
     def test_lcs_bounds(self, a, b):
@@ -1053,7 +543,7 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.lcs_similarity(a, b)
-        assert 0.0 <= sim <= 1.0
+        assert 0.0 <= sim <= 1.0, f"lcs_similarity({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=50))
     def test_lcs_identity(self, s):
@@ -1082,7 +572,7 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.jaro_similarity(a, b)
-        assert 0.0 <= sim <= 1.0
+        assert 0.0 <= sim <= 1.0, f"jaro_similarity({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=50), st.text(min_size=0, max_size=50))
     def test_levenshtein_similarity_bounds(self, a, b):
@@ -1090,7 +580,7 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.levenshtein_similarity(a, b)
-        assert 0.0 <= sim <= 1.0
+        assert 0.0 <= sim <= 1.0, f"levenshtein_similarity({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=50))
     def test_levenshtein_similarity_identity(self, s):
@@ -1104,8 +594,10 @@ class TestPropertyBased:
         """Cosine similarity variants are always between 0 and 1."""
         import fuzzyrust as fr
 
-        assert 0.0 <= fr.cosine_similarity_chars(a, b) <= 1.0
-        assert 0.0 <= fr.cosine_similarity_ngrams(a, b) <= 1.0
+        sim_chars = fr.cosine_similarity_chars(a, b)
+        assert 0.0 <= sim_chars <= 1.0, f"cosine_similarity_chars({a!r}, {b!r}) = {sim_chars} is outside [0.0, 1.0]"
+        sim_ngrams = fr.cosine_similarity_ngrams(a, b)
+        assert 0.0 <= sim_ngrams <= 1.0, f"cosine_similarity_ngrams({a!r}, {b!r}) = {sim_ngrams} is outside [0.0, 1.0]"
 
     @given(
         st.text(alphabet=string.ascii_letters + " ", min_size=1, max_size=50),
@@ -1117,7 +609,7 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.cosine_similarity_words(a, b)
-        assert 0.0 <= sim <= 1.0
+        assert 0.0 <= sim <= 1.0, f"cosine_similarity_words({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=40))
     def test_ci_variants_consistency(self, s):
@@ -1183,7 +675,9 @@ class TestBenchmarks:
         import fuzzyrust as fr
 
         result = benchmark(fr.jaro_winkler_similarity, "hello", "hallo")
-        assert 0.0 <= result <= 1.0
+        # "hello" and "hallo" have high similarity (common prefix "h", similar structure)
+        # Expected Jaro-Winkler similarity is approximately 0.88
+        assert 0.85 <= result <= 0.92, f"Expected Jaro-Winkler('hello', 'hallo') in [0.85, 0.92], got {result}"
 
     def test_benchmark_batch_levenshtein(self, benchmark, sample_strings):
         """Benchmark batch Levenshtein processing."""
@@ -1225,7 +719,11 @@ class TestBenchmarks:
         tree = fr.BkTree()
         tree.add_all(sample_strings)
         result = benchmark(tree.search, "hello", max_distance=2)
-        assert isinstance(result, list)
+        assert isinstance(result, list), f"Expected list, got {type(result).__name__}"
+        # Verify result contains SearchResult objects with valid structure
+        for r in result:
+            assert hasattr(r, "text") and hasattr(r, "distance"), f"SearchResult missing required attributes"
+            assert r.distance <= 2, f"Result distance {r.distance} exceeds max_distance=2"
 
     def test_benchmark_ngram_index_build(self, benchmark, sample_strings):
         """Benchmark N-gram index construction."""
@@ -1246,7 +744,11 @@ class TestBenchmarks:
         index = fr.NgramIndex(ngram_size=2)
         index.add_all(sample_strings)
         result = benchmark(index.search, "hello", min_similarity=0.5)
-        assert isinstance(result, list)
+        assert isinstance(result, list), f"Expected list, got {type(result).__name__}"
+        # Verify result contains MatchResult objects with valid structure and scores
+        for r in result:
+            assert hasattr(r, "text") and hasattr(r, "score"), f"MatchResult missing required attributes"
+            assert r.score >= 0.5, f"Result score {r.score} below min_similarity=0.5"
 
     def test_benchmark_soundex(self, benchmark):
         """Benchmark Soundex encoding."""
@@ -1386,7 +888,11 @@ class TestBenchmarks:
         index = fr.HybridIndex(ngram_size=2)
         index.add_all(sample_strings)
         result = benchmark(index.search, "hello", min_similarity=0.5)
-        assert isinstance(result, list)
+        assert isinstance(result, list), f"Expected list, got {type(result).__name__}"
+        # Verify result contains MatchResult objects with valid structure and scores
+        for r in result:
+            assert hasattr(r, "text") and hasattr(r, "score"), f"MatchResult missing required attributes"
+            assert r.score >= 0.5, f"Result score {r.score} below min_similarity=0.5"
 
     def test_benchmark_find_duplicates_small(self, benchmark):
         """Benchmark find_duplicates on small dataset."""
@@ -1417,9 +923,6 @@ class TestBenchmarks:
 # =============================================================================
 # Threading and Concurrent Access Tests
 # =============================================================================
-
-import concurrent.futures
-import threading
 
 
 class TestThreadSafety:
@@ -1749,10 +1252,10 @@ class TestMemoryStress:
 
         # 1 million small operations
         for i in range(1_000_000):
-            fr.levenshtein("hello", "hallo")
+            result = fr.levenshtein("hello", "hallo")
 
-        # If we get here without memory leak, test passes
-        assert True
+        # Verify computation is correct after many iterations (no memory corruption)
+        assert result == 1, f"Expected distance of 1 after 1M operations, got {result}"
 
     @pytest.mark.slow
     def test_hybrid_index_large_scale(self):
@@ -1767,772 +1270,6 @@ class TestMemoryStress:
 
         results = index.search("hybrid_test_025000", min_similarity=0.8, limit=10)
         assert len(results) <= 10
-
-
-# =============================================================================
-# Batch Operation Edge Case Tests
-# =============================================================================
-
-
-class TestBatchEdgeCases:
-    """Edge case tests for batch operations."""
-
-    def test_batch_levenshtein_empty_list(self):
-        """Test batch_levenshtein with empty list."""
-        import fuzzyrust as fr
-
-        result = fr.batch_levenshtein([], "hello")
-        assert result == []
-
-    def test_batch_levenshtein_empty_query(self):
-        """Test batch_levenshtein with empty query."""
-        import fuzzyrust as fr
-
-        strings = ["hello", "world"]
-        result = fr.batch_levenshtein(strings, "")
-        # Empty string vs non-empty = distance equals length, normalized similarity = 0.0
-        assert [r.score for r in result] == [0.0, 0.0]
-
-    def test_batch_levenshtein_empty_strings_in_list(self):
-        """Test batch_levenshtein with empty strings in list."""
-        import fuzzyrust as fr
-
-        strings = ["", "a", ""]
-        result = fr.batch_levenshtein(strings, "a")
-        # "" vs "a" = distance 1, normalized = 0.0; "a" vs "a" = exact match = 1.0
-        assert [r.score for r in result] == [0.0, 1.0, 0.0]
-
-    def test_batch_jaro_winkler_empty_list(self):
-        """Test batch_jaro_winkler with empty list."""
-        import fuzzyrust as fr
-
-        result = fr.batch_jaro_winkler([], "hello")
-        assert result == []
-
-    def test_batch_jaro_winkler_unicode(self):
-        """Test batch_jaro_winkler with Unicode strings."""
-        import fuzzyrust as fr
-
-        strings = ["cafe", "café", "caf"]
-        result = fr.batch_jaro_winkler(strings, "café")
-        assert len(result) == 3
-        # batch_jaro_winkler returns MatchResult objects with .score attribute
-        assert all(0.0 <= r.score <= 1.0 for r in result)
-
-    def test_find_best_matches_empty_list(self):
-        """Test find_best_matches with empty list."""
-        import fuzzyrust as fr
-
-        result = fr.find_best_matches([], "hello")
-        assert result == []
-
-    def test_find_best_matches_limit_zero(self):
-        """Test find_best_matches with limit=0."""
-        import fuzzyrust as fr
-
-        strings = ["hello", "world"]
-        result = fr.find_best_matches(strings, "hello", limit=0)
-        assert result == []
-
-    def test_find_best_matches_min_score_one(self):
-        """Test find_best_matches with min_similarity=1.0 (exact matches only)."""
-        import fuzzyrust as fr
-
-        strings = ["hello", "hallo", "hello"]
-        result = fr.find_best_matches(strings, "hello", min_similarity=1.0)
-        # Note: results are deduplicated, so only one "hello" match
-        assert len(result) >= 1
-        # Results are MatchResult objects
-        assert all(r.score == 1.0 for r in result)
-
-    def test_find_best_matches_all_algorithms(self):
-        """Test find_best_matches with all valid algorithms."""
-        import fuzzyrust as fr
-
-        strings = ["test", "text", "best"]
-        algorithms = [
-            "levenshtein",
-            "damerau_levenshtein",
-            "jaro",
-            "jaro_winkler",
-            "ngram",
-            "bigram",
-            "trigram",
-            "lcs",
-            "cosine",
-        ]
-
-        for algo in algorithms:
-            result = fr.find_best_matches(strings, "test", algorithm=algo, min_similarity=0.0)
-            assert len(result) >= 0
-            # Results are MatchResult objects
-            assert all(0.0 <= r.score <= 1.0 for r in result)
-
-    def test_ngram_index_batch_search_empty_queries(self):
-        """Test NgramIndex.batch_search with empty query list."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)
-        index.add_all(["hello", "world"])
-        result = index.batch_search([])
-        assert result == []
-
-    def test_bktree_search_max_distance_zero(self):
-        """Test BK-tree search with max_distance=0 (exact matches only)."""
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_all(["hello", "hallo", "hello"])
-        result = tree.search("hello", max_distance=0)
-        # Note: BK-tree may store duplicates separately depending on implementation
-        assert len(result) >= 1
-        # Results are SearchResult objects
-        assert all(r.text == "hello" and r.distance == 0 for r in result)
-
-    def test_bktree_find_nearest_k_zero(self):
-        """Test BK-tree find_nearest with k=0."""
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_all(["hello", "world"])
-        result = tree.find_nearest("hello", k=0)
-        assert result == []
-
-    def test_bktree_find_nearest_large_k(self):
-        """Test BK-tree find_nearest with k larger than tree size."""
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        tree.add_all(["hello", "world"])
-        result = tree.find_nearest("hello", k=100)
-        assert len(result) == 2  # Can only return what exists
-
-
-class TestPhoneticEdgeCases:
-    """Edge case tests for phonetic algorithms."""
-
-    def test_soundex_empty_string(self):
-        """Test Soundex with empty string."""
-        import fuzzyrust as fr
-
-        result = fr.soundex("")
-        # Empty string should return empty or default code
-        assert isinstance(result, str)
-
-    def test_soundex_single_char(self):
-        """Test Soundex with single character."""
-        import fuzzyrust as fr
-
-        result = fr.soundex("A")
-        assert isinstance(result, str)
-        assert len(result) == 4  # Soundex always returns 4 chars
-        assert result.startswith("A")
-
-    def test_metaphone_empty_string(self):
-        """Test Metaphone with empty string."""
-        import fuzzyrust as fr
-
-        result = fr.metaphone("")
-        assert result == ""
-
-    def test_metaphone_single_char(self):
-        """Test Metaphone with single character."""
-        import fuzzyrust as fr
-
-        result = fr.metaphone("A")
-        assert isinstance(result, str)
-
-    def test_soundex_numbers_only(self):
-        """Test Soundex with numbers only."""
-        import fuzzyrust as fr
-
-        result = fr.soundex("123")
-        assert isinstance(result, str)
-
-    def test_metaphone_unicode(self):
-        """Test Metaphone with Unicode characters."""
-        import fuzzyrust as fr
-
-        result = fr.metaphone("café")
-        assert isinstance(result, str)
-
-
-class TestVeryLongStringProtection:
-    """Tests verifying very long strings don't cause DoS."""
-
-    def test_levenshtein_long_strings(self):
-        """Test that Levenshtein handles long strings without hanging."""
-        import fuzzyrust as fr
-
-        long_a = "a" * 1000
-        long_b = "b" * 1000
-        # Should complete without hanging (space-efficient algorithm)
-        result = fr.levenshtein(long_a, long_b)
-        assert result == 1000
-
-    def test_damerau_levenshtein_long_strings(self):
-        """Test Damerau-Levenshtein with long strings."""
-        import fuzzyrust as fr
-
-        long_a = "a" * 1000
-        long_b = "b" * 1000
-        # Should complete without hanging
-        result = fr.damerau_levenshtein(long_a, long_b)
-        assert isinstance(result, int)
-
-    def test_jaro_similarity_long_strings(self):
-        """Test Jaro similarity with long strings."""
-        import fuzzyrust as fr
-
-        long_a = "a" * 1000
-        long_b = "b" * 1000
-        result = fr.jaro_similarity(long_a, long_b)
-        assert isinstance(result, float)
-        assert 0.0 <= result <= 1.0
-
-    def test_lcs_length_long_strings(self):
-        """Test LCS length with long strings (space-efficient)."""
-        import fuzzyrust as fr
-
-        long_a = "a" * 1000
-        long_b = "a" * 500 + "b" * 500
-        result = fr.lcs_length(long_a, long_b)
-        assert result == 500
-
-    def test_lcs_string_very_long_returns_empty(self):
-        """Test lcs_string returns empty for very long strings to prevent DoS."""
-        import fuzzyrust as fr
-
-        # Strings longer than 10000 should return empty (protection)
-        long_a = "a" * 15000
-        long_b = "a" * 15000
-        result = fr.lcs_string(long_a, long_b)
-        # Should return empty due to DoS protection
-        assert result == ""
-
-    def test_longest_common_substring_very_long_returns_empty(self):
-        """Test longest_common_substring returns empty for very long strings."""
-        import fuzzyrust as fr
-
-        long_a = "a" * 15000
-        long_b = "a" * 15000
-        result = fr.longest_common_substring(long_a, long_b)
-        # Should return empty due to DoS protection
-        assert result == ""
-
-    def test_ngram_similarity_long_strings(self):
-        """Test n-gram similarity with long strings."""
-        import fuzzyrust as fr
-
-        long_a = "a" * 1000
-        long_b = "a" * 1000
-        result = fr.ngram_similarity(long_a, long_b, ngram_size=2)
-        assert result == 1.0
-
-    def test_bktree_add_long_strings(self):
-        """Test BK-tree can add moderately long strings."""
-        import fuzzyrust as fr
-
-        tree = fr.BkTree()
-        long_str = "a" * 500
-        tree.add(long_str)
-        assert len(tree) == 1
-        assert tree.contains(long_str)
-
-
-class TestNormalizedNgramIndex:
-    """Tests for case-insensitive n-gram indexing."""
-
-    def test_normalized_index_finds_case_variants(self):
-        """Normalized index should find candidates regardless of case."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2, normalize=True)
-        index.add_all(["Rain shadow jkt", "FLEECE JACKET", "hiking pants"])
-        results = index.search("rain shadow", min_similarity=0.5)
-        texts = [r.text for r in results]
-        assert "Rain shadow jkt" in texts
-
-    def test_normalized_index_default_true(self):
-        """Default normalize=True should work for mixed-case matching."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2)  # normalize=True by default
-        index.add_all(["HELLO WORLD", "hello there"])
-        results = index.search("hello world", min_similarity=0.8)
-        texts = [r.text for r in results]
-        assert "HELLO WORLD" in texts
-
-    def test_unnormalized_index_is_case_sensitive(self):
-        """With normalize=False, n-gram extraction is case-sensitive."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2, normalize=False)
-        index.add_all(["HELLO"])
-        # With normalize=False, "HE" != "he", so no candidates found
-        results = index.search("hello", min_similarity=0.5, case_insensitive=False)
-        assert len(results) == 0
-
-    def test_hybrid_index_normalized(self):
-        """HybridIndex should also support normalization."""
-        import fuzzyrust as fr
-
-        index = fr.HybridIndex(ngram_size=2, normalize=True)
-        index.add_all(["Product Name", "ANOTHER PRODUCT"])
-        results = index.search("product name", min_similarity=0.8)
-        texts = [r.text for r in results]
-        assert "Product Name" in texts
-
-    def test_contains_respects_normalize(self):
-        """contains() should use normalized comparison when normalize=True."""
-        import fuzzyrust as fr
-
-        index = fr.NgramIndex(ngram_size=2, normalize=True)
-        index.add("Hello World")
-        assert index.contains("hello world")  # Should match despite case
-
-        index2 = fr.NgramIndex(ngram_size=2, normalize=False)
-        index2.add("Hello World")
-        assert not index2.contains("hello world")  # Should not match
-
-
-class TestTfIdfCosine:
-    """Tests for TF-IDF weighted cosine similarity."""
-
-    def test_tfidf_basic(self):
-        """Basic TF-IDF similarity test."""
-        import fuzzyrust as fr
-
-        tfidf = fr.TfIdfCosine()
-        tfidf.add_documents(["hello world", "hello there", "world news"])
-        sim = tfidf.similarity("hello world", "hello there")
-        assert 0.0 < sim < 1.0
-
-    def test_tfidf_identical(self):
-        """Identical strings should have similarity 1.0."""
-        import fuzzyrust as fr
-
-        tfidf = fr.TfIdfCosine()
-        tfidf.add_document("test document")
-        assert tfidf.similarity("hello", "hello") == 1.0
-
-    def test_tfidf_different(self):
-        """Completely different strings should have low similarity."""
-        import fuzzyrust as fr
-
-        tfidf = fr.TfIdfCosine()
-        tfidf.add_documents(["apple banana", "cherry grape"])
-        sim = tfidf.similarity("apple", "cherry")
-        assert sim == 0.0  # No common words
-
-    def test_tfidf_num_documents(self):
-        """num_documents should return correct count."""
-        import fuzzyrust as fr
-
-        tfidf = fr.TfIdfCosine()
-        assert tfidf.num_documents() == 0
-        tfidf.add_document("first")
-        assert tfidf.num_documents() == 1
-        tfidf.add_documents(["second", "third"])
-        assert tfidf.num_documents() == 3
-
-    def test_tfidf_rare_words_weighted_higher(self):
-        """Rare words should contribute more to similarity than common words."""
-        import fuzzyrust as fr
-
-        tfidf = fr.TfIdfCosine()
-        # "the" appears in most docs, "quantum" appears in one
-        tfidf.add_documents(
-            ["the quick brown fox", "the lazy dog", "the fast cat", "quantum physics theory"]
-        )
-        # Comparing strings with common word "the"
-        sim_common = tfidf.similarity("the cat", "the dog")
-        # Comparing strings with rare word "quantum"
-        sim_rare = tfidf.similarity("quantum theory", "quantum physics")
-        # Rare words should give higher similarity
-        assert sim_rare > sim_common
-
-
-class TestPhoneticSimilarity:
-    """Tests for phonetic similarity functions."""
-
-    def test_soundex_similarity_identical_codes(self):
-        """Same Soundex codes should have similarity 1.0."""
-        import fuzzyrust as fr
-
-        # Robert and Rupert both have Soundex code R163
-        assert fr.soundex_similarity("Robert", "Rupert") == 1.0
-
-    def test_soundex_similarity_partial(self):
-        """Different Soundex codes should have partial similarity."""
-        import fuzzyrust as fr
-
-        sim = fr.soundex_similarity("Robert", "Richard")
-        assert 0.0 < sim < 1.0
-
-    def test_soundex_similarity_different(self):
-        """Completely different names should have low similarity."""
-        import fuzzyrust as fr
-
-        sim = fr.soundex_similarity("Smith", "Johnson")
-        assert sim < 0.5
-
-    def test_metaphone_similarity_identical(self):
-        """Same Metaphone codes should have similarity 1.0."""
-        import fuzzyrust as fr
-
-        # Stephen and Steven have same Metaphone code
-        assert fr.metaphone_similarity("Stephen", "Steven") == 1.0
-
-    def test_metaphone_similarity_partial(self):
-        """Similar sounds should have high but not perfect similarity."""
-        import fuzzyrust as fr
-
-        sim = fr.metaphone_similarity("John", "Jon")
-        assert sim > 0.8
-
-
-class TestNgramConvenience:
-    """Tests for n-gram convenience functions."""
-
-    def test_bigram_similarity_identical(self):
-        """Identical strings should have similarity 1.0."""
-        import fuzzyrust as fr
-
-        assert fr.bigram_similarity("hello", "hello") == 1.0
-
-    def test_bigram_similarity_similar(self):
-        """Similar strings should have high similarity."""
-        import fuzzyrust as fr
-
-        sim = fr.bigram_similarity("hello", "hallo")
-        assert 0.0 < sim < 1.0
-
-    def test_trigram_similarity(self):
-        """Trigram similarity should work correctly."""
-        import fuzzyrust as fr
-
-        sim = fr.trigram_similarity("hello", "hallo")
-        assert 0.0 < sim < 1.0
-        # Trigram is typically stricter than bigram
-        bigram = fr.bigram_similarity("hello", "hallo")
-        assert sim <= bigram or abs(sim - bigram) < 0.2
-
-    def test_ngram_profile_similarity_identical(self):
-        """Identical strings should have profile similarity 1.0."""
-        import fuzzyrust as fr
-
-        assert fr.ngram_profile_similarity("abab", "abab", 2) == 1.0
-
-    def test_ngram_profile_counts_frequency(self):
-        """Profile similarity should account for n-gram frequency."""
-        import fuzzyrust as fr
-
-        # Profile similarity uses frequency counts
-        sim = fr.ngram_profile_similarity("aaa", "aa", 2)
-        assert 0.0 < sim < 1.0
-
-
-class TestHammingVariants:
-    """Tests for Hamming distance variants."""
-
-    def test_hamming_padded_equal_length(self):
-        """Padded Hamming should work on equal-length strings."""
-        import fuzzyrust as fr
-
-        assert fr.hamming_distance_padded("abc", "axc") == 1
-        assert fr.hamming_distance_padded("abc", "abc") == 0
-
-    def test_hamming_padded_unequal_length(self):
-        """Padded Hamming should work on unequal-length strings."""
-        import fuzzyrust as fr
-
-        # "ab" becomes "ab " when padded to match "abc"
-        result = fr.hamming_distance_padded("ab", "abc")
-        assert result >= 1
-
-    def test_hamming_similarity_equal_length(self):
-        """Hamming similarity should work for equal-length strings."""
-        import fuzzyrust as fr
-
-        assert fr.hamming_similarity("abc", "abc") == 1.0
-        sim = fr.hamming_similarity("abc", "axc")
-        assert sim is not None
-        assert 0.5 < sim < 1.0
-
-    def test_hamming_similarity_unequal_length(self):
-        """Hamming similarity should raise ValueError for unequal lengths."""
-        import pytest
-
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError):
-            fr.hamming_similarity("abc", "ab")
-        with pytest.raises(ValueError):
-            fr.hamming_similarity("ab", "abc")
-
-
-class TestLcsAlternative:
-    """Tests for LCS alternative metrics."""
-
-    def test_lcs_similarity_max_identical(self):
-        """Identical strings should have similarity 1.0."""
-        import fuzzyrust as fr
-
-        assert fr.lcs_similarity_max("abc", "abc") == 1.0
-
-    def test_lcs_similarity_max_partial(self):
-        """Partial matches should have proportional similarity."""
-        import fuzzyrust as fr
-
-        # LCS of "abc" and "ab" is "ab" (length 2)
-        # lcs_similarity_max = 2 / max(3, 2) = 2/3
-        sim = fr.lcs_similarity_max("abc", "ab")
-        assert abs(sim - 2 / 3) < 0.01
-
-    def test_lcs_similarity_max_different(self):
-        """Completely different strings should have similarity 0.0."""
-        import fuzzyrust as fr
-
-        assert fr.lcs_similarity_max("abc", "xyz") == 0.0
-
-
-class TestCaseInsensitiveFunctions:
-    """Tests for case-insensitive (_ci) function variants."""
-
-    def test_ngram_jaccard_ci(self):
-        """ngram_jaccard_ci should be case-insensitive."""
-        import fuzzyrust as fr
-
-        # Case-sensitive would give different results
-        assert fr.ngram_jaccard_ci("Hello", "hello") == fr.ngram_jaccard("hello", "hello")
-        assert fr.ngram_jaccard_ci("WORLD", "world") == 1.0
-
-    def test_cosine_similarity_chars_ci(self):
-        """cosine_similarity_chars_ci should be case-insensitive."""
-        import fuzzyrust as fr
-
-        assert fr.cosine_similarity_chars_ci("ABC", "abc") == 1.0
-        assert fr.cosine_similarity_chars_ci("Hello", "HELLO") == 1.0
-
-    def test_cosine_similarity_words_ci(self):
-        """cosine_similarity_words_ci should be case-insensitive."""
-        import fuzzyrust as fr
-
-        assert fr.cosine_similarity_words_ci("The Quick Fox", "the quick fox") == 1.0
-        assert fr.cosine_similarity_words_ci("HELLO WORLD", "hello world") == 1.0
-
-    def test_cosine_similarity_ngrams_ci(self):
-        """cosine_similarity_ngrams_ci should be case-insensitive."""
-        import fuzzyrust as fr
-
-        assert fr.cosine_similarity_ngrams_ci("Hello", "HELLO") == 1.0
-        assert fr.cosine_similarity_ngrams_ci("WORLD", "world") == 1.0
-
-
-class TestSchemaIndex:
-    """Tests for SchemaIndex with renamed parameters."""
-
-    def test_schema_index_min_similarity_parameter(self):
-        """SchemaIndex.search should accept min_similarity parameter."""
-        import fuzzyrust as fr
-
-        builder = fr.SchemaBuilder()
-        builder.add_field("name", "short_text", algorithm="jaro_winkler", weight=1.0)
-        schema = builder.build()
-
-        index = fr.SchemaIndex(schema)
-        index.add({"name": "apple"})
-        index.add({"name": "banana"})
-
-        # Use new parameter name min_similarity
-        results = index.search({"name": "apple"}, min_similarity=0.9)
-        assert len(results) >= 1
-        assert results[0].score >= 0.9
-
-    def test_schema_index_min_field_similarity_parameter(self):
-        """SchemaIndex.search should accept min_field_similarity parameter."""
-        import fuzzyrust as fr
-
-        builder = fr.SchemaBuilder()
-        builder.add_field("name", "short_text", algorithm="jaro_winkler", weight=1.0)
-        builder.add_field("category", "short_text", algorithm="jaro_winkler", weight=1.0)
-        schema = builder.build()
-
-        index = fr.SchemaIndex(schema)
-        index.add({"name": "apple", "category": "fruit"})
-
-        # Use new parameter name min_field_similarity
-        results = index.search(
-            {"name": "apple", "category": "fruit"}, min_similarity=0.0, min_field_similarity=0.8
-        )
-        assert len(results) >= 1
-
-
-class TestHybridIndexConstructor:
-    """Tests for HybridIndex constructor parameters."""
-
-    def test_hybrid_index_constructor_params(self):
-        """HybridIndex should accept constructor parameters."""
-        import fuzzyrust as fr
-
-        # Test constructor with explicit parameters
-        index = fr.HybridIndex(ngram_size=3, min_ngram_ratio=0.2)
-        index.add("apple")
-        index.add("banana")
-
-        # min_similarity is specified in search, not constructor
-        results = index.search("apple", min_similarity=0.9)
-        assert len(results) >= 1
-
-
-class TestNormalizeParameter:
-    """Tests for the new normalize parameter on similarity functions."""
-
-    def test_levenshtein_normalize_lowercase(self):
-        """levenshtein with normalize='lowercase' should be case-insensitive."""
-        import fuzzyrust as fr
-
-        # Without normalization
-        assert fr.levenshtein("Hello", "HELLO") == 4  # 4 substitutions
-        # With lowercase normalization
-        assert fr.levenshtein("Hello", "HELLO", normalize="lowercase") == 0
-
-    def test_levenshtein_similarity_normalize(self):
-        """levenshtein_similarity with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.levenshtein_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
-        assert fr.levenshtein_similarity("Hello", "HELLO") < 1.0  # Without normalization
-
-    def test_damerau_levenshtein_normalize(self):
-        """damerau_levenshtein with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.damerau_levenshtein("Hello", "HELLO", normalize="lowercase") == 0
-        assert fr.damerau_levenshtein("Hello", "HELLO") > 0
-
-    def test_damerau_levenshtein_similarity_normalize(self):
-        """damerau_levenshtein_similarity with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.damerau_levenshtein_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
-
-    def test_jaro_similarity_normalize(self):
-        """jaro_similarity with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.jaro_similarity("MARTHA", "martha", normalize="lowercase") == 1.0
-
-    def test_jaro_winkler_similarity_normalize(self):
-        """jaro_winkler_similarity with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.jaro_winkler_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
-        # Works with other parameters too
-        assert (
-            fr.jaro_winkler_similarity("Hello", "HELLO", prefix_weight=0.1, normalize="lowercase")
-            == 1.0
-        )
-
-    def test_ngram_similarity_normalize(self):
-        """ngram_similarity with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.ngram_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
-        # Works with other parameters too
-        assert fr.ngram_similarity("Hello", "HELLO", ngram_size=3, normalize="lowercase") == 1.0
-
-    def test_ngram_jaccard_normalize(self):
-        """ngram_jaccard with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.ngram_jaccard("Hello", "HELLO", normalize="lowercase") == 1.0
-
-    def test_cosine_similarity_chars_normalize(self):
-        """cosine_similarity_chars with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.cosine_similarity_chars("ABC", "abc", normalize="lowercase") == 1.0
-
-    def test_cosine_similarity_words_normalize(self):
-        """cosine_similarity_words with normalize should work."""
-        import fuzzyrust as fr
-
-        assert (
-            fr.cosine_similarity_words("HELLO WORLD", "hello world", normalize="lowercase") == 1.0
-        )
-
-    def test_cosine_similarity_ngrams_normalize(self):
-        """cosine_similarity_ngrams with normalize should work."""
-        import fuzzyrust as fr
-
-        assert fr.cosine_similarity_ngrams("Hello", "HELLO", normalize="lowercase") == 1.0
-
-    def test_normalize_strict_mode(self):
-        """Test strict normalization mode (combines all normalizations)."""
-        import fuzzyrust as fr
-
-        # Strict mode: lowercase + remove punctuation + remove whitespace + NFKD
-        assert (
-            fr.levenshtein_similarity("  Hello, World!  ", "helloworld", normalize="strict") == 1.0
-        )
-
-    def test_normalize_remove_punctuation(self):
-        """Test remove_punctuation normalization mode."""
-        import fuzzyrust as fr
-
-        # Removes punctuation but keeps case and whitespace
-        assert (
-            fr.levenshtein_similarity(
-                "Hello, World!", "Hello World", normalize="remove_punctuation"
-            )
-            == 1.0
-        )
-
-    def test_normalize_remove_whitespace(self):
-        """Test remove_whitespace normalization mode."""
-        import fuzzyrust as fr
-
-        assert (
-            fr.levenshtein_similarity("hello world", "helloworld", normalize="remove_whitespace")
-            == 1.0
-        )
-
-    def test_normalize_invalid_mode_raises_error(self):
-        """Invalid normalize mode should raise ValueError."""
-        import fuzzyrust as fr
-
-        with pytest.raises(ValueError, match="Unknown normalization mode"):
-            fr.levenshtein_similarity("hello", "world", normalize="invalid_mode")
-
-    def test_ci_functions_equivalent_to_normalize_lowercase(self):
-        """_ci functions should be equivalent to base functions with normalize='lowercase'."""
-        import fuzzyrust as fr
-
-        # levenshtein_similarity_ci == levenshtein_similarity with normalize="lowercase"
-        assert fr.levenshtein_similarity_ci("Hello", "HELLO") == fr.levenshtein_similarity(
-            "Hello", "HELLO", normalize="lowercase"
-        )
-
-        # jaro_winkler_similarity_ci == jaro_winkler_similarity with normalize="lowercase"
-        assert fr.jaro_winkler_similarity_ci("Hello", "HELLO") == fr.jaro_winkler_similarity(
-            "Hello", "HELLO", normalize="lowercase"
-        )
-
-        # ngram_similarity_ci == ngram_similarity with normalize="lowercase"
-        assert fr.ngram_similarity_ci("Hello", "HELLO") == fr.ngram_similarity(
-            "Hello", "HELLO", normalize="lowercase"
-        )
-
-    def test_normalize_none_is_default(self):
-        """normalize=None should give same results as no normalization."""
-        import fuzzyrust as fr
-
-        # Explicit None should be the same as not passing the parameter
-        assert fr.levenshtein_similarity(
-            "Hello", "HELLO", normalize=None
-        ) == fr.levenshtein_similarity("Hello", "HELLO")
 
 
 if __name__ == "__main__":

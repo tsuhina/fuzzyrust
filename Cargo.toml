@@ -15,7 +15,7 @@ name = "fuzzyrust"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["extension-module"] }
+pyo3 = { version = "0.23", features = ["extension-module"] }
 rayon = "1.10"
 ahash = { version = "0.8", features = ["serde"] }
 unicode-segmentation = "1.12"
@@ -23,7 +23,22 @@ unicode-normalization = "0.1"
 smallvec = "1.13"
 itertools = "0.13"
 serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
 thiserror = "1.0"
+parking_lot = "0.12"
+
+# SIMD-accelerated edit distance (optional, enabled by default for performance)
+triple_accel = "0.4"
+
+# Optional Polars plugin dependencies
+pyo3-polars = { version = "0.20", optional = true, features = ["derive"] }
+polars = { version = "0.46", optional = true, default-features = false, features = ["lazy", "strings", "dtype-struct"] }
+polars-arrow = { version = "0.46", optional = true }
+polars-core = { version = "0.46", optional = true }
+
+[features]
+default = []
+polars-plugin = ["pyo3-polars", "polars", "polars-arrow", "polars-core"]
 
 [profile.release]
 lto = "fat"

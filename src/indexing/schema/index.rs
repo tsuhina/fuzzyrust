@@ -9,6 +9,7 @@ use super::scoring::FieldScore;
 use super::storage::{OptimizedStorage, Record};
 use crate::algorithms::normalize;
 use ahash::AHashMap;
+use rayon::prelude::*;
 use std::sync::Arc;
 
 /// Search options for SchemaIndex queries
@@ -23,6 +24,10 @@ pub struct SearchOptions {
     /// Minimum per-field similarity (applied before scoring)
     /// Fields with scores below this threshold are ignored
     pub min_field_score: f64,
+
+    /// Query-time field weight boosts (multipliers applied to schema weights)
+    /// Keys are field names, values are multipliers (e.g., 2.0 doubles the weight)
+    pub field_boosts: Option<AHashMap<String, f64>>,
 }
 
 impl Default for SearchOptions {
@@ -31,6 +36,7 @@ impl Default for SearchOptions {
             min_score: 0.0,
             limit: None,
             min_field_score: 0.0,
+            field_boosts: None,
         }
     }
 }
@@ -53,6 +59,15 @@ impl SearchOptions {
     /// Set minimum per-field score
     pub fn with_min_field_score(mut self, min_field_score: f64) -> Self {
         self.min_field_score = min_field_score;
+        self
+    }
+
+    /// Set query-time field boosts
+    ///
+    /// Field boosts are multipliers applied to the schema weights at query time.
+    /// For example, a boost of 2.0 doubles the field's weight.
+    pub fn with_field_boosts(mut self, boosts: AHashMap<String, f64>) -> Self {
+        self.field_boosts = Some(boosts);
         self
     }
 }
@@ -241,13 +256,24 @@ impl SchemaIndex {
 
                 // Collect scores for each candidate
                 for field_match in field_matches {
+                    // Apply query-time field boost if specified
+                    let effective_weight = if let Some(ref boosts) = options.field_boosts {
+                        if let Some(&boost) = boosts.get(&field.name) {
+                            field.weight * boost
+                        } else {
+                            field.weight
+                        }
+                    } else {
+                        field.weight
+                    };
+
                     candidate_scores
                         .entry(field_match.id)
                         .or_default()
                         .push(FieldScore::new(
                             field.name.clone(),
                             field_match.score,
-                            field.weight,
+                            effective_weight,
                         ));
                 }
             }
@@ -291,10 +317,32 @@ impl SchemaIndex {
             }
         }
 
-        // Debug assertion to catch NaN scores early
+        // Filter out NaN scores and warn in release mode
+        // NaN scores indicate a bug in the scoring algorithm and should never occur
         #[cfg(debug_assertions)]
-        for r in &results {
-            debug_assert!(!r.score.is_nan(), "NaN score detected for record id: {}", r.id);
+        let original_count = results.len();
+
+        results.retain(|r| {
+            if r.score.is_nan() {
+                eprintln!(
+                    "[fuzzyrust warning] NaN score detected for record id: {}. \
+                     This indicates a bug in the scoring algorithm. The result was filtered out.",
+                    r.id
+                );
+                false
+            } else {
+                true
+            }
+        });
+
+        // Debug assertion for development - panics if NaN was detected
+        #[cfg(debug_assertions)]
+        if results.len() < original_count {
+            debug_assert!(
+                false,
+                "NaN scores were detected and filtered out. {} records had NaN scores.",
+                original_count - results.len()
+            );
         }
 
         // Sort by descending score
@@ -330,6 +378,36 @@ impl SchemaIndex {
     pub fn get_record(&self, id: usize) -> Result<Option<Record>, SchemaError> {
         self.storage.get_record(id)
             .map_err(|e| SchemaError::StorageError(format!("Failed to get record {}: {}", id, e)))
+    }
+
+    /// Batch search for multiple queries in parallel
+    ///
+    /// Executes searches for all queries concurrently using Rayon,
+    /// returning results in the same order as the input queries.
+    ///
+    /// # Arguments
+    /// * `queries` - Slice of query records to search for
+    /// * `options` - Search options (min_score, limit, etc.)
+    ///
+    /// # Returns
+    /// A vector of search results for each query, maintaining input order.
+    /// Each inner vector contains matches sorted by descending score.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let queries = vec![query1, query2, query3];
+    /// let results = index.batch_search(&queries, SearchOptions::with_min_score(0.7))?;
+    /// // results[0] contains matches for query1, etc.
+    /// ```
+    pub fn batch_search(
+        &self,
+        queries: &[Record],
+        options: SearchOptions,
+    ) -> Result<Vec<Vec<SchemaSearchResult>>, SchemaError> {
+        queries
+            .par_iter()
+            .map(|query| self.search(query, options.clone()))
+            .collect()
     }
 }
 

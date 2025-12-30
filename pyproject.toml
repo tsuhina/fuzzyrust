@@ -27,7 +27,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 authors = [{name = "Tomislav Suhina", email = "tomislav.suhina@gmail.com"}]
-# No runtime dependencies - pure Rust extension module
+dependencies = ["polars>=1.36.1"]
 
 [project.urls]
 Homepage = "https://github.com/tsuhina/fuzzyrust"
@@ -50,18 +50,16 @@ benchmarks = [
     "rapidfuzz>=3.13.0",
     "thefuzz>=0.22.1",
 ]
-polars = [
-    "polars>=1.36.1",
-]
 jupyter = [
     "jupyter>=1.1.1",
+    "ipykernel>=6.29.0",
 ]
 all = [
-    "fuzzyrust[dev,benchmarks,polars,jupyter]",
+    "fuzzyrust[dev,benchmarks,jupyter]",
 ]
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
+features = ["pyo3/extension-module", "polars-plugin"]
 python-source = "python"
 module-name = "fuzzyrust._core"
 strip = true
@@ -132,4 +130,10 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[dependency-groups]
+dev = [
+    "jellyfish>=1.2.1",
+    "rapidfuzz>=3.13.0",
+]
 

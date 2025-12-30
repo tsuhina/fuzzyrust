@@ -146,8 +146,8 @@ class TestFScore:
         assert f0 == pytest.approx(0.5, abs=0.001)  # precision = 0.5
 
     def test_negative_beta_raises(self):
-        """Negative beta should raise ValueError."""
-        with pytest.raises(ValueError):
+        """Negative beta should raise ValidationError."""
+        with pytest.raises(fr.ValidationError):
             fr.f_score([(0, 1)], [(0, 1)], beta=-1.0)
 
 

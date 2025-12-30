@@ -1,8 +1,8 @@
-"""Type stubs for fuzzyrust v0.1.0."""
+"""Type stubs for fuzzyrust v0.1.1."""
 
 from collections.abc import Sequence
 from enum import Enum
-from typing import List, Optional, TypeAlias, Union
+from typing import List, Optional, Tuple, TypeAlias, Union
 
 __version__: str
 
@@ -54,8 +54,9 @@ class MatchResult:
 
     text: str
     score: float
+    id: Optional[int]
 
-    def __init__(self, text: str, score: float) -> None: ...
+    def __init__(self, text: str, score: float, id: Optional[int] = None) -> None: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
@@ -86,6 +87,33 @@ class AlgorithmComparison:
         score: float,
         matches: List[MatchResult],
     ) -> None: ...
+
+# =============================================================================
+# Exceptions
+# =============================================================================
+
+class FuzzyRustError(Exception):
+    """Base exception for all FuzzyRust errors."""
+    ...
+
+class ValidationError(FuzzyRustError):
+    """Raised when input validation fails (invalid parameters, out of range values)."""
+    ...
+
+class AlgorithmError(FuzzyRustError):
+    """Raised when an unknown or unsupported algorithm is specified."""
+    ...
+
+class FuzzyIndexError(FuzzyRustError):
+    """Raised when index operations fail (add, search, serialization).
+
+    Note: Aliased from IndexError in Rust to avoid shadowing Python's built-in IndexError.
+    """
+    ...
+
+class SchemaError(FuzzyRustError):
+    """Raised when schema validation or operations fail."""
+    ...
 
 # =============================================================================
 # Enums
@@ -166,13 +194,15 @@ def levenshtein(
         a: First string
         b: Second string
         max_distance: Optional maximum distance for early termination.
-                     Returns very large value if exceeded.
+                     Returns max_distance + 1 if exceeded (RapidFuzz compatible).
+                     Use levenshtein_bounded() if you prefer None semantics.
         normalize: Optional normalization mode to apply before comparison:
                   "lowercase", "unicode_nfkd", "remove_punctuation",
                   "remove_whitespace", "strict"
 
     Returns:
         The minimum number of single-character edits needed to transform a into b.
+        Returns max_distance + 1 if threshold exceeded.
 
     Complexity:
         Time: O(m*n) where m, n are string lengths. O(m*k) with max_distance=k.
@@ -183,6 +213,34 @@ def levenshtein(
         3
         >>> levenshtein("Hello", "HELLO", normalize="lowercase")
         0
+        >>> levenshtein("abc", "xyz", max_distance=2)  # Distance is 3, exceeds threshold
+        3  # Returns max_distance + 1
+    """
+    ...
+
+def levenshtein_bounded(
+    a: str,
+    b: str,
+    max_distance: int,
+    normalize: Optional[Union[str, NormalizationMode]] = None,
+) -> Optional[int]:
+    """
+    Compute Levenshtein distance with explicit None return when threshold exceeded.
+
+    Args:
+        a: First string
+        b: Second string
+        max_distance: Maximum distance threshold. Returns None if exceeded.
+        normalize: Optional normalization mode to apply before comparison
+
+    Returns:
+        The edit distance if within threshold, None if exceeded.
+
+    Example:
+        >>> levenshtein_bounded("abc", "abd", max_distance=2)
+        1
+        >>> levenshtein_bounded("abc", "xyz", max_distance=2)
+        None
     """
     ...
 
@@ -225,7 +283,15 @@ def damerau_levenshtein(
     Useful for typo detection where letter swaps are common.
 
     Args:
+        a: First string
+        b: Second string
+        max_distance: Optional maximum distance for early termination.
+                     Returns max_distance + 1 if exceeded (RapidFuzz compatible).
+                     Use damerau_levenshtein_bounded() if you prefer None semantics.
         normalize: Optional normalization mode to apply before comparison
+
+    Returns:
+        The edit distance. Returns max_distance + 1 if threshold exceeded.
 
     Complexity:
         Time: O(m*n) where m, n are string lengths.
@@ -236,6 +302,32 @@ def damerau_levenshtein(
         1
         >>> levenshtein("ca", "ac")  # Two edits without transposition
         2
+    """
+    ...
+
+def damerau_levenshtein_bounded(
+    a: str,
+    b: str,
+    max_distance: int,
+    normalize: Optional[Union[str, NormalizationMode]] = None,
+) -> Optional[int]:
+    """
+    Compute Damerau-Levenshtein distance with explicit None return when threshold exceeded.
+
+    Args:
+        a: First string
+        b: Second string
+        max_distance: Maximum distance threshold. Returns None if exceeded.
+        normalize: Optional normalization mode to apply before comparison
+
+    Returns:
+        The edit distance if within threshold, None if exceeded.
+
+    Example:
+        >>> damerau_levenshtein_bounded("ca", "ac", max_distance=2)
+        1
+        >>> damerau_levenshtein_bounded("abc", "xyz", max_distance=2)
+        None
     """
     ...
 
@@ -359,7 +451,7 @@ def hamming_similarity(a: str, b: str) -> float:
 def ngram_similarity(
     a: str,
     b: str,
-    ngram_size: int = 2,
+    ngram_size: int = 3,
     pad: bool = True,
     normalize: Optional[Union[str, NormalizationMode]] = None,
 ) -> float:
@@ -369,7 +461,7 @@ def ngram_similarity(
     Args:
         a: First string
         b: Second string
-        ngram_size: Size of n-grams (default 2 for bigrams)
+        ngram_size: Size of n-grams (default 3 for trigrams)
         pad: Whether to pad strings for edge matching
         normalize: Optional normalization mode to apply before comparison
 
@@ -386,7 +478,7 @@ def ngram_similarity(
 def ngram_jaccard(
     a: str,
     b: str,
-    ngram_size: int = 2,
+    ngram_size: int = 3,
     pad: bool = True,
     normalize: Optional[Union[str, NormalizationMode]] = None,
 ) -> float:
@@ -426,7 +518,7 @@ def trigram_similarity(a: str, b: str) -> float:
     """
     ...
 
-def ngram_profile_similarity(a: str, b: str, ngram_size: int = 2) -> float:
+def ngram_profile_similarity(a: str, b: str, ngram_size: int = 3) -> float:
     """
     Compute n-gram profile similarity.
 
@@ -442,7 +534,7 @@ def ngram_profile_similarity(a: str, b: str, ngram_size: int = 2) -> float:
     """
     ...
 
-def extract_ngrams(s: str, ngram_size: int = 2, pad: bool = True) -> List[str]:
+def extract_ngrams(s: str, ngram_size: int = 3, pad: bool = True) -> List[str]:
     """
     Extract n-grams from a string.
 
@@ -520,6 +612,250 @@ def metaphone_similarity(a: str, b: str, max_length: int = 4) -> float:
     """
     ...
 
+def double_metaphone(text: str, max_length: int = 4) -> Tuple[str, str]:
+    """
+    Encode a string using Double Metaphone algorithm.
+
+    Double Metaphone is an improvement over Metaphone that handles European
+    names (Germanic, Slavic, Italian, etc.) better by returning two possible
+    phonetic codes - a primary and an alternate pronunciation.
+
+    Args:
+        text: String to encode
+        max_length: Maximum length of each code (default: 4)
+
+    Returns:
+        Tuple of (primary_code, alternate_code). The alternate may be empty
+        if there's only one pronunciation.
+
+    Example:
+        >>> double_metaphone("Schmidt")
+        ('XMT', 'SMT')  # German and Anglicized pronunciations
+        >>> double_metaphone("Smith")
+        ('SM0', 'XMT')  # 0 represents the TH sound
+    """
+    ...
+
+def double_metaphone_match(a: str, b: str) -> bool:
+    """
+    Check if two strings match phonetically using Double Metaphone.
+
+    Returns True if any of the codes match (primary-primary, primary-alternate,
+    alternate-primary, or alternate-alternate).
+
+    More lenient than metaphone_match because it considers alternate
+    pronunciations, making it better for matching names with varied spellings.
+
+    Example:
+        >>> double_metaphone_match("Schmidt", "Smith")
+        True  # Matches via alternate codes
+        >>> double_metaphone_match("Katherine", "Catherine")
+        True
+    """
+    ...
+
+def double_metaphone_similarity(a: str, b: str, max_length: int = 4) -> float:
+    """
+    Compute Double Metaphone similarity between two strings.
+
+    Returns 1.0 for exact phonetic match (any code combination matches),
+    or a partial score based on Jaro-Winkler similarity of the best
+    matching code pair.
+
+    Args:
+        a: First string
+        b: Second string
+        max_length: Maximum length of metaphone codes (default: 4)
+
+    Returns:
+        Similarity score from 0.0 to 1.0
+
+    Example:
+        >>> double_metaphone_similarity("Stephen", "Steven")
+        1.0
+        >>> double_metaphone_similarity("Schmidt", "Smith")
+        1.0  # Matches via alternate codes
+    """
+    ...
+
+# =============================================================================
+# Grapheme Cluster Mode Functions
+# =============================================================================
+# These functions treat grapheme clusters as single units, which is important
+# for correctly handling emoji sequences, combining characters, and other
+# multi-codepoint characters.
+
+def levenshtein_grapheme(a: str, b: str) -> int:
+    """
+    Compute Levenshtein distance treating grapheme clusters as single units.
+
+    A grapheme cluster is a user-perceived character, which may consist of
+    multiple Unicode code points (e.g., family emoji 👨‍👩‍👧‍👦 is 7 code points
+    but 1 grapheme cluster).
+
+    Args:
+        a: First string
+        b: Second string
+
+    Returns:
+        Edit distance counting each grapheme cluster as one character.
+
+    Example:
+        >>> # Family emoji: 7 code points but 1 grapheme
+        >>> levenshtein("👨‍👩‍👧‍👦", "👨‍👩‍👧")  # Regular: counts code points
+        4
+        >>> levenshtein_grapheme("👨‍👩‍👧‍👦", "👨‍👩‍👧")  # Grapheme: counts visual chars
+        1
+    """
+    ...
+
+def levenshtein_similarity_grapheme(a: str, b: str) -> float:
+    """
+    Compute normalized Levenshtein similarity using grapheme clusters.
+
+    Like levenshtein_similarity but treats grapheme clusters as single units.
+    This gives more intuitive results for text containing emoji or combining characters.
+
+    Args:
+        a: First string
+        b: Second string
+
+    Returns:
+        Similarity score from 0.0 to 1.0 based on grapheme distance.
+
+    Example:
+        >>> levenshtein_similarity_grapheme("café", "cafe")  # é is 1 grapheme
+        0.8  # 1 difference out of 5 graphemes
+    """
+    ...
+
+def jaro_similarity_grapheme(a: str, b: str) -> float:
+    """
+    Compute Jaro similarity treating grapheme clusters as single units.
+
+    Like jaro_similarity but correctly handles multi-codepoint characters
+    such as emoji sequences, combining characters, and regional indicators.
+
+    Args:
+        a: First string
+        b: Second string
+
+    Returns:
+        Jaro similarity score from 0.0 to 1.0.
+
+    Example:
+        >>> jaro_similarity_grapheme("👨‍👩‍👧", "👨‍👩‍👦")
+        0.833...  # 2 matching graphemes out of 3
+    """
+    ...
+
+def jaro_winkler_similarity_grapheme(
+    a: str,
+    b: str,
+    prefix_weight: float = 0.1,
+    max_prefix_length: int = 4,
+) -> float:
+    """
+    Compute Jaro-Winkler similarity treating grapheme clusters as single units.
+
+    Like jaro_winkler_similarity but counts grapheme clusters instead of
+    code points. This gives correct results for strings with emoji or
+    combining characters.
+
+    Args:
+        a: First string
+        b: Second string
+        prefix_weight: Weight for common prefix bonus (default: 0.1)
+        max_prefix_length: Maximum prefix length to consider (default: 4)
+
+    Returns:
+        Jaro-Winkler similarity score from 0.0 to 1.0.
+
+    Example:
+        >>> jaro_winkler_similarity_grapheme("🇺🇸🇬🇧", "🇺🇸🇫🇷")
+        0.9  # Common prefix "🇺🇸" boosts the score
+    """
+    ...
+
+# =============================================================================
+# SIMD-Accelerated Functions
+# =============================================================================
+# These functions use triple_accel's SIMD-optimized implementation for
+# 20-30x faster edit distance calculations on x86/x86-64 CPUs.
+
+def levenshtein_simd(a: str, b: str) -> int:
+    """
+    SIMD-accelerated Levenshtein distance.
+
+    Uses triple_accel's SIMD-optimized implementation which can be 20-30x faster
+    than the scalar implementation for longer strings. Automatically falls back
+    to scalar on CPUs without SIMD support (e.g., ARM).
+
+    Best for:
+    - Long strings (>100 characters)
+    - Batch processing many comparisons
+    - x86/x86-64 CPUs with AVX2 or SSE4.1
+
+    Note: Works on byte-level, so for Unicode strings the result may differ
+    slightly from character-level distance (use regular levenshtein for
+    character-accurate Unicode distance).
+
+    Args:
+        a: First string
+        b: Second string
+
+    Returns:
+        Edit distance (number of insertions, deletions, substitutions).
+
+    Example:
+        >>> levenshtein_simd("kitten", "sitting")
+        3
+    """
+    ...
+
+def levenshtein_simd_bounded(a: str, b: str, max_distance: int) -> Optional[int]:
+    """
+    SIMD-accelerated Levenshtein distance with max threshold.
+
+    Returns None if the distance exceeds max_distance, enabling early termination.
+    Uses SIMD acceleration when available for optimal performance.
+
+    Args:
+        a: First string
+        b: Second string
+        max_distance: Maximum distance threshold
+
+    Returns:
+        Edit distance if within threshold, None if exceeded.
+
+    Example:
+        >>> levenshtein_simd_bounded("hello", "hallo", 2)
+        1
+        >>> levenshtein_simd_bounded("abc", "xyz", 2)
+        None
+    """
+    ...
+
+def levenshtein_similarity_simd(a: str, b: str) -> float:
+    """
+    SIMD-accelerated Levenshtein similarity (0.0 to 1.0).
+
+    Uses SIMD acceleration for the distance calculation, providing
+    significant speedups on x86/x86-64 CPUs.
+
+    Args:
+        a: First string
+        b: Second string
+
+    Returns:
+        Similarity score from 0.0 (completely different) to 1.0 (identical).
+
+    Example:
+        >>> levenshtein_similarity_simd("hello", "hallo")
+        0.8
+    """
+    ...
+
 def lcs_length(a: str, b: str) -> int:
     """
     Compute the length of the Longest Common Subsequence.
@@ -541,6 +877,10 @@ def lcs_string(a: str, b: str) -> str:
     Complexity:
         Time: O(m*n) where m, n are string lengths.
         Space: O(m*n) for backtracking matrix.
+
+    Raises:
+        ValidationError: If either string exceeds 10,000 characters.
+            Use lcs_length for a space-efficient alternative.
     """
     ...
 
@@ -593,6 +933,10 @@ def longest_common_substring(a: str, b: str) -> str:
     Complexity:
         Time: O(m*n) where m, n are string lengths.
         Space: O(m*n) for backtracking.
+
+    Raises:
+        ValidationError: If either string exceeds 10,000 characters.
+            Use longest_common_substring_length for a space-efficient alternative.
     """
     ...
 
@@ -633,7 +977,7 @@ def cosine_similarity_words(
 def cosine_similarity_ngrams(
     a: str,
     b: str,
-    ngram_size: int = 2,
+    ngram_size: int = 3,
     normalize: Optional[Union[str, NormalizationMode]] = None,
 ) -> float:
     """
@@ -681,11 +1025,11 @@ def jaro_winkler_similarity_ci(
     """Case-insensitive Jaro-Winkler similarity. Equivalent to jaro_winkler_similarity(a, b, normalize="lowercase")."""
     ...
 
-def ngram_similarity_ci(a: str, b: str, ngram_size: int = 2, pad: bool = True) -> float:
+def ngram_similarity_ci(a: str, b: str, ngram_size: int = 3, pad: bool = True) -> float:
     """Case-insensitive n-gram similarity. Equivalent to ngram_similarity(a, b, normalize="lowercase")."""
     ...
 
-def ngram_jaccard_ci(a: str, b: str, ngram_size: int = 2, pad: bool = True) -> float:
+def ngram_jaccard_ci(a: str, b: str, ngram_size: int = 3, pad: bool = True) -> float:
     """Case-insensitive n-gram Jaccard similarity. Equivalent to ngram_jaccard(a, b, normalize="lowercase")."""
     ...
 
@@ -697,8 +1041,92 @@ def cosine_similarity_words_ci(a: str, b: str) -> float:
     """Case-insensitive word-level cosine similarity. Equivalent to cosine_similarity_words(a, b, normalize="lowercase")."""
     ...
 
-def cosine_similarity_ngrams_ci(a: str, b: str, ngram_size: int = 2) -> float:
+def cosine_similarity_ngrams_ci(a: str, b: str, ngram_size: int = 3) -> float:
     """Case-insensitive n-gram cosine similarity. Equivalent to cosine_similarity_ngrams(a, b, normalize="lowercase")."""
+    ...
+
+def bigram_similarity_ci(a: str, b: str) -> float:
+    """Case-insensitive bigram similarity. Equivalent to ngram_similarity(a, b, ngram_size=2, normalize="lowercase")."""
+    ...
+
+def trigram_similarity_ci(a: str, b: str) -> float:
+    """Case-insensitive trigram similarity. Equivalent to ngram_similarity(a, b, ngram_size=3, normalize="lowercase")."""
+    ...
+
+def lcs_similarity_ci(a: str, b: str) -> float:
+    """Case-insensitive LCS similarity. Equivalent to lcs_similarity(a.lower(), b.lower())."""
+    ...
+
+def lcs_length_ci(a: str, b: str) -> int:
+    """Case-insensitive LCS length. Equivalent to lcs_length(a.lower(), b.lower())."""
+    ...
+
+def lcs_string_ci(a: str, b: str) -> str:
+    """
+    Case-insensitive LCS string.
+
+    Returns the actual Longest Common Subsequence string after converting
+    both inputs to lowercase.
+
+    Raises:
+        ValidationError: If either string exceeds 10,000 characters.
+            Use lcs_length_ci for a space-efficient alternative.
+    """
+    ...
+
+def longest_common_substring_ci(a: str, b: str) -> str:
+    """
+    Case-insensitive longest common substring.
+
+    Returns the longest common contiguous substring after converting
+    both inputs to lowercase.
+
+    Raises:
+        ValidationError: If either string exceeds 10,000 characters.
+            Use longest_common_substring_length for a space-efficient alternative.
+    """
+    ...
+
+def hamming_ci(a: str, b: str) -> int:
+    """
+    Case-insensitive Hamming distance.
+
+    Converts both strings to lowercase before computing Hamming distance.
+
+    Raises:
+        ValidationError: If strings have different lengths.
+
+    Example:
+        >>> hamming_ci("ABC", "abc")
+        0
+        >>> hamming_ci("ABC", "AXC")
+        1
+    """
+    ...
+
+def hamming_similarity_ci(a: str, b: str) -> float:
+    """
+    Case-insensitive Hamming similarity (0.0 to 1.0).
+
+    Converts both strings to lowercase before computing Hamming similarity.
+
+    Raises:
+        ValidationError: If strings have different lengths.
+
+    Example:
+        >>> hamming_similarity_ci("ABC", "abc")
+        1.0
+        >>> hamming_similarity_ci("ABC", "AXC")
+        0.666...
+    """
+    ...
+
+def soundex_similarity_ci(a: str, b: str) -> float:
+    """Case-insensitive Soundex similarity. Equivalent to soundex_similarity(a.lower(), b.lower())."""
+    ...
+
+def metaphone_similarity_ci(a: str, b: str, max_length: int = 4) -> float:
+    """Case-insensitive Metaphone similarity. Equivalent to metaphone_similarity(a.lower(), b.lower())."""
     ...
 
 # =============================================================================
@@ -817,7 +1245,12 @@ def token_set_ratio(s1: str, s2: str) -> float:
     """
     ...
 
-def wratio(s1: str, s2: str) -> float:
+def wratio(
+    s1: str,
+    s2: str,
+    partial_weight: float = 0.9,
+    token_weight: float = 0.95,
+) -> float:
     """
     Compute weighted ratio using the best method for the input.
 
@@ -833,6 +1266,12 @@ def wratio(s1: str, s2: str) -> float:
     Args:
         s1: First string
         s2: Second string
+        partial_weight: Weight for partial_ratio (0.0 to 1.0, default: 0.9).
+            Higher values favor substring matching. The effective weight is
+            further adjusted based on length ratio between strings.
+        token_weight: Weight for token-based ratios (0.0 to 1.0, default: 0.95).
+            Higher values favor word-order-independent matching (token_sort_ratio
+            and token_set_ratio).
 
     Returns:
         Similarity score (0.0 to 1.0).
@@ -842,6 +1281,9 @@ def wratio(s1: str, s2: str) -> float:
         0.82
         >>> wratio("test", "this is a test!")
         0.9
+        >>> # Custom weights to favor token matching
+        >>> wratio("hello world", "world hello", partial_weight=0.9, token_weight=1.0)
+        1.0
     """
     ...
 
@@ -865,11 +1307,69 @@ def ratio(s1: str, s2: str) -> float:
     """
     ...
 
+def qratio(s1: str, s2: str) -> float:
+    """
+    Compute similarity ratio with automatic Unicode NFC normalization.
+
+    This is equivalent to ratio() but first applies Unicode NFC (Canonical
+    Decomposition, followed by Canonical Composition) normalization to both
+    strings. This ensures that equivalent Unicode representations (e.g., "é"
+    as a single character vs "e" + combining accent) are treated as identical.
+
+    Use this function when comparing strings that may have different Unicode
+    representations of the same visual characters.
+
+    Args:
+        s1: First string
+        s2: Second string
+
+    Returns:
+        Similarity score (0.0 to 1.0).
+
+    Example:
+        >>> # These are the same character in different Unicode forms
+        >>> nfc = "café"  # é as single codepoint U+00E9
+        >>> nfd = "cafe\\u0301"  # e + combining acute accent
+        >>> qratio(nfc, nfd)
+        1.0
+    """
+    ...
+
+def qwratio(
+    s1: str,
+    s2: str,
+    partial_weight: float = 0.9,
+    token_weight: float = 0.95,
+) -> float:
+    """
+    Compute weighted ratio with automatic Unicode NFC normalization.
+
+    This is equivalent to wratio() but first applies Unicode NFC normalization
+    to both strings before comparison. Combines the intelligent method selection
+    of wratio with proper Unicode handling.
+
+    Args:
+        s1: First string
+        s2: Second string
+        partial_weight: Weight for partial_ratio (0.0 to 1.0, default: 0.9)
+        token_weight: Weight for token-based ratios (0.0 to 1.0, default: 0.95)
+
+    Returns:
+        Similarity score (0.0 to 1.0).
+
+    Example:
+        >>> qwratio("naïve approach", "naive approach")
+        1.0
+        >>> qwratio("Müller", "Mueller")
+        0.85
+    """
+    ...
+
 def extract(
     query: str,
     choices: List[str],
-    limit: int = 5,
-    score_cutoff: float = 0.0,
+    limit: int = 10,
+    min_similarity: float = 0.0,
 ) -> List[MatchResult]:
     """
     Find top N matches from a list (RapidFuzz-compatible).
@@ -880,8 +1380,8 @@ def extract(
     Args:
         query: Query string to match
         choices: List of strings to search
-        limit: Maximum number of results (default 5)
-        score_cutoff: Minimum similarity threshold (default 0.0)
+        limit: Maximum number of results (default 10)
+        min_similarity: Minimum similarity threshold (default 0.0)
 
     Returns:
         List of MatchResult objects sorted by score descending.
@@ -896,27 +1396,27 @@ def extract(
 def extract_one(
     query: str,
     choices: List[str],
-    score_cutoff: float = 0.0,
+    min_similarity: float = 0.0,
 ) -> Optional[MatchResult]:
     """
     Find the single best match from a list (RapidFuzz-compatible).
 
-    Returns the best match if one exists above the score cutoff, otherwise None.
+    Returns the best match if one exists above the minimum similarity, otherwise None.
     This function provides API compatibility with RapidFuzz's `process.extractOne`.
 
     Args:
         query: Query string to match
         choices: List of strings to search
-        score_cutoff: Minimum similarity threshold (default 0.0)
+        min_similarity: Minimum similarity threshold (default 0.0)
 
     Returns:
-        Best MatchResult if found above cutoff, otherwise None.
+        Best MatchResult if found above threshold, otherwise None.
 
     Example:
         >>> result = extract_one("appel", ["apple", "banana"])
         >>> result.text, result.score
         ('apple', 0.93)
-        >>> extract_one("xyz", ["apple", "banana"], score_cutoff=0.9)
+        >>> extract_one("xyz", ["apple", "banana"], min_similarity=0.9)
         None
     """
     ...
@@ -925,21 +1425,40 @@ def extract_one(
 # Batch Processing Functions
 # =============================================================================
 
-def batch_levenshtein(strings: List[str], query: str) -> List[MatchResult]:
+def batch_levenshtein(
+    strings: List[str],
+    query: str,
+    normalize: Optional[str] = None,
+) -> List[MatchResult]:
     """
     Compute Levenshtein distances for all strings against a query in parallel.
 
     Args:
         strings: List of strings to compare
         query: Query string to compare against
+        normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
 
     Returns:
         List of MatchResult objects in the same order as input strings.
     """
     ...
 
-def batch_jaro_winkler(strings: List[str], query: str) -> List[MatchResult]:
-    """Compute Jaro-Winkler similarities for all strings in parallel."""
+def batch_jaro_winkler(
+    strings: List[str],
+    query: str,
+    normalize: Optional[str] = None,
+) -> List[MatchResult]:
+    """
+    Compute Jaro-Winkler similarities for all strings in parallel.
+
+    Args:
+        strings: List of strings to compare
+        query: Query string to compare against
+        normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+
+    Returns:
+        List of MatchResult objects in the same order as input strings.
+    """
     ...
 
 def find_best_matches(
@@ -948,6 +1467,7 @@ def find_best_matches(
     algorithm: str = "jaro_winkler",
     limit: int = 10,
     min_similarity: float = 0.0,
+    normalize: Optional[str] = None,
 ) -> List[MatchResult]:
     """
     Find best matching strings from a list.
@@ -959,6 +1479,7 @@ def find_best_matches(
                   "jaro_winkler", "ngram", "bigram", "trigram", "lcs", "cosine"
         limit: Maximum number of results to return
         min_similarity: Minimum similarity score to include
+        normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
 
     Returns:
         List of MatchResult objects sorted by score descending.
@@ -970,9 +1491,165 @@ def find_best_matches(
     """
     ...
 
+def batch_similarity_pairs(
+    left: List[str],
+    right: List[str],
+    algorithm: str = "jaro_winkler",
+    normalize: Optional[str] = None,
+) -> List[Optional[float]]:
+    """
+    Compute similarity scores for pairs of strings in parallel.
+
+    Takes two equal-length lists of strings and computes the similarity
+    for each corresponding pair using Rayon for parallel processing.
+
+    Args:
+        left: First list of strings
+        right: Second list of strings (must be same length as left)
+        algorithm: Similarity algorithm to use. Supported algorithms:
+            - "levenshtein": Normalized Levenshtein similarity
+            - "jaro": Jaro similarity
+            - "jaro_winkler": Jaro-Winkler similarity (default)
+            - "ngram": Trigram (n=3) similarity
+            - "cosine": Character-level cosine similarity
+        normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+
+    Returns:
+        List of similarity scores (0.0 to 1.0). Returns None for pairs
+        where an unknown algorithm is specified.
+
+    Raises:
+        ValueError: If left and right have different lengths.
+
+    Example:
+        >>> left = ["hello", "world"]
+        >>> right = ["hallo", "word"]
+        >>> batch_similarity_pairs(left, right)
+        [0.88, 0.75]
+    """
+    ...
+
+def cdist(
+    queries: List[str],
+    choices: List[str],
+    scorer: str = "levenshtein",
+    workers: int = -1,
+    normalize: Optional[str] = None,
+) -> List[List[float]]:
+    """
+    Compute pairwise distance/similarity matrix between two lists of strings.
+
+    Similar to scipy.spatial.distance.cdist, this function computes the similarity
+    between every pair of strings from queries and choices, returning a 2D matrix.
+
+    Args:
+        queries: First list of strings (rows of output matrix)
+        choices: Second list of strings (columns of output matrix)
+        scorer: Algorithm to use. Options:
+            - "levenshtein": Normalized Levenshtein similarity (default)
+            - "jaro": Jaro similarity
+            - "jaro_winkler": Jaro-Winkler similarity
+            - "ngram": Trigram (n=3) similarity
+            - "cosine": Character-level cosine similarity
+            - "damerau": Normalized Damerau-Levenshtein similarity
+        workers: Number of parallel workers. -1 means use all available cores (default)
+        normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+
+    Returns:
+        2D list where result[i][j] is the similarity between queries[i] and choices[j]
+
+    Raises:
+        ValueError: If an unknown scorer is specified.
+
+    Example:
+        >>> queries = ["hello", "world"]
+        >>> choices = ["hallo", "word", "help"]
+        >>> matrix = cdist(queries, choices, scorer="jaro_winkler")
+        >>> # matrix[0] = similarities of "hello" with each choice
+        >>> # matrix[1] = similarities of "world" with each choice
+    """
+    ...
+
+def batch_similarity(
+    strings: List[str],
+    query: str,
+    algorithm: str = "jaro_winkler",
+    normalize: Optional[str] = None,
+) -> List[MatchResult]:
+    """
+    Compute similarity scores for all strings against a query using any algorithm.
+
+    This is a unified batch similarity function that supports all algorithms.
+    Results include an id field for tracking the original position.
+
+    Args:
+        strings: List of strings to compare
+        query: Query string to compare against
+        algorithm: Similarity algorithm to use:
+            - "levenshtein": Normalized Levenshtein similarity
+            - "damerau_levenshtein": Normalized Damerau-Levenshtein similarity
+            - "jaro": Jaro similarity
+            - "jaro_winkler": Jaro-Winkler similarity (default)
+            - "ngram": Trigram (n=3) similarity
+            - "cosine": Character-level cosine similarity
+            - "lcs": LCS similarity
+        normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+
+    Returns:
+        List of MatchResult objects in the same order as input strings.
+        Each result has text, score, and id fields.
+
+    Example:
+        >>> results = batch_similarity(["hello", "hallo", "world"], "helo")
+        >>> [(r.text, r.score, r.id) for r in results]
+        [('hello', 0.91, 0), ('hallo', 0.73, 1), ('world', 0.40, 2)]
+    """
+    ...
+
 # =============================================================================
 # Deduplication
 # =============================================================================
+
+def find_duplicate_pairs(
+    items: List[str],
+    algorithm: str = "jaro_winkler",
+    min_similarity: float = 0.85,
+    window_size: int = 50,
+    normalize: str = "lowercase",
+) -> List[tuple[int, int, float]]:
+    """
+    Find duplicate pairs using Sorted Neighborhood Method (SNM).
+
+    Returns pairs of similar items with their indices and similarity scores.
+    This is more efficient than brute force for large datasets (O(N log N) vs O(N^2))
+    and returns results in a format suitable for DataFrame integration.
+
+    Args:
+        items: List of strings to check for duplicates
+        algorithm: Similarity algorithm (default: "jaro_winkler")
+        min_similarity: Minimum similarity threshold (0.0 to 1.0, default: 0.85)
+        window_size: Window size for SNM comparison (default: 50)
+        normalize: Normalization mode to apply before comparison:
+            - "none": No normalization
+            - "lowercase": Convert to lowercase (default)
+            - "unicode_nfkd" or "nfkd": Apply Unicode NFKD normalization
+            - "remove_punctuation": Remove ASCII punctuation
+            - "remove_whitespace": Remove all whitespace
+            - "strict": Apply all normalizations
+
+    Returns:
+        List of (idx_a, idx_b, score) tuples for each pair of similar items,
+        where idx_a < idx_b (smaller index always first for consistency).
+
+    Example:
+        >>> items = ["hello", "hallo", "world", "word"]
+        >>> pairs = find_duplicate_pairs(items, min_similarity=0.8)
+        >>> for a, b, score in pairs:
+        ...     print(f"{items[a]} ~ {items[b]}: {score:.2f}")
+        hello ~ hallo: 0.88
+        world ~ word: 0.75
+    """
+    ...
 
 def find_duplicates(
     items: List[str],
@@ -1322,21 +1999,126 @@ class BkTree:
         """Add multiple strings to the tree."""
         ...
 
-    def search(self, query: str, max_distance: int) -> List[SearchResult]:
+    def search(
+        self,
+        query: str,
+        max_distance: Optional[int] = None,
+        min_similarity: Optional[float] = None,
+        limit: Optional[int] = None,
+        normalize: Optional[str] = None,
+    ) -> List[SearchResult]:
         """
-        Search for strings within a given edit distance.
+        Search for strings within a given edit distance or above a similarity threshold.
+
+        Args:
+            query: The string to search for
+            max_distance: Maximum edit distance (mutually exclusive with min_similarity)
+            min_similarity: Minimum similarity threshold 0.0-1.0 (converted to max_distance)
+            limit: Maximum number of results to return
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+
+        Returns:
+            List of SearchResult objects sorted by distance/similarity.
+
+        Raises:
+            ValueError: If neither max_distance nor min_similarity is provided,
+                       or if both are provided.
+        """
+        ...
+
+    def batch_search(
+        self,
+        queries: Sequence[str],
+        max_distance: int,
+        limit: Optional[int] = None,
+        normalize: Optional[str] = None,
+    ) -> List[List[SearchResult]]:
+        """
+        Search for multiple queries in parallel.
+
+        Args:
+            queries: List of query strings
+            max_distance: Maximum edit distance
+            limit: Maximum number of results per query
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+
+        Returns:
+            List of result lists, one per query.
+        """
+        ...
+
+    def find_nearest(
+        self,
+        query: str,
+        limit: int,
+    ) -> List[SearchResult]:
+        """
+        Find the nearest neighbors to the query.
+
+        Args:
+            query: The string to search for
+            limit: Number of nearest neighbors to return
 
         Returns:
             List of SearchResult objects sorted by distance.
         """
         ...
 
-    def find_nearest(self, query: str, k: int) -> List[SearchResult]:
-        """Find the k nearest neighbors to the query."""
-        ...
-
     def contains(self, query: str) -> bool:
         """Check if the tree contains an exact match."""
+        ...
+
+    def remove(self, id: int) -> bool:
+        """
+        Remove an item by its ID (soft delete using tombstone).
+
+        Returns:
+            True if the item was found and deleted, False otherwise.
+        """
+        ...
+
+    def remove_text(self, text: str) -> bool:
+        """
+        Remove an item by its text (soft delete using tombstone).
+
+        Returns:
+            True if the item was found and deleted, False otherwise.
+        """
+        ...
+
+    def deleted_count(self) -> int:
+        """Get the number of deleted (tombstoned) items."""
+        ...
+
+    def active_count(self) -> int:
+        """Get the number of active (non-deleted) items."""
+        ...
+
+    def compact(self) -> None:
+        """Rebuild the tree without deleted items."""
+        ...
+
+    def to_bytes(self) -> bytes:
+        """
+        Serialize the tree to bytes.
+
+        Note: The distance function is not serialized. When deserializing,
+        the tree will use the default Levenshtein distance.
+        """
+        ...
+
+    @staticmethod
+    def from_bytes(data: bytes) -> "BkTree":
+        """
+        Deserialize a tree from bytes.
+
+        Note: The deserialized tree will use Levenshtein distance by default.
+        """
+        ...
+
+    @staticmethod
+    def from_bytes_damerau(data: bytes) -> "BkTree":
+        """Deserialize a tree from bytes using Damerau-Levenshtein distance."""
         ...
 
     def __len__(self) -> int:
@@ -1376,7 +2158,7 @@ class NgramIndex:
 
     def __init__(
         self,
-        ngram_size: int = 2,
+        ngram_size: int = 3,
         min_ngram_ratio: float = 0.2,
         normalize: bool = True,
     ) -> None:
@@ -1420,7 +2202,7 @@ class NgramIndex:
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
         limit: Optional[int] = None,
-        case_insensitive: bool = True,
+        normalize: Optional[str] = "lowercase",
     ) -> List[SearchResult]:
         """
         Search with similarity scoring.
@@ -1430,10 +2212,8 @@ class NgramIndex:
             algorithm: "jaro_winkler", "jaro", "levenshtein", "ngram", "trigram"
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
             limit: Maximum results to return
-            case_insensitive: Whether to ignore case when computing similarity
-                scores. When True, "Hello" and "hello" are compared as equal.
-                This affects the final score, not candidate retrieval (which
-                is controlled by the `normalize` constructor parameter).
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive
+                comparison (default). Use None for case-sensitive comparison.
 
         Returns:
             List of SearchResult objects sorted by similarity.
@@ -1446,7 +2226,7 @@ class NgramIndex:
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
         limit: Optional[int] = None,
-        case_insensitive: bool = True,
+        normalize: Optional[str] = "lowercase",
     ) -> List[List[SearchResult]]:
         """Search for multiple queries in parallel."""
         ...
@@ -1454,11 +2234,23 @@ class NgramIndex:
     def find_nearest(
         self,
         query: str,
-        k: int,
+        limit: int,
         algorithm: str = "jaro_winkler",
-        case_insensitive: bool = True,
+        normalize: Optional[str] = "lowercase",
     ) -> List[SearchResult]:
-        """Find the k nearest neighbors by similarity."""
+        """
+        Find the nearest neighbors by similarity.
+
+        Args:
+            query: The string to search for
+            limit: Number of nearest neighbors to return
+            algorithm: Similarity algorithm to use
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive
+                comparison (default). Use None for case-sensitive comparison.
+
+        Returns:
+            Up to limit SearchResult objects sorted by similarity.
+        """
         ...
 
     def contains(self, query: str) -> bool:
@@ -1469,8 +2261,60 @@ class NgramIndex:
         """Get all candidates that share n-grams with query."""
         ...
 
+    def to_bytes(self) -> bytes:
+        """Serialize the index to bytes."""
+        ...
+
+    @staticmethod
+    def from_bytes(data: bytes) -> "NgramIndex":
+        """Deserialize an index from bytes."""
+        ...
+
     def __len__(self) -> int:
         """Get the number of indexed items."""
+        ...
+
+    def compress(self) -> None:
+        """
+        Compress the posting lists to reduce memory usage.
+
+        This converts the uncompressed posting lists to delta + varint encoded
+        format, typically achieving 50-70% memory reduction for large indices.
+
+        After compression:
+        - The original uncompressed index is cleared to free memory
+        - Searches will use the compressed index (slightly slower decode)
+        - New items cannot be added (call decompress() first)
+
+        Example:
+            >>> index = NgramIndex()
+            >>> index.add_all(large_dataset)
+            >>> index.compress()  # Reduce memory usage
+            >>> # Searches still work, using compressed index
+        """
+        ...
+
+    def decompress(self) -> None:
+        """
+        Decompress the posting lists to allow adding new items.
+
+        This restores the uncompressed index from the compressed format.
+        Call this before adding new items to a compressed index.
+        """
+        ...
+
+    def is_compressed(self) -> bool:
+        """Check if the index is currently compressed."""
+        ...
+
+    def compression_stats(self) -> Optional[tuple[int, int, float]]:
+        """
+        Get compression statistics.
+
+        Returns:
+            A tuple of (compressed_bytes, uncompressed_bytes, compression_ratio),
+            or None if the index is not compressed.
+        """
         ...
 
 class HybridIndex:
@@ -1549,7 +2393,7 @@ class HybridIndex:
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
         limit: Optional[int] = None,
-        case_insensitive: bool = True,
+        normalize: Optional[str] = "lowercase",
     ) -> List[SearchResult]:
         """
         Search for similar strings.
@@ -1559,10 +2403,8 @@ class HybridIndex:
             algorithm: Similarity algorithm ("jaro_winkler", "jaro", "levenshtein")
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
             limit: Maximum number of results to return
-            case_insensitive: Whether to ignore case when computing similarity
-                scores. When True, "Hello" and "hello" are compared as equal.
-                This affects the final score, not candidate retrieval (which
-                is controlled by the `normalize` constructor parameter).
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive
+                comparison (default). Use None for case-sensitive comparison.
 
         Returns:
             List of SearchResult objects sorted by similarity (highest first).
@@ -1575,7 +2417,7 @@ class HybridIndex:
         algorithm: str = "jaro_winkler",
         min_similarity: float = 0.0,
         limit: Optional[int] = None,
-        case_insensitive: bool = True,
+        normalize: Optional[str] = "lowercase",
     ) -> List[List[SearchResult]]:
         """
         Search for multiple queries in parallel.
@@ -1585,7 +2427,8 @@ class HybridIndex:
             algorithm: Similarity algorithm to use
             min_similarity: Minimum similarity score
             limit: Maximum results per query
-            case_insensitive: Whether to ignore case when comparing strings.
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive
+                comparison (default). Use None for case-sensitive comparison.
 
         Returns:
             List of result lists, one per query.
@@ -1595,26 +2438,39 @@ class HybridIndex:
     def find_nearest(
         self,
         query: str,
-        k: int,
+        limit: Optional[int] = None,
         algorithm: str = "jaro_winkler",
-        case_insensitive: bool = True,
+        normalize: Optional[str] = "lowercase",
+        *,
+        k: Optional[int] = None,
     ) -> List[SearchResult]:
         """
-        Find the k nearest neighbors by similarity.
+        Find the nearest neighbors by similarity.
 
         Args:
             query: Query string
-            k: Number of nearest neighbors to return
+            limit: Number of nearest neighbors to return
             algorithm: Similarity algorithm to use
-            case_insensitive: Whether to ignore case when comparing strings.
+            normalize: Optional normalization mode. Use "lowercase" for case-insensitive
+                comparison (default). Use None for case-sensitive comparison.
+            k: Deprecated alias for limit
 
         Returns:
-            Up to k SearchResult objects sorted by similarity.
+            Up to limit SearchResult objects sorted by similarity.
         """
         ...
 
     def contains(self, query: str) -> bool:
         """Check if the index contains an exact match for the query."""
+        ...
+
+    def to_bytes(self) -> bytes:
+        """Serialize the index to bytes."""
+        ...
+
+    @staticmethod
+    def from_bytes(data: bytes) -> "HybridIndex":
+        """Deserialize an index from bytes."""
         ...
 
     def __len__(self) -> int:
@@ -1787,7 +2643,7 @@ class SchemaIndex:
         >>> results = index.search({
         ...     "name": "Macbook",
         ...     "tags": "laptop"
-        ... }, min_score=0.5, limit=10)
+        ... }, min_similarity=0.5, limit=10)
         >>>
         >>> for r in results:
         ...     print(f"Score: {r.score:.3f}, Name: {r.record['name']}")
@@ -1853,6 +2709,7 @@ class SchemaIndex:
         min_similarity: float = 0.0,
         limit: Optional[int] = None,
         min_field_similarity: float = 0.0,
+        field_boosts: Optional[dict[str, float]] = None,
     ) -> List[SchemaSearchResult]:
         """
         Search for records matching the query across multiple fields.
@@ -1868,6 +2725,10 @@ class SchemaIndex:
             limit: Maximum number of results to return (None for unlimited)
             min_field_similarity: Minimum score for individual fields (0.0 to 1.0).
                            Fields with scores below this threshold are excluded
+            field_boosts: Optional dictionary of field name to boost multiplier.
+                Boosts are multiplied with schema weights at query time.
+                Example: {"name": 2.0, "city": 0.5} doubles name's weight, halves city's.
+                This allows dynamic re-weighting without rebuilding the index.
 
         Returns:
             List of SchemaSearchResult objects sorted by descending score.
@@ -1877,16 +2738,67 @@ class SchemaIndex:
             ValueError: If query contains unknown field names
 
         Example:
+            >>> # Basic search
             >>> results = index.search({
             ...     "name": "laptop",
             ...     "tags": "computing,apple"
             ... }, min_similarity=0.7, limit=5)
             >>>
+            >>> # With query-time field boosting
+            >>> results = index.search(
+            ...     {"name": "John", "city": "NYC"},
+            ...     field_boosts={"name": 2.0, "city": 0.5}  # Emphasize name matches
+            ... )
+            >>>
             >>> for r in results:
             ...     print(f"Overall: {r.score:.3f}")
             ...     print(f"  Name score: {r.field_scores['name']:.3f}")
-            ...     print(f"  Tags score: {r.field_scores['tags']:.3f}")
             ...     print(f"  Record: {r.record}")
+        """
+        ...
+
+    def batch_search(
+        self,
+        queries: List[dict[str, str]],
+        min_similarity: float = 0.0,
+        limit: Optional[int] = None,
+        min_field_similarity: float = 0.0,
+        field_boosts: Optional[dict[str, float]] = None,
+    ) -> List[List[SchemaSearchResult]]:
+        """
+        Search for multiple queries in parallel.
+
+        Executes multiple searches concurrently using parallel processing,
+        maintaining the order of results corresponding to input queries.
+
+        Args:
+            queries: List of query records (each a dict mapping field names to values)
+            min_similarity: Minimum overall similarity score (0.0 to 1.0)
+            limit: Maximum number of results per query (None for unlimited)
+            min_field_similarity: Minimum per-field similarity threshold (0.0 to 1.0)
+            field_boosts: Optional dictionary of field name to boost multiplier.
+                Applied to all queries in the batch.
+
+        Returns:
+            List of lists, where each inner list contains SchemaSearchResult objects
+            for the corresponding query, sorted by descending score.
+
+        Raises:
+            ValueError: If any query contains unknown field names
+
+        Example:
+            >>> queries = [
+            ...     {"name": "laptop", "tags": "computing"},
+            ...     {"name": "phone", "tags": "mobile"}
+            ... ]
+            >>> results = index.batch_search(
+            ...     queries,
+            ...     min_similarity=0.7,
+            ...     limit=5,
+            ...     field_boosts={"name": 2.0}  # Boost name field for all queries
+            ... )
+            >>> for i, query_results in enumerate(results):
+            ...     print(f"Query {i}: {len(query_results)} matches")
         """
         ...
 

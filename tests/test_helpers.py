@@ -10,14 +10,16 @@ class TestCaseInsensitiveVariants:
         import fuzzyrust as fr
 
         assert fr.levenshtein_ci("Hello", "HELLO") == 0
-        assert fr.levenshtein_ci("Hello", "World") > 0
+        # "hello" vs "world" (lowercased): 4 substitutions = distance 4
+        assert fr.levenshtein_ci("Hello", "World") == 4
 
     def test_levenshtein_similarity_ci(self):
         import fuzzyrust as fr
 
         assert fr.levenshtein_similarity_ci("Hello", "HELLO") == 1.0
         assert fr.levenshtein_similarity_ci("Test", "TEST") == 1.0
-        assert 0.0 < fr.levenshtein_similarity_ci("Hello", "Hallo") < 1.0
+        # "Hello" vs "Hallo" after lowercasing: 1 edit out of 5 = 0.8 similarity
+        assert fr.levenshtein_similarity_ci("Hello", "Hallo") == 0.8
 
     def test_damerau_levenshtein_ci(self):
         import fuzzyrust as fr
@@ -140,8 +142,8 @@ class TestNormalizationFunctions:
 
         import fuzzyrust as fr
 
-        # Invalid string mode should raise ValueError
-        with pytest.raises(ValueError):
+        # Invalid string mode should raise ValidationError
+        with pytest.raises(fr.ValidationError):
             fr.normalize_string("Hello", "invalid_mode")
 
     def test_normalize_string_empty(self):
@@ -167,13 +169,21 @@ class TestDeduplication:
         items = ["hello", "Hello", "HELLO", "world"]
         result = fr.find_duplicates(items, min_similarity=0.9, normalize="lowercase")
 
-        assert isinstance(result.groups, list)
-        assert isinstance(result.unique, list)
+        assert isinstance(result.groups, list), "Expected groups to be a list"
+        assert len(result.groups) == 1, f"Expected exactly 1 group (hello variants), got {len(result.groups)}"
+        assert isinstance(result.unique, list), "Expected unique to be a list"
+        assert len(result.unique) == 1, f"Expected 1 unique item (world), got {len(result.unique)}"
         assert isinstance(result.total_duplicates, int)
 
-        # "hello", "Hello", "HELLO" should be grouped
-        assert len(result.groups) >= 1
-        assert "world" in result.unique
+        # "hello", "Hello", "HELLO" should be grouped together (3 items, 2 duplicates)
+        assert result.total_duplicates == 2, f"Expected 2 duplicates in hello group, got {result.total_duplicates}"
+        assert "world" in result.unique, f"Expected 'world' in unique list, got {result.unique}"
+        # Verify the group contains all hello variants (check unique values)
+        hello_group = result.groups[0]
+        unique_in_group = set(hello_group)
+        assert unique_in_group == {"hello", "Hello", "HELLO"}, (
+            f"Expected hello variants in group, got {unique_in_group}"
+        )
 
     def test_find_duplicates_no_normalize(self):
         import fuzzyrust as fr
@@ -181,9 +191,12 @@ class TestDeduplication:
         items = ["hello", "Hello", "HELLO"]
         result = fr.find_duplicates(items, min_similarity=0.9, normalize="none")
 
-        # Without normalization, case differences matter
-        # So they won't be grouped
-        assert len(result.groups) == 0 or len(result.unique) > 0
+        # Without normalization and high min_similarity (0.9), case differences prevent grouping
+        # "hello" vs "Hello" has ~0.8 similarity (1 char diff / 5 chars), below 0.9 threshold
+        # So all items should remain unique with no duplicate groups
+        assert len(result.groups) == 0, "Expected no groups when case differs and min_similarity=0.9"
+        assert len(result.unique) == 3, "Expected all 3 items to be unique without normalization"
+        assert result.total_duplicates == 0, "Expected no duplicates detected"
 
     def test_find_duplicates_algorithms(self):
         import fuzzyrust as fr
@@ -198,16 +211,31 @@ class TestDeduplication:
             assert hasattr(result, "groups")
             assert hasattr(result, "unique")
             assert hasattr(result, "total_duplicates")
-            assert isinstance(result.groups, list)
-            assert isinstance(result.unique, list)
+            assert isinstance(result.groups, list), f"Algorithm {algo}: expected groups to be a list"
+            assert isinstance(result.unique, list), f"Algorithm {algo}: expected unique to be a list"
             assert isinstance(result.total_duplicates, int)
-            # total_duplicates should be non-negative
-            assert result.total_duplicates >= 0, (
-                f"Algorithm {algo}: expected non-negative duplicates"
+
+            # With normalize="lowercase", "test" and "Test" become identical (1.0 similarity)
+            # At min_similarity=0.7, "test" and "Test" will always be grouped
+            # "tset" may or may not be included depending on the algorithm
+            assert len(result.groups) >= 1, f"Algorithm {algo}: expected at least 1 group, got {len(result.groups)}"
+            assert result.total_duplicates >= 1, (
+                f"Algorithm {algo}: expected at least 1 duplicate (test/Test), got {result.total_duplicates}"
             )
-            # With normalize=True and min_similarity=0.7, we expect some grouping behavior
-            # At minimum, "test" and "Test" should be normalized to same value
-            # The exact grouping depends on the algorithm and min_similarity
+            # Verify the group contains test and Test (normalized to same value)
+            unique_in_first_group = set(result.groups[0])
+            assert {"test", "Test"}.issubset(unique_in_first_group), (
+                f"Algorithm {algo}: expected test/Test in group, got {unique_in_first_group}"
+            )
+            # Total items accounted for: groups + unique should cover all inputs
+            grouped_items = set()
+            for group in result.groups:
+                grouped_items.update(group)
+            all_items = set(items)
+            covered_items = grouped_items.union(set(result.unique))
+            assert all_items.issubset(covered_items), (
+                f"Algorithm {algo}: not all items covered. Missing: {all_items - covered_items}"
+            )
 
     def test_find_duplicates_empty(self):
         import fuzzyrust as fr
@@ -311,15 +339,24 @@ class TestMultiAlgorithmComparison:
 
         results = fr.compare_algorithms(strings, query)
 
-        assert isinstance(results, list)
-        assert len(results) > 0
+        assert isinstance(results, list), "Expected results to be a list"
+        # compare_algorithms returns results for multiple algorithms by default
+        # At minimum: levenshtein, jaro_winkler, ngram (3 algorithms)
+        assert len(results) >= 3, f"Expected at least 3 algorithm results, got {len(results)}"
 
-        # Check first result structure
+        # Check first result structure and content
         first = results[0]
         assert hasattr(first, "algorithm")
         assert hasattr(first, "score")
         assert hasattr(first, "matches")
-        assert isinstance(first.matches, list)
+        assert isinstance(first.matches, list), "Expected matches to be a list"
+        # Query "helo" should find matches in ["hello", "hallo", "help"]
+        # All are within edit distance 1-2, so we expect matches
+        assert len(first.matches) >= 1, f"Expected at least 1 match for top algorithm, got {len(first.matches)}"
+        # The best match for "helo" should be "hello" (1 insertion)
+        assert first.matches[0].text in ["hello", "hallo", "help"], (
+            f"Expected match from input strings, got {first.matches[0].text}"
+        )
 
     def test_compare_algorithms_specific_algos(self):
         import fuzzyrust as fr
@@ -367,7 +404,8 @@ class TestMultiAlgorithmComparison:
             match = results[0].matches[0]
             assert hasattr(match, "text")
             assert hasattr(match, "score")
-            assert 0.0 <= match.score <= 1.0
+            # "apple" vs "apple" should be exact match (1.0)
+            assert match.score == 1.0, f"Expected exact match score 1.0 for 'apple' vs 'apple', got {match.score}"
 
     def test_algorithm_comparison_attributes(self):
         import fuzzyrust as fr
@@ -375,11 +413,20 @@ class TestMultiAlgorithmComparison:
         strings = ["test"]
         results = fr.compare_algorithms(strings, "test", limit=1)
 
-        assert len(results) > 0
+        assert len(results) >= 3, f"Expected at least 3 algorithm results, got {len(results)}"
         result = results[0]
-        assert isinstance(result.algorithm, str)
-        assert isinstance(result.score, float)
-        assert isinstance(result.matches, list)
+        assert isinstance(result.algorithm, str), "Expected algorithm to be a string"
+        assert result.algorithm in ["levenshtein", "jaro_winkler", "ngram", "cosine", "jaro"], (
+            f"Unexpected algorithm name: {result.algorithm}"
+        )
+        assert isinstance(result.score, float), "Expected score to be a float"
+        # For exact match "test" vs "test", top algorithm should have score 1.0
+        assert result.score == 1.0, f"Expected score 1.0 for exact match, got {result.score}"
+        assert isinstance(result.matches, list), "Expected matches to be a list"
+        assert len(result.matches) == 1, f"Expected 1 match (limit=1), got {len(result.matches)}"
+        # Verify the match is the exact string
+        assert result.matches[0].text == "test", f"Expected match text 'test', got {result.matches[0].text}"
+        assert result.matches[0].score == 1.0, f"Expected match score 1.0, got {result.matches[0].score}"
 
 
 class TestIndexMissingMethods:
@@ -391,7 +438,7 @@ class TestIndexMissingMethods:
         index = fr.NgramIndex()
         index.add_all(["apple", "apply", "banana"])
 
-        results = index.find_nearest("aple", k=2)
+        results = index.find_nearest("aple", limit=2)
         assert len(results) <= 2
         assert all(hasattr(r, "text") and hasattr(r, "score") for r in results)
 
@@ -410,10 +457,20 @@ class TestIndexMissingMethods:
         index = fr.HybridIndex()
         index.add_all(["cat", "dog", "bird"])
 
-        results = index.batch_search(["ct", "dg"])
-        assert isinstance(results, list)
-        assert len(results) == 2
-        assert all(isinstance(r, list) for r in results)
+        # Use longer query strings for better n-gram matching
+        results = index.batch_search(["catt", "dogg"])
+        assert isinstance(results, list), "Expected results to be a list"
+        assert len(results) == 2, f"Expected 2 result lists for 2 queries, got {len(results)}"
+        assert all(isinstance(r, list) for r in results), "Expected each result to be a list"
+        # "catt" should match "cat" (high similarity), "dogg" should match "dog"
+        assert len(results[0]) >= 1, f"Expected at least 1 match for 'catt', got {len(results[0])}"
+        assert len(results[1]) >= 1, f"Expected at least 1 match for 'dogg', got {len(results[1])}"
+        # Verify the matches are from the index and correct
+        assert results[0][0].text == "cat", f"Expected 'cat' as best match for 'catt', got {results[0][0].text}"
+        assert results[1][0].text == "dog", f"Expected 'dog' as best match for 'dogg', got {results[1][0].text}"
+        # Verify high similarity scores
+        assert results[0][0].score >= 0.9, f"Expected high score for 'catt'/'cat', got {results[0][0].score}"
+        assert results[1][0].score >= 0.9, f"Expected high score for 'dogg'/'dog', got {results[1][0].score}"
 
     def test_hybrid_index_find_nearest(self):
         import fuzzyrust as fr
@@ -421,7 +478,7 @@ class TestIndexMissingMethods:
         index = fr.HybridIndex()
         index.add_all(["test", "text", "best"])
 
-        results = index.find_nearest("tst", k=2)
+        results = index.find_nearest("tst", limit=2)
         assert len(results) <= 2
 
     def test_hybrid_index_contains(self):
@@ -493,7 +550,9 @@ class TestNewResultTypes:
         assert hasattr(result, "score")
         assert isinstance(result.text, str)
         assert isinstance(result.score, float)
-        assert 0.0 <= result.score <= 1.0
+        # "apple" should be exact match with score 1.0
+        assert result.score == 1.0, f"Expected exact match score 1.0 for 'apple', got {result.score}"
+        assert result.text == "apple", f"Expected best match to be 'apple', got {result.text}"
 
     def test_batch_operations_return_match_results(self):
         import fuzzyrust as fr
@@ -543,7 +602,21 @@ class TestParameterRenames:
 
         # find_best_matches should use min_similarity
         results = fr.find_best_matches(strings, "hello", min_similarity=0.8)
-        assert all(r.score >= 0.8 for r in results)
+        # Verify we get results and they all meet the min_similarity threshold
+        assert len(results) >= 1, f"Expected at least 1 result for 'hello' query, got {len(results)}"
+        # "hello" exact match should have score 1.0
+        # "hallo" differs by 1 char, should have score ~0.8-0.9 (Jaro-Winkler)
+        # "world" differs significantly, should be filtered out at 0.8 threshold
+        assert len(results) <= 2, f"Expected at most 2 results (hello, hallo), got {len(results)}"
+        for r in results:
+            # All results must meet the min_similarity threshold
+            assert r.score >= 0.8, f"Result '{r.text}' has score {r.score} below min_similarity 0.8"
+            # More specific: scores should be in expected ranges
+            if r.text == "hello":
+                assert r.score == 1.0, f"Expected exact match score 1.0 for 'hello', got {r.score}"
+            elif r.text == "hallo":
+                # "hallo" vs "hello" should be ~0.88 (Jaro-Winkler)
+                assert 0.8 <= r.score <= 0.95, f"Expected 0.8-0.95 for 'hallo', got {r.score}"
 
 
 class TestAlgorithmEnum:
@@ -571,21 +644,31 @@ class TestEdgeCases:
 
         items = ["hello", "hallo", "hullo"]
         result = fr.find_duplicates(items, min_similarity=0.99)
-        # With very high min_similarity, items might not be grouped
-        assert isinstance(result.groups, list)
+        # With min_similarity=0.99, only near-identical strings should group
+        # "hello", "hallo", "hullo" each differ by 1 char (80% similar), below 0.99 threshold
+        assert isinstance(result.groups, list), "Expected groups to be a list"
+        assert len(result.groups) == 0, f"Expected 0 groups at 0.99 threshold, got {len(result.groups)}"
+        assert len(result.unique) == 3, f"Expected all 3 items unique at 0.99 threshold, got {len(result.unique)}"
+        assert result.total_duplicates == 0, f"Expected 0 duplicates at 0.99 threshold, got {result.total_duplicates}"
 
     def test_compare_algorithms_empty_strings(self):
         import fuzzyrust as fr
 
         results = fr.compare_algorithms([], "test")
-        # Should handle empty list gracefully
-        assert isinstance(results, list)
+        # Should handle empty list gracefully - returns algorithm results with empty matches
+        assert isinstance(results, list), "Expected results to be a list"
+        # Even with empty input, we get results for each algorithm
+        assert len(results) >= 3, f"Expected at least 3 algorithm results, got {len(results)}"
+        # Each algorithm result should have empty matches
+        for r in results:
+            assert hasattr(r, "matches"), f"Algorithm result missing 'matches' attribute"
+            assert len(r.matches) == 0, f"Expected 0 matches for empty input, got {len(r.matches)}"
 
     def test_find_nearest_empty_index(self):
         import fuzzyrust as fr
 
         index = fr.NgramIndex()
-        results = index.find_nearest("test", k=5)
+        results = index.find_nearest("test", limit=5)
         assert results == []
 
     def test_contains_empty_index(self):
@@ -593,6 +676,151 @@ class TestEdgeCases:
 
         index = fr.HybridIndex()
         assert index.contains("test") is False
+
+
+# =============================================================================
+# Tests for find_duplicate_pairs
+# =============================================================================
+
+
+class TestFindDuplicatePairs:
+    """Tests for find_duplicate_pairs function."""
+
+    def test_basic(self):
+        """Basic test with similar strings."""
+        import fuzzyrust as fr
+
+        pairs = fr.find_duplicate_pairs(["hello", "hallo", "world"])
+        assert len(pairs) >= 1, "Expected at least one pair"
+        # Each pair is (idx1, idx2, score)
+        assert all(len(p) == 3 for p in pairs), "Each pair should have 3 elements"
+        # Verify pair structure: (int, int, float)
+        for idx1, idx2, score in pairs:
+            assert isinstance(idx1, int), f"idx1 should be int, got {type(idx1)}"
+            assert isinstance(idx2, int), f"idx2 should be int, got {type(idx2)}"
+            assert isinstance(score, float), f"score should be float, got {type(score)}"
+            assert idx1 < idx2, "idx1 should always be less than idx2"
+            assert 0.0 <= score <= 1.0, f"score should be in [0, 1], got {score}"
+
+    def test_with_normalize(self):
+        """Test with normalize parameter."""
+        import fuzzyrust as fr
+
+        pairs = fr.find_duplicate_pairs(["Hello", "HELLO"], normalize="lowercase")
+        assert len(pairs) == 1, f"Expected 1 pair, got {len(pairs)}"
+        assert pairs[0][2] == 1.0, "Identical after normalization should be 1.0"
+
+    def test_empty_list(self):
+        """Empty input should return empty result."""
+        import fuzzyrust as fr
+
+        pairs = fr.find_duplicate_pairs([])
+        assert pairs == [], f"Expected empty list, got {pairs}"
+
+    def test_single_item(self):
+        """Single item should return empty result."""
+        import fuzzyrust as fr
+
+        pairs = fr.find_duplicate_pairs(["hello"])
+        assert pairs == [], f"Expected empty list for single item, got {pairs}"
+
+    def test_no_duplicates(self):
+        """Items with no similarity should return empty result."""
+        import fuzzyrust as fr
+
+        # Very different strings with high threshold
+        pairs = fr.find_duplicate_pairs(
+            ["apple", "orange", "banana"], min_similarity=0.99
+        )
+        assert pairs == [], f"Expected no pairs for very different strings, got {pairs}"
+
+    def test_all_identical(self):
+        """All identical items should all be paired."""
+        import fuzzyrust as fr
+
+        pairs = fr.find_duplicate_pairs(["test", "test", "test"])
+        # With 3 identical items, we should get pairs: (0,1), (0,2), (1,2)
+        assert len(pairs) == 3, f"Expected 3 pairs, got {len(pairs)}"
+        for idx1, idx2, score in pairs:
+            assert score == 1.0, f"Identical strings should have score 1.0, got {score}"
+
+    def test_min_similarity_threshold(self):
+        """Test min_similarity parameter filtering."""
+        import fuzzyrust as fr
+
+        items = ["hello", "hallo", "hullo", "world"]
+
+        # With high threshold, fewer pairs
+        pairs_high = fr.find_duplicate_pairs(items, min_similarity=0.95)
+
+        # With lower threshold, more pairs
+        pairs_low = fr.find_duplicate_pairs(items, min_similarity=0.7)
+
+        assert len(pairs_low) >= len(pairs_high), (
+            f"Lower threshold should find at least as many pairs: "
+            f"low={len(pairs_low)}, high={len(pairs_high)}"
+        )
+
+    def test_different_algorithms(self):
+        """Test with different similarity algorithms."""
+        import fuzzyrust as fr
+
+        items = ["hello", "hallo"]
+
+        # Different algorithms have different thresholds where hello/hallo pair is found
+        # - levenshtein: 0.8 (1 edit in 5 chars)
+        # - jaro_winkler: ~0.88 (high similarity)
+        # - ngram: ~0.57 (lower due to n-gram overlap)
+        algorithm_thresholds = [
+            ("levenshtein", 0.7),
+            ("jaro_winkler", 0.7),
+            ("ngram", 0.5),  # ngram has lower similarity (~0.57) for hello/hallo
+        ]
+
+        for algo, threshold in algorithm_thresholds:
+            pairs = fr.find_duplicate_pairs(items, algorithm=algo, min_similarity=threshold)
+            # Each algorithm should find the hello/hallo pair with appropriate threshold
+            assert len(pairs) >= 1, f"Algorithm {algo} with threshold {threshold} should find at least 1 pair"
+            # Verify the pair is valid
+            idx1, idx2, score = pairs[0]
+            assert threshold <= score <= 1.0, f"Algorithm {algo}: score {score} below threshold {threshold}"
+
+    def test_window_size_parameter(self):
+        """Test window_size parameter affects results."""
+        import fuzzyrust as fr
+
+        # Create items where duplicates are far apart
+        items = ["hello"] + [f"item_{i}" for i in range(100)] + ["hallo"]
+
+        # With small window, might miss the pair
+        pairs_small = fr.find_duplicate_pairs(items, window_size=5, min_similarity=0.7)
+
+        # With larger window, should find more pairs
+        pairs_large = fr.find_duplicate_pairs(items, window_size=200, min_similarity=0.7)
+
+        # The test is that both should run without error
+        # Result depends on sorting and algorithm specifics
+        assert isinstance(pairs_small, list)
+        assert isinstance(pairs_large, list)
+
+    def test_normalize_modes(self):
+        """Test different normalization modes."""
+        import fuzzyrust as fr
+
+        items = ["HELLO", "hello", "Hello"]
+
+        # With "none", case differences affect similarity
+        pairs_none = fr.find_duplicate_pairs(items, normalize="none", min_similarity=0.99)
+
+        # With "lowercase", all should be identical
+        pairs_lower = fr.find_duplicate_pairs(
+            items, normalize="lowercase", min_similarity=0.99
+        )
+
+        # Lowercase normalization should find all pairs as identical
+        assert len(pairs_lower) == 3, f"Expected 3 pairs with lowercase, got {len(pairs_lower)}"
+        for idx1, idx2, score in pairs_lower:
+            assert score == 1.0, "All pairs should be 1.0 after lowercase normalization"
 
 
 if __name__ == "__main__":

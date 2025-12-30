@@ -1,5 +1,7 @@
 """Tests for RapidFuzz-compatible convenience functions."""
 
+import pytest
+
 import fuzzyrust as fr
 
 
@@ -24,7 +26,8 @@ class TestPartialRatio:
     def test_partial_match(self):
         """Should find best partial match."""
         score = fr.partial_ratio("hello", "hallo world")
-        assert score > 0.7  # "hello" vs "hallo" window
+        # Best window "hallo" vs "hello": 4/5 chars match = 0.8
+        assert 0.75 <= score <= 0.85, f"Expected partial_ratio 0.75-0.85 for 'hello' vs 'hallo world', got {score}"
 
     def test_empty_strings(self):
         """Edge cases with empty strings."""
@@ -54,8 +57,9 @@ class TestTokenSortRatio:
     def test_different_words(self):
         """Different words should lower score."""
         score = fr.token_sort_ratio("hello world", "hello there")
-        assert score > 0.5
-        assert score < 1.0
+        # After sorting: "hello world" vs "hello there" (11 chars each)
+        # Levenshtein: 5 edits (world -> there), similarity = 6/11 = ~0.545
+        assert 0.5 <= score <= 0.65, f"Expected token_sort_ratio 0.5-0.65 for partially matching phrases, got {score}"
 
     def test_empty_strings(self):
         """Edge cases with empty strings."""
@@ -77,17 +81,28 @@ class TestTokenSetRatio:
     def test_duplicate_words(self):
         """Duplicates should be ignored."""
         score = fr.token_set_ratio("hello hello", "hello")
-        assert score > 0.9
+        # After deduplication: both become just "hello" = perfect match
+        assert score == 1.0, f"Expected 1.0 when duplicates normalize to same set, got {score}"
 
     def test_overlapping_sets(self):
         """Overlapping token sets should have high score."""
         score = fr.token_set_ratio("hello world", "hello")
-        assert score > 0.6
+        # token_set_ratio takes the max of three comparisons:
+        # 1. sorted intersection vs sorted intersection = 1.0
+        # 2. sorted intersection vs (sorted intersection + sorted rest of s1)
+        # 3. sorted intersection vs (sorted intersection + sorted rest of s2)
+        # Since intersection "hello" matches perfectly, score is 1.0
+        assert score == 1.0, f"Expected token_set_ratio 1.0 for overlapping sets with perfect intersection, got {score}"
 
     def test_disjoint_sets(self):
         """Completely different sets should have low score."""
         score = fr.token_set_ratio("hello world", "foo bar")
-        assert score < 0.5
+        # No overlapping tokens, similarity based on string comparison of sorted tokens
+        # "hello world" (sorted) vs "bar foo" (sorted): completely different character sequences
+        # token_set_ratio computes Levenshtein similarity between joined sorted token strings
+        # Score should be low (0.25-0.35 range) for completely different token sets
+        assert 0.2 <= score <= 0.4, \
+            f"Expected token_set_ratio in [0.2, 0.4] for disjoint sets (no common tokens), got {score}"
 
     def test_empty_strings(self):
         """Edge cases with empty strings."""
@@ -105,17 +120,22 @@ class TestWRatio:
     def test_similar_strings(self):
         """Similar strings should have high score."""
         score = fr.wratio("hello", "hallo")
-        assert score > 0.7
+        # "hello" vs "hallo": 4/5 chars match = 0.8 base Levenshtein similarity
+        # wratio picks the best of multiple algorithms
+        assert 0.75 <= score <= 0.90, f"Expected wratio 0.75-0.90 for 1-edit-distance strings, got {score}"
 
     def test_substring_case(self):
         """Should handle substring cases well."""
         score = fr.wratio("test", "this is a test!")
-        assert score > 0.8  # Should use partial_ratio
+        # "test" is a perfect substring, wratio should use partial_ratio = 1.0
+        assert 0.9 <= score <= 1.0, f"Expected wratio >= 0.9 for substring match, got {score}"
 
     def test_reordered_words(self):
         """Should handle word reordering."""
         score = fr.wratio("hello world", "world hello")
-        assert score > 0.9  # Should use token_sort_ratio
+        # Same tokens, different order: token_sort_ratio = 1.0
+        # wratio may weight multiple algorithms, so we accept high score
+        assert score >= 0.95, f"Expected wratio >= 0.95 for reordered words, got {score}"
 
     def test_empty_strings(self):
         """Edge cases with empty strings."""
@@ -126,7 +146,8 @@ class TestWRatio:
     def test_different_strings(self):
         """Completely different strings."""
         score = fr.wratio("hello", "xyz")
-        assert score < 0.5
+        # No common characters at all - should be very low
+        assert score <= 0.3, f"Expected wratio <= 0.3 for completely different strings, got {score}"
 
 
 class TestRatio:
@@ -159,10 +180,13 @@ class TestExtract:
         """Basic extraction with limit."""
         choices = ["apple", "apply", "banana", "cherry"]
         results = fr.extract("appel", choices, limit=2)
-        assert len(results) == 2
-        # Both "apple" and "apply" are close matches to "appel"
-        assert results[0].text in ["apple", "apply"]
-        assert results[0].score > 0.6
+        assert len(results) == 2, f"Expected 2 results with limit=2, got {len(results)}"
+        # "apple" and "apply" are both close matches to "appel"
+        assert results[0].text in ["apple", "apply"], f"Expected 'apple' or 'apply' as best match, got {results[0].text}"
+        # "appel" vs "apple"/"apply": wratio computes weighted combination of algorithms
+        # The actual computed score is ~0.633 for both matches
+        assert results[0].score == pytest.approx(0.633, abs=0.01), \
+            f"Expected score ~0.633 for 'appel' vs '{results[0].text}', got {results[0].score}"
 
     def test_extract_all(self):
         """Extract with high limit should return all above cutoff."""
@@ -173,14 +197,14 @@ class TestExtract:
     def test_score_cutoff(self):
         """Score cutoff should filter results."""
         choices = ["apple", "banana", "cherry"]
-        results = fr.extract("apple", choices, score_cutoff=0.9)
+        results = fr.extract("apple", choices, min_similarity=0.9)
         assert len(results) == 1
         assert results[0].text == "apple"
 
     def test_no_matches(self):
         """No matches above cutoff should return empty list."""
         choices = ["apple", "banana", "cherry"]
-        results = fr.extract("xyz", choices, score_cutoff=0.9)
+        results = fr.extract("xyz", choices, min_similarity=0.9)
         assert len(results) == 0
 
     def test_empty_choices(self):
@@ -203,15 +227,14 @@ class TestExtractOne:
         """Should return best match."""
         choices = ["apple", "apply", "banana"]
         result = fr.extract_one("appel", choices)
-        assert result is not None
         # Both "apple" and "apply" are close matches to "appel"
-        assert result.text in ["apple", "apply"]
-        assert result.score > 0.6
+        assert result.text in ["apple", "apply"], f"Expected 'apple' or 'apply', got {result.text}"
+        assert 0.6 < result.score <= 1.0, f"Expected score in (0.6, 1.0], got {result.score}"
 
     def test_score_cutoff(self):
         """Score cutoff should filter result."""
         choices = ["apple", "banana"]
-        result = fr.extract_one("xyz", choices, score_cutoff=0.9)
+        result = fr.extract_one("xyz", choices, min_similarity=0.9)
         assert result is None
 
     def test_no_choices(self):
@@ -223,9 +246,8 @@ class TestExtractOne:
         """Exact match should return 1.0."""
         choices = ["apple", "banana", "cherry"]
         result = fr.extract_one("apple", choices)
-        assert result is not None
-        assert result.text == "apple"
-        assert result.score == 1.0
+        assert result.text == "apple", f"Expected exact match 'apple', got {result.text}"
+        assert result.score == 1.0, f"Expected score 1.0 for exact match, got {result.score}"
 
 
 class TestFuzzIntegration:
@@ -240,19 +262,23 @@ class TestFuzzIntegration:
             "Dell XPS 15",
         ]
 
-        # Typo in query
+        # Typo in query: "macbok pro" should match "MacBook Pro"
         result = fr.extract_one("macbok pro", products)
-        assert result is not None
-        assert "MacBook" in result.text
+        assert "MacBook Pro" in result.text, f"Expected match containing 'MacBook Pro', got {result.text}"
+        # "macbok pro" vs "Apple MacBook Pro 16-inch": partial match with typo
+        # wratio computes weighted combination; actual score is ~0.54
+        assert result.score == pytest.approx(0.54, abs=0.05), \
+            f"Expected score ~0.54 for 'macbok pro' partial match with typo, got {result.score}"
 
     def test_name_matching(self):
         """Simulate name matching."""
         names = ["John Smith", "Jane Doe", "Bob Johnson", "Alice Williams"]
 
-        # Reversed name
+        # Reversed name: "Smith John" vs "John Smith" - same tokens, different order
         result = fr.extract_one("Smith John", names)
-        assert result is not None
-        assert result.text == "John Smith"
+        assert result.text == "John Smith", f"Expected 'John Smith', got {result.text}"
+        # token_sort_ratio should give perfect match for reversed names
+        assert 0.95 <= result.score <= 1.0, f"Expected score 0.95-1.0 for reversed name, got {result.score}"
 
     def test_address_matching(self):
         """Simulate address matching with variations."""
