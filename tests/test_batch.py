@@ -75,9 +75,9 @@ class TestBatchEdgeCases:
         # "cafe" vs "cafe" should be high (~0.93+ due to 1 char difference in 4 chars)
         # "caf" vs "cafe" should be high (~0.93+ due to length difference)
         for r in result:
-            assert (
-                0.85 <= r.score <= 1.0
-            ), f"Expected score in [0.85, 1.0] for {r.text!r}, got {r.score}"
+            assert 0.85 <= r.score <= 1.0, (
+                f"Expected score in [0.85, 1.0] for {r.text!r}, got {r.score}"
+            )
 
     def test_find_best_matches_empty_list(self):
         """Test find_best_matches with empty list."""

@@ -66,9 +66,9 @@ class TestLevenshteinReference:
         else:
             max_len = max(len(a), len(b))
             expected_similarity = 1.0 - (distance / max_len)
-            assert (
-                abs(similarity - expected_similarity) < 1e-10
-            ), f"Similarity {similarity} inconsistent with distance {distance} for ({a!r}, {b!r})"
+            assert abs(similarity - expected_similarity) < 1e-10, (
+                f"Similarity {similarity} inconsistent with distance {distance} for ({a!r}, {b!r})"
+            )
 
 
 @pytest.mark.skipif(not HAS_JELLYFISH, reason="jellyfish not installed")
@@ -110,9 +110,9 @@ class TestJaroReference:
 
         expected = jellyfish.jaro_similarity(a, b)
         actual = fr.jaro_similarity(a, b)
-        assert (
-            abs(actual - expected) < 1e-10
-        ), f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
+        assert abs(actual - expected) < 1e-10, (
+            f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
+        )
 
     def test_jaro_classic_examples(self):
         """Test classic Jaro examples."""
@@ -155,9 +155,9 @@ class TestJaroWinklerReference:
         for a, b in test_pairs:
             expected = jellyfish.jaro_winkler_similarity(a, b)
             actual = fr.jaro_winkler_similarity(a, b)
-            assert (
-                abs(actual - expected) < 1e-10
-            ), f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
+            assert abs(actual - expected) < 1e-10, (
+                f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
+            )
 
     def test_jaro_winkler_prefix_boost(self):
         """Verify prefix boost works correctly."""
@@ -201,9 +201,9 @@ class TestHammingReference:
 
         expected = jellyfish.hamming_distance(s, modified)
         actual = fr.hamming(s, modified)
-        assert (
-            actual == expected
-        ), f"Mismatch for ({s!r}, {modified!r}): got {actual}, expected {expected}"
+        assert actual == expected, (
+            f"Mismatch for ({s!r}, {modified!r}): got {actual}, expected {expected}"
+        )
 
 
 @pytest.mark.skipif(not HAS_JELLYFISH, reason="jellyfish not installed")
@@ -254,9 +254,9 @@ class TestMetaphoneReference:
         for word in test_words:
             expected = jellyfish.metaphone(word)
             actual = fr.metaphone(word)
-            assert (
-                actual == expected
-            ), f"Mismatch for {word!r}: got {actual!r}, expected {expected!r}"
+            assert actual == expected, (
+                f"Mismatch for {word!r}: got {actual!r}, expected {expected!r}"
+            )
 
     def test_metaphone_classic_examples(self):
         """Test classic Metaphone examples."""
@@ -289,9 +289,9 @@ class TestMatchQualityReference:
         for candidate in candidates:
             fr_score = fr.jaro_winkler_similarity(target, candidate)
             jf_score = jellyfish.jaro_winkler_similarity(target, candidate)
-            assert (
-                abs(fr_score - jf_score) < 1e-10
-            ), f"Score mismatch for {candidate!r}: fr={fr_score}, jf={jf_score}"
+            assert abs(fr_score - jf_score) < 1e-10, (
+                f"Score mismatch for {candidate!r}: fr={fr_score}, jf={jf_score}"
+            )
 
     def test_typo_detection(self):
         """Verify common typos are detected with high similarity."""

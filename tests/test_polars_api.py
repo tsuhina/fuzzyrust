@@ -54,18 +54,18 @@ class TestBatchSimilarity:
             # All similarity scores must be in [0, 1] range
             for i, s in enumerate(result):
                 if s is not None:
-                    assert (
-                        0.0 <= s <= 1.0
-                    ), f"Algorithm {algo} returned invalid score {s} at index {i}"
+                    assert 0.0 <= s <= 1.0, (
+                        f"Algorithm {algo} returned invalid score {s} at index {i}"
+                    )
 
             # Check algorithm-specific expected ranges for kitten/sitting
             ks_min, ks_max, ss_min, ss_max = expected_ranges[algo]
-            assert (
-                ks_min <= result[0] <= ks_max
-            ), f"Algorithm {algo}: kitten/sitting score {result[0]} outside expected range [{ks_min}, {ks_max}]"
-            assert (
-                ss_min <= result[1] <= ss_max
-            ), f"Algorithm {algo}: saturday/sunday score {result[1]} outside expected range [{ss_min}, {ss_max}]"
+            assert ks_min <= result[0] <= ks_max, (
+                f"Algorithm {algo}: kitten/sitting score {result[0]} outside expected range [{ks_min}, {ks_max}]"
+            )
+            assert ss_min <= result[1] <= ss_max, (
+                f"Algorithm {algo}: saturday/sunday score {result[1]} outside expected range [{ss_min}, {ss_max}]"
+            )
 
     def test_handles_nulls(self):
         """Test null handling."""
@@ -150,14 +150,14 @@ class TestDedupeSNM:
         # John Smith, Jon Smith, and John Smyth should be grouped together
         # At min_similarity=0.8, these similar names should form at least one group
         grouped = result.filter(pl.col("_group_id").is_not_null())
-        assert (
-            len(grouped) >= 2
-        ), f"Expected at least 2 grouped rows (John/Jon variants), got {len(grouped)}"
+        assert len(grouped) >= 2, (
+            f"Expected at least 2 grouped rows (John/Jon variants), got {len(grouped)}"
+        )
         # Verify the grouped names are the expected similar ones
         grouped_names = set(grouped["name"].to_list())
-        assert any(
-            name in grouped_names for name in ["John Smith", "Jon Smith", "John Smyth"]
-        ), f"Expected Smith variants to be grouped, but got {grouped_names}"
+        assert any(name in grouped_names for name in ["John Smith", "Jon Smith", "John Smyth"]), (
+            f"Expected Smith variants to be grouped, but got {grouped_names}"
+        )
 
     def test_keep_first(self):
         """Test keep='first' strategy."""
@@ -278,9 +278,9 @@ class TestMatchRecordsBatch:
         assert len(result) > 0, "Expected at least one match"
         # With 10x weight on email, exact email match "jon@test.com" should win
         # Target index 1 has "jon@test.com" which matches query exactly
-        assert (
-            result["target_idx"][0] == 1
-        ), f"Expected target_idx 1 (Jon Jones with exact email), got {result['target_idx'][0]}"
+        assert result["target_idx"][0] == 1, (
+            f"Expected target_idx 1 (Jon Jones with exact email), got {result['target_idx'][0]}"
+        )
 
     def test_per_column_algorithms(self):
         """Test per-column algorithm specification."""

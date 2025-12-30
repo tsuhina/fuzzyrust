@@ -123,9 +123,9 @@ class TestPluginSimilarity:
         for i, (plugin_score, fallback_score) in enumerate(
             zip(plugin_result["score"], fallback_scores)
         ):
-            assert (
-                abs(plugin_score - fallback_score) < 1e-10
-            ), f"Mismatch at row {i}: plugin={plugin_score}, fallback={fallback_score}"
+            assert abs(plugin_score - fallback_score) < 1e-10, (
+                f"Mismatch at row {i}: plugin={plugin_score}, fallback={fallback_score}"
+            )
 
     def test_similarity_different_algorithms(self):
         """Test similarity with different algorithms."""
@@ -312,17 +312,17 @@ class TestPluginPhonetic:
         result_soundex = df.with_columns(code=pl.col("name").fuzzy.phonetic("soundex"))
         for i, name in enumerate(df["name"]):
             expected = fr.soundex(name)
-            assert (
-                result_soundex["code"][i] == expected
-            ), f"Soundex mismatch for {name}: got {result_soundex['code'][i]}, expected {expected}"
+            assert result_soundex["code"][i] == expected, (
+                f"Soundex mismatch for {name}: got {result_soundex['code'][i]}, expected {expected}"
+            )
 
         # Metaphone
         result_metaphone = df.with_columns(code=pl.col("name").fuzzy.phonetic("metaphone"))
         for i, name in enumerate(df["name"]):
             expected = fr.metaphone(name)
-            assert (
-                result_metaphone["code"][i] == expected
-            ), f"Metaphone mismatch for {name}: got {result_metaphone['code'][i]}, expected {expected}"
+            assert result_metaphone["code"][i] == expected, (
+                f"Metaphone mismatch for {name}: got {result_metaphone['code'][i]}, expected {expected}"
+            )
 
 
 class TestPluginExpressionIntegration:

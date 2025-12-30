@@ -27,16 +27,16 @@ class TestThreadSafetyDocumentation:
     def test_ngram_index_docstring_warning(self):
         """NgramIndex should have thread safety warning."""
         docstring = fr.NgramIndex.__doc__ or ""
-        assert (
-            "thread" in docstring.lower()
-        ), "Missing thread-safety warning in NgramIndex docstring"
+        assert "thread" in docstring.lower(), (
+            "Missing thread-safety warning in NgramIndex docstring"
+        )
 
     def test_fuzzy_index_docstring_warning(self):
         """FuzzyIndex should have thread safety warning."""
         docstring = fr.FuzzyIndex.__doc__ or ""
-        assert (
-            "thread" in docstring.lower()
-        ), "Missing thread-safety warning in FuzzyIndex docstring"
+        assert "thread" in docstring.lower(), (
+            "Missing thread-safety warning in FuzzyIndex docstring"
+        )
 
 
 class TestSeparateIndicesPerThread:

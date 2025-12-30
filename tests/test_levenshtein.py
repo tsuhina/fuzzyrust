@@ -30,9 +30,9 @@ class TestLevenshtein:
         # cafe with accent vs without: 1 character difference
         assert fr.levenshtein("caf\u00e9", "cafe") == 1, "Accent difference is 1 edit"
         # 3 chars vs 2 chars: 1 deletion
-        assert (
-            fr.levenshtein("\u65e5\u672c\u8a9e", "\u65e5\u672c") == 1
-        ), "Removing one Japanese character is 1 edit"
+        assert fr.levenshtein("\u65e5\u672c\u8a9e", "\u65e5\u672c") == 1, (
+            "Removing one Japanese character is 1 edit"
+        )
 
     def test_max_distance(self):
         # Should return max_distance + 1 when distance exceeds threshold
@@ -41,25 +41,25 @@ class TestLevenshtein:
         assert result == 4, "Distance exceeding max_distance returns max_distance + 1"
 
         # Should return actual distance when within threshold
-        assert (
-            fr.levenshtein("abc", "abd", max_distance=2) == 1
-        ), "Distance within max_distance returns actual distance"
+        assert fr.levenshtein("abc", "abd", max_distance=2) == 1, (
+            "Distance within max_distance returns actual distance"
+        )
 
         # Test the bounded variant that returns None when exceeded
         assert fr.levenshtein_bounded("abc", "abd", max_distance=2) == 1
         assert fr.levenshtein_bounded("abcdef", "ghijkl", max_distance=3) is None
 
     def test_similarity(self):
-        assert (
-            fr.levenshtein_similarity("hello", "hello") == 1.0
-        ), "Identical strings should have similarity 1.0"
-        assert (
-            fr.levenshtein_similarity("hello", "") == 0.0
-        ), "Comparing to empty string should have similarity 0.0"
+        assert fr.levenshtein_similarity("hello", "hello") == 1.0, (
+            "Identical strings should have similarity 1.0"
+        )
+        assert fr.levenshtein_similarity("hello", "") == 0.0, (
+            "Comparing to empty string should have similarity 0.0"
+        )
         # "hello" vs "hallo": 1 edit out of 5 chars = 0.8 similarity
-        assert (
-            fr.levenshtein_similarity("hello", "hallo") == 0.8
-        ), "1 edit in 5 chars = 0.8 similarity"
+        assert fr.levenshtein_similarity("hello", "hallo") == 0.8, (
+            "1 edit in 5 chars = 0.8 similarity"
+        )
 
 
 class TestDamerauLevenshtein:
@@ -135,9 +135,9 @@ class TestHammingVariants:
 
     def test_hamming_similarity_equal_length(self):
         """Hamming similarity should work for equal-length strings."""
-        assert (
-            fr.hamming_similarity("abc", "abc") == 1.0
-        ), "Identical strings should have similarity 1.0"
+        assert fr.hamming_similarity("abc", "abc") == 1.0, (
+            "Identical strings should have similarity 1.0"
+        )
         # "abc" vs "axc": 1 difference out of 3 = 2/3 similarity
         sim = fr.hamming_similarity("abc", "axc")
         expected = 2.0 / 3.0  # 2 matches out of 3 characters
