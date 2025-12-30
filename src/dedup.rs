@@ -121,7 +121,9 @@ where
     F: Fn(&str, &str) -> f64 + Sync + Send,
 {
     match method {
-        DedupMethod::BruteForce => find_duplicates_brute_force(items, similarity_fn, min_similarity),
+        DedupMethod::BruteForce => {
+            find_duplicates_brute_force(items, similarity_fn, min_similarity)
+        }
         DedupMethod::SortedNeighborhood { window_size } => {
             find_duplicates_snm(items, similarity_fn, min_similarity, window_size)
         }
@@ -299,7 +301,7 @@ where
     }
 
     let n = items.len();
-    
+
     // 1. Create indexed items for sorting
     // We store (original_index, string_slice)
     let mut indexed_items: Vec<(usize, &str)> = items
@@ -317,10 +319,10 @@ where
     // 3. Sliding window comparison
     // For each item in the sorted list, compare with the next `window_size` items
     let window_size = window_size.max(1);
-    
+
     // Parallel processing using direct range iteration
     // We iterate 0..n and for each item check the window ahead.
-    
+
     // We need to share `indexed_items` across threads. Since it's a read-only Vec, &Vec is Sync.
     // However, into_par_iter() closures usually require move.
     // We can use a reference wrapper or just refer to the slice if we're careful.
@@ -333,12 +335,12 @@ where
             let (orig_idx_i, str_i) = indexed_items_ref[i];
             let sim_fn_ref = &similarity_fn;
             let items_slice = indexed_items_ref;
-            
+
             // Inner loop: check window
             (i + 1..end).into_par_iter().filter_map(move |j| {
                 let (orig_idx_j, str_j) = items_slice[j];
                 let similarity = sim_fn_ref(str_i, str_j);
-                
+
                 if similarity >= min_similarity {
                     Some((orig_idx_i, orig_idx_j))
                 } else {
@@ -384,9 +386,13 @@ pub fn find_duplicates_with_metric<S: Similarity + ?Sized>(
     min_similarity: f64,
     method: DedupMethod,
 ) -> DeduplicationResult {
-    find_duplicates(items, |a, b| metric.similarity(a, b), min_similarity, method)
+    find_duplicates(
+        items,
+        |a, b| metric.similarity(a, b),
+        min_similarity,
+        method,
+    )
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -397,31 +403,29 @@ mod tests {
     fn test_find_duplicates_empty() {
         let items: Vec<String> = vec![];
         let result = find_duplicates(
-            &items, 
-            |a, b| a.len().min(b.len()) as f64, 
+            &items,
+            |a, b| a.len().min(b.len()) as f64,
             0.8,
-            DedupMethod::BruteForce
+            DedupMethod::BruteForce,
         );
         assert_eq!(result.groups.len(), 0);
         assert_eq!(result.unique.len(), 0);
         assert_eq!(result.total_duplicates, 0);
     }
 
-
     #[test]
     fn test_find_duplicates_single() {
         let items = vec!["hello".to_string()];
         let result = find_duplicates(
-            &items, 
-            |a, b| if a == b { 1.0 } else { 0.0 }, 
+            &items,
+            |a, b| if a == b { 1.0 } else { 0.0 },
             0.8,
-            DedupMethod::BruteForce
+            DedupMethod::BruteForce,
         );
         assert_eq!(result.groups.len(), 0);
         assert_eq!(result.unique.len(), 1);
         assert_eq!(result.total_duplicates, 0);
     }
-
 
     #[test]
     fn test_find_duplicates_basic() {
@@ -433,12 +437,7 @@ mod tests {
         ];
 
         let jw = JaroWinkler::new();
-        let result = find_duplicates_with_metric(
-            &items, 
-            &jw, 
-            0.85, 
-            DedupMethod::BruteForce
-        );
+        let result = find_duplicates_with_metric(&items, &jw, 0.85, DedupMethod::BruteForce);
 
         // "hello", "helo", and "hello" should be grouped
         // "world" should be unique
@@ -455,12 +454,7 @@ mod tests {
         ];
 
         let jw = JaroWinkler::new();
-        let result = find_duplicates_with_metric(
-            &items, 
-            &jw, 
-            0.9, 
-            DedupMethod::BruteForce
-        );
+        let result = find_duplicates_with_metric(&items, &jw, 0.9, DedupMethod::BruteForce);
 
         assert_eq!(result.groups.len(), 0);
         assert_eq!(result.unique.len(), 3);
@@ -469,17 +463,13 @@ mod tests {
 
     #[test]
     fn test_find_duplicates_all_same() {
-        let items = vec![
-            "test".to_string(),
-            "test".to_string(),
-            "test".to_string(),
-        ];
+        let items = vec!["test".to_string(), "test".to_string(), "test".to_string()];
 
         let result = find_duplicates(
-            &items, 
-            |a, b| if a == b { 1.0 } else { 0.0 }, 
+            &items,
+            |a, b| if a == b { 1.0 } else { 0.0 },
             0.99,
-            DedupMethod::BruteForce
+            DedupMethod::BruteForce,
         );
 
         assert_eq!(result.groups.len(), 1);
@@ -502,12 +492,7 @@ mod tests {
         let n = 5000;
         let items: Vec<String> = (0..n).map(|i| format!("item_{}", i)).collect();
 
-        let result = find_duplicates(
-            &items,
-            levenshtein_similarity,
-            0.9,
-            DedupMethod::BruteForce
-        );
+        let result = find_duplicates(&items, levenshtein_similarity, 0.9, DedupMethod::BruteForce);
 
         // Just verify it completes successfully
         assert_eq!(result.total_duplicates, 0); // items distinct enough
@@ -547,7 +532,7 @@ mod tests {
             &items,
             |a, b| if a == b { 1.0 } else { 0.0 },
             0.99,
-            DedupMethod::BruteForce
+            DedupMethod::BruteForce,
         );
 
         // All items are unique
@@ -568,7 +553,7 @@ mod tests {
             &items,
             |a, b| if a == b { 1.0 } else { 0.0 },
             0.99,
-            DedupMethod::BruteForce
+            DedupMethod::BruteForce,
         );
 
         // Should find 2 groups (the duplicates)

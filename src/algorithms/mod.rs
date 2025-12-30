@@ -1,27 +1,27 @@
 //! Core string similarity algorithms
-//! 
+//!
 //! Each algorithm is implemented as a standalone function for composability,
 //! plus a trait-based interface for extensibility.
 
-pub mod levenshtein;
-pub mod damerau;
-pub mod jaro;
-pub mod hamming;
-pub mod ngram;
-pub mod phonetic;
-pub mod lcs;
 pub mod cosine;
-pub mod normalize;
+pub mod damerau;
 pub mod fuzz;
+pub mod hamming;
+pub mod jaro;
+pub mod lcs;
+pub mod levenshtein;
+pub mod ngram;
+pub mod normalize;
+pub mod phonetic;
 
-pub use levenshtein::*;
+pub use cosine::*;
 pub use damerau::*;
-pub use jaro::*;
 pub use hamming::*;
+pub use jaro::*;
+pub use lcs::*;
+pub use levenshtein::*;
 pub use ngram::*;
 pub use phonetic::*;
-pub use lcs::*;
-pub use cosine::*;
 
 /// Trait for all similarity metrics.
 /// Returns a value between 0.0 (completely different) and 1.0 (identical).

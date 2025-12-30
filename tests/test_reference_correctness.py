@@ -4,31 +4,42 @@ These tests verify that fuzzyrust produces the same results as well-known
 reference implementations for string similarity algorithms.
 """
 
-import pytest
-from hypothesis import given, assume, settings, HealthCheck
 import hypothesis.strategies as st
+import pytest
+from hypothesis import HealthCheck, assume, given, settings
 
 import fuzzyrust as fr
 
 # Import jellyfish as reference implementation
 try:
     import jellyfish
+
     HAS_JELLYFISH = True
 except ImportError:
     HAS_JELLYFISH = False
 
 
 # Strategy for ASCII strings (avoiding unicode edge cases in reference comparison)
-ascii_text = st.text(alphabet=st.characters(min_codepoint=32, max_codepoint=126), min_size=0, max_size=50)
+ascii_text = st.text(
+    alphabet=st.characters(min_codepoint=32, max_codepoint=126), min_size=0, max_size=50
+)
 
 # Strategy for alphanumeric strings (most reliable for phonetic algorithms)
-alphanumeric_text = st.text(alphabet=st.characters(whitelist_categories=('Lu', 'Ll', 'Nd')), min_size=0, max_size=30)
+alphanumeric_text = st.text(
+    alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")), min_size=0, max_size=30
+)
 
 # Strategy for letters only (best for phonetic algorithms)
-letters_only = st.text(alphabet=st.characters(whitelist_categories=('Lu', 'Ll')), min_size=0, max_size=20)
+letters_only = st.text(
+    alphabet=st.characters(whitelist_categories=("Lu", "Ll")), min_size=0, max_size=20
+)
 
 # Strategy for ASCII letters only (for phonetic algorithms that work best with ASCII)
-ascii_letters = st.text(alphabet=st.sampled_from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'), min_size=1, max_size=15)
+ascii_letters = st.text(
+    alphabet=st.sampled_from("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"),
+    min_size=1,
+    max_size=15,
+)
 
 
 @pytest.mark.skipif(not HAS_JELLYFISH, reason="jellyfish not installed")
@@ -55,8 +66,9 @@ class TestLevenshteinReference:
         else:
             max_len = max(len(a), len(b))
             expected_similarity = 1.0 - (distance / max_len)
-            assert abs(similarity - expected_similarity) < 1e-10, \
-                f"Similarity {similarity} inconsistent with distance {distance} for ({a!r}, {b!r})"
+            assert (
+                abs(similarity - expected_similarity) < 1e-10
+            ), f"Similarity {similarity} inconsistent with distance {distance} for ({a!r}, {b!r})"
 
 
 @pytest.mark.skipif(not HAS_JELLYFISH, reason="jellyfish not installed")
@@ -98,8 +110,9 @@ class TestJaroReference:
 
         expected = jellyfish.jaro_similarity(a, b)
         actual = fr.jaro_similarity(a, b)
-        assert abs(actual - expected) < 1e-10, \
-            f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
+        assert (
+            abs(actual - expected) < 1e-10
+        ), f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
 
     def test_jaro_classic_examples(self):
         """Test classic Jaro examples."""
@@ -142,8 +155,9 @@ class TestJaroWinklerReference:
         for a, b in test_pairs:
             expected = jellyfish.jaro_winkler_similarity(a, b)
             actual = fr.jaro_winkler_similarity(a, b)
-            assert abs(actual - expected) < 1e-10, \
-                f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
+            assert (
+                abs(actual - expected) < 1e-10
+            ), f"Mismatch for ({a!r}, {b!r}): got {actual}, expected {expected}"
 
     def test_jaro_winkler_prefix_boost(self):
         """Verify prefix boost works correctly."""
@@ -178,15 +192,18 @@ class TestHammingReference:
 
         # Create a modified version
         import random
+
         chars = list(s)
         for i in range(min(3, len(chars))):
             if random.random() > 0.5:
                 chars[i] = chr((ord(chars[i]) + 1) % 127)
-        modified = ''.join(chars)
+        modified = "".join(chars)
 
         expected = jellyfish.hamming_distance(s, modified)
         actual = fr.hamming(s, modified)
-        assert actual == expected, f"Mismatch for ({s!r}, {modified!r}): got {actual}, expected {expected}"
+        assert (
+            actual == expected
+        ), f"Mismatch for ({s!r}, {modified!r}): got {actual}, expected {expected}"
 
 
 @pytest.mark.skipif(not HAS_JELLYFISH, reason="jellyfish not installed")
@@ -222,13 +239,24 @@ class TestMetaphoneReference:
         """
         # Words where both implementations agree
         test_words = [
-            "phone", "Stephen", "knight", "gnome", "John", "Smith",
-            "Katherine", "Wright", "Thomas", "xenophobia", "school",
+            "phone",
+            "Stephen",
+            "knight",
+            "gnome",
+            "John",
+            "Smith",
+            "Katherine",
+            "Wright",
+            "Thomas",
+            "xenophobia",
+            "school",
         ]
         for word in test_words:
             expected = jellyfish.metaphone(word)
             actual = fr.metaphone(word)
-            assert actual == expected, f"Mismatch for {word!r}: got {actual!r}, expected {expected!r}"
+            assert (
+                actual == expected
+            ), f"Mismatch for {word!r}: got {actual!r}, expected {expected!r}"
 
     def test_metaphone_classic_examples(self):
         """Test classic Metaphone examples."""
@@ -261,8 +289,9 @@ class TestMatchQualityReference:
         for candidate in candidates:
             fr_score = fr.jaro_winkler_similarity(target, candidate)
             jf_score = jellyfish.jaro_winkler_similarity(target, candidate)
-            assert abs(fr_score - jf_score) < 1e-10, \
-                f"Score mismatch for {candidate!r}: fr={fr_score}, jf={jf_score}"
+            assert (
+                abs(fr_score - jf_score) < 1e-10
+            ), f"Score mismatch for {candidate!r}: fr={fr_score}, jf={jf_score}"
 
     def test_typo_detection(self):
         """Verify common typos are detected with high similarity."""
@@ -302,8 +331,7 @@ class TestAlgorithmProperties:
         d_ac = fr.levenshtein(a, c)
         d_ab = fr.levenshtein(a, b)
         d_bc = fr.levenshtein(b, c)
-        assert d_ac <= d_ab + d_bc, \
-            f"Triangle inequality violated: {d_ac} > {d_ab} + {d_bc}"
+        assert d_ac <= d_ab + d_bc, f"Triangle inequality violated: {d_ac} > {d_ab} + {d_bc}"
 
     @given(ascii_text)
     @settings(max_examples=100)
@@ -321,8 +349,12 @@ class TestAlgorithmProperties:
     @settings(max_examples=100)
     def test_similarity_bounds(self, a: str, b: str):
         """Similarity should be in [0, 1]."""
-        for sim_func in [fr.jaro_similarity, fr.jaro_winkler_similarity,
-                         fr.levenshtein_similarity, fr.damerau_levenshtein_similarity]:
+        for sim_func in [
+            fr.jaro_similarity,
+            fr.jaro_winkler_similarity,
+            fr.levenshtein_similarity,
+            fr.damerau_levenshtein_similarity,
+        ]:
             score = sim_func(a, b)
             assert 0.0 <= score <= 1.0, f"{sim_func.__name__}({a!r}, {b!r}) = {score}"
 

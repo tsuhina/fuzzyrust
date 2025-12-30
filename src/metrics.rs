@@ -98,7 +98,11 @@ pub fn recall(
     predicted_matches: &HashSet<(usize, usize)>,
 ) -> f64 {
     if true_matches.is_empty() {
-        return if predicted_matches.is_empty() { 1.0 } else { 0.0 };
+        return if predicted_matches.is_empty() {
+            1.0
+        } else {
+            0.0
+        };
     }
     let tp = predicted_matches.intersection(true_matches).count();
     tp as f64 / true_matches.len() as f64

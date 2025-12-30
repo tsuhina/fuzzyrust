@@ -78,7 +78,7 @@ fn myers_64(pattern: &[char], text: &[char]) -> usize {
         // Update vertical vectors for next iteration
         // Shift hp and hn left by 1 (with implicit 0 at position 0)
         // This is correct because the first row is 0,1,2,3... so hp[0] and hn[0] are fixed
-        let hp_shifted = (hp << 1) | 1;  // Set bit 0 to 1 (first column always increases)
+        let hp_shifted = (hp << 1) | 1; // Set bit 0 to 1 (first column always increases)
         let hn_shifted = hn << 1;
 
         vp = hn_shifted | !(xv | hp_shifted);
@@ -273,7 +273,9 @@ impl Levenshtein {
 
     #[must_use]
     pub fn with_max_distance(max_distance: usize) -> Self {
-        Self { max_distance: Some(max_distance) }
+        Self {
+            max_distance: Some(max_distance),
+        }
     }
 
     /// Compute distance with proper Option semantics.
@@ -290,8 +292,9 @@ impl EditDistance for Levenshtein {
         // When max_distance is set and exceeded, return max_distance + 1
         // to indicate "greater than threshold" without using sentinel values
         match self.max_distance {
-            Some(max_d) => levenshtein_distance_bounded(a, b, Some(max_d))
-                .unwrap_or(max_d.saturating_add(1)),
+            Some(max_d) => {
+                levenshtein_distance_bounded(a, b, Some(max_d)).unwrap_or(max_d.saturating_add(1))
+            }
             None => levenshtein_distance_bounded(a, b, None).unwrap_or(0),
         }
     }
@@ -324,7 +327,11 @@ impl EditDistance for Levenshtein {
 /// ```
 #[inline]
 #[must_use]
-pub fn levenshtein_distance_bounded(a: &str, b: &str, max_distance: Option<usize>) -> Option<usize> {
+pub fn levenshtein_distance_bounded(
+    a: &str,
+    b: &str,
+    max_distance: Option<usize>,
+) -> Option<usize> {
     if a == b {
         return Some(0);
     }
@@ -433,7 +440,10 @@ pub fn levenshtein_exp(a: &str, b: &str) -> usize {
 /// Returns `usize::MAX` if distance exceeds max_distance (when provided).
 #[inline]
 #[must_use]
-#[deprecated(since = "0.2.0", note = "Use levenshtein_distance_bounded for proper Option semantics")]
+#[deprecated(
+    since = "0.2.0",
+    note = "Use levenshtein_distance_bounded for proper Option semantics"
+)]
 pub fn levenshtein_distance(a: &str, b: &str, max_distance: Option<usize>) -> usize {
     levenshtein_distance_bounded(a, b, max_distance).unwrap_or(usize::MAX)
 }
@@ -662,10 +672,18 @@ pub fn levenshtein_simd_bounded(a: &str, b: &str, max_distance: usize) -> Option
     let b_len = b.len();
 
     if a_len == 0 {
-        return if b_len <= max_distance { Some(b_len) } else { None };
+        return if b_len <= max_distance {
+            Some(b_len)
+        } else {
+            None
+        };
     }
     if b_len == 0 {
-        return if a_len <= max_distance { Some(a_len) } else { None };
+        return if a_len <= max_distance {
+            Some(a_len)
+        } else {
+            None
+        };
     }
 
     // Early exit if length difference exceeds threshold
@@ -674,11 +692,8 @@ pub fn levenshtein_simd_bounded(a: &str, b: &str, max_distance: usize) -> Option
     }
 
     // triple_accel's levenshtein_simd_k returns Option<u32>
-    triple_accel::levenshtein::levenshtein_simd_k(
-        a.as_bytes(),
-        b.as_bytes(),
-        max_distance as u32,
-    ).map(|d| d as usize)
+    triple_accel::levenshtein::levenshtein_simd_k(a.as_bytes(), b.as_bytes(), max_distance as u32)
+        .map(|d| d as usize)
 }
 
 /// SIMD-accelerated Levenshtein similarity (0.0 to 1.0).
@@ -720,7 +735,10 @@ mod tests {
     #[test]
     fn test_levenshtein_bounded_returns_none_when_exceeded() {
         // Exceeds threshold - returns None
-        assert_eq!(levenshtein_distance_bounded("abcdef", "ghijkl", Some(3)), None);
+        assert_eq!(
+            levenshtein_distance_bounded("abcdef", "ghijkl", Some(3)),
+            None
+        );
         // Within threshold - returns actual distance
         assert_eq!(levenshtein_distance_bounded("abc", "abd", Some(2)), Some(1));
         // Equal strings always return Some(0)
@@ -730,7 +748,10 @@ mod tests {
     #[test]
     fn test_levenshtein_bounded_no_threshold() {
         // Without threshold, always returns Some
-        assert_eq!(levenshtein_distance_bounded("kitten", "sitting", None), Some(3));
+        assert_eq!(
+            levenshtein_distance_bounded("kitten", "sitting", None),
+            Some(3)
+        );
         assert_eq!(levenshtein_distance_bounded("", "", None), Some(0));
         assert_eq!(levenshtein_distance_bounded("abc", "", None), Some(3));
     }
@@ -749,7 +770,10 @@ mod tests {
     #[allow(deprecated)]
     fn test_deprecated_levenshtein_distance() {
         // Backward compatibility: deprecated function still works
-        assert_eq!(levenshtein_distance("abcdef", "ghijkl", Some(3)), usize::MAX);
+        assert_eq!(
+            levenshtein_distance("abcdef", "ghijkl", Some(3)),
+            usize::MAX
+        );
         assert_eq!(levenshtein_distance("abc", "abd", Some(2)), 1);
     }
 
@@ -771,6 +795,6 @@ mod tests {
         assert_eq!(levenshtein("algorithm", "altruistic"), 6);
         assert_eq!(levenshtein("intention", "execution"), 5);
         assert_eq!(levenshtein("a", "b"), 1);
-        assert_eq!(levenshtein("ab", "ba"), 2);  // swap is 2 edits in Levenshtein
+        assert_eq!(levenshtein("ab", "ba"), 2); // swap is 2 edits in Levenshtein
     }
 }

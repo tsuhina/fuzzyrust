@@ -5,7 +5,7 @@
 
 use super::types::{Algorithm, FieldType};
 use crate::algorithms::{self, Similarity};
-use crate::indexing::{NgramIndex, HybridIndex};
+use crate::indexing::{HybridIndex, NgramIndex};
 use ahash::{AHashMap, AHashSet};
 
 /// Result from a field index search
@@ -33,7 +33,12 @@ pub trait FieldIndex: Send + Sync {
     /// Search for similar values
     ///
     /// Returns matches sorted by descending similarity score.
-    fn search(&self, query: &str, min_similarity: f64, limit: Option<usize>) -> Vec<FieldSearchMatch>;
+    fn search(
+        &self,
+        query: &str,
+        min_similarity: f64,
+        limit: Option<usize>,
+    ) -> Vec<FieldSearchMatch>;
 
     /// Get the index size (number of entries)
     fn len(&self) -> usize;
@@ -73,7 +78,12 @@ impl FieldIndex for ShortTextIndex {
         self.inner.add_with_data(value.to_string(), data);
     }
 
-    fn search(&self, query: &str, min_similarity: f64, limit: Option<usize>) -> Vec<FieldSearchMatch> {
+    fn search(
+        &self,
+        query: &str,
+        min_similarity: f64,
+        limit: Option<usize>,
+    ) -> Vec<FieldSearchMatch> {
         // Match on algorithm and call search with the concrete type
         let raw_matches = match &self.algorithm {
             Algorithm::Levenshtein => {
@@ -85,8 +95,8 @@ impl FieldIndex for ShortTextIndex {
                 self.inner.search(query, &sim, min_similarity, limit)
             }
             Algorithm::JaroWinkler(config) => {
-                let sim = algorithms::jaro::JaroWinkler::new()
-                    .with_prefix_weight(config.prefix_weight);
+                let sim =
+                    algorithms::jaro::JaroWinkler::new().with_prefix_weight(config.prefix_weight);
                 self.inner.search(query, &sim, min_similarity, limit)
             }
             Algorithm::Ngram { ngram_size } => {
@@ -158,7 +168,12 @@ impl FieldIndex for LongTextIndex {
         self.inner.add_with_data(value.to_string(), data);
     }
 
-    fn search(&self, query: &str, min_similarity: f64, limit: Option<usize>) -> Vec<FieldSearchMatch> {
+    fn search(
+        &self,
+        query: &str,
+        min_similarity: f64,
+        limit: Option<usize>,
+    ) -> Vec<FieldSearchMatch> {
         // Match on algorithm and call search with the concrete type
         let raw_matches = match &self.algorithm {
             Algorithm::Ngram { ngram_size } => {
@@ -256,7 +271,11 @@ impl TokenSetIndex {
     }
 
     /// Compute Jaccard similarity between two token sets
-    fn jaccard_similarity(&self, query_tokens: &AHashSet<String>, entry_tokens: &AHashSet<String>) -> f64 {
+    fn jaccard_similarity(
+        &self,
+        query_tokens: &AHashSet<String>,
+        entry_tokens: &AHashSet<String>,
+    ) -> f64 {
         if query_tokens.is_empty() && entry_tokens.is_empty() {
             return 1.0;
         }
@@ -293,7 +312,12 @@ impl FieldIndex for TokenSetIndex {
         });
     }
 
-    fn search(&self, query: &str, min_similarity: f64, limit: Option<usize>) -> Vec<FieldSearchMatch> {
+    fn search(
+        &self,
+        query: &str,
+        min_similarity: f64,
+        limit: Option<usize>,
+    ) -> Vec<FieldSearchMatch> {
         let query_tokens = self.tokenize(query);
 
         if query_tokens.is_empty() {
@@ -332,11 +356,19 @@ impl FieldIndex for TokenSetIndex {
         // Debug assertion to catch NaN scores early
         #[cfg(debug_assertions)]
         for m in &matches {
-            debug_assert!(!m.score.is_nan(), "NaN score detected for value: {}", m.value);
+            debug_assert!(
+                !m.score.is_nan(),
+                "NaN score detected for value: {}",
+                m.value
+            );
         }
 
         // Sort by descending score
-        matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Apply limit
         if let Some(limit) = limit {
@@ -401,21 +433,9 @@ mod tests {
     fn test_long_text_index() {
         let mut index = LongTextIndex::new(Algorithm::Ngram { ngram_size: 2 });
 
-        index.add(
-            0,
-            "The quick brown fox jumps over the lazy dog",
-            Some(200),
-        );
-        index.add(
-            1,
-            "A fast brown fox leaps over a sleepy dog",
-            Some(201),
-        );
-        index.add(
-            2,
-            "Python is a high-level programming language",
-            Some(202),
-        );
+        index.add(0, "The quick brown fox jumps over the lazy dog", Some(200));
+        index.add(1, "A fast brown fox leaps over a sleepy dog", Some(201));
+        index.add(2, "Python is a high-level programming language", Some(202));
 
         let matches = index.search("quick brown fox", 0.3, Some(10));
 

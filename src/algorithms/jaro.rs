@@ -36,7 +36,7 @@ impl Similarity for Jaro {
     fn similarity(&self, a: &str, b: &str) -> f64 {
         jaro_similarity(a, b)
     }
-    
+
     fn name(&self) -> &'static str {
         "jaro"
     }
@@ -131,7 +131,7 @@ impl Similarity for JaroWinkler {
     fn similarity(&self, a: &str, b: &str) -> f64 {
         jaro_winkler_similarity_params(a, b, self.prefix_weight, self.max_prefix_length)
     }
-    
+
     fn name(&self) -> &'static str {
         "jaro_winkler"
     }
@@ -323,7 +323,12 @@ fn jaro_standard(a_chars: &[char], b_chars: &[char]) -> f64 {
 /// Note: prefix_weight is clamped to [0.0, 0.25] to ensure the result stays in [0.0, 1.0].
 #[inline]
 #[must_use]
-pub fn jaro_winkler_similarity_params(a: &str, b: &str, prefix_weight: f64, max_prefix_len: usize) -> f64 {
+pub fn jaro_winkler_similarity_params(
+    a: &str,
+    b: &str,
+    prefix_weight: f64,
+    max_prefix_len: usize,
+) -> f64 {
     let jaro_sim = jaro_similarity(a, b);
 
     if jaro_sim == 0.0 {
@@ -334,7 +339,8 @@ pub fn jaro_winkler_similarity_params(a: &str, b: &str, prefix_weight: f64, max_
     let prefix_weight = prefix_weight.clamp(0.0, 0.25);
 
     // Find common prefix length
-    let prefix_len = a.chars()
+    let prefix_len = a
+        .chars()
         .zip(b.chars())
         .take(max_prefix_len)
         .take_while(|(ac, bc)| ac == bc)
@@ -531,7 +537,10 @@ mod tests {
     fn test_jaro_unicode_path() {
         // Test Unicode strings that will use the Unicode path
         assert!(approx_eq(jaro_similarity("cafe", "cafe"), 1.0)); // ASCII
-        assert!(approx_eq(jaro_similarity("cafe", "cafe"), jaro_similarity("cafe", "cafe")));
+        assert!(approx_eq(
+            jaro_similarity("cafe", "cafe"),
+            jaro_similarity("cafe", "cafe")
+        ));
 
         // Actual Unicode (non-ASCII) strings
         let unicode_score = jaro_similarity("cafe", "caf\u{00e9}"); // cafe vs cafe (with e-acute)

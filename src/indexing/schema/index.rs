@@ -188,8 +188,9 @@ impl SchemaIndex {
         record_with_data.data = data;
 
         // Add to storage
-        let record_id = self.storage.add_record(&record_with_data)
-            .map_err(|e| SchemaError::StorageError(format!("Failed to add record to storage: {}", e)))?;
+        let record_id = self.storage.add_record(&record_with_data).map_err(|e| {
+            SchemaError::StorageError(format!("Failed to add record to storage: {}", e))
+        })?;
 
         // Add to each field index
         for (field_idx, field) in self.schema.fields().iter().enumerate() {
@@ -226,7 +227,11 @@ impl SchemaIndex {
     ///   - TokenSet fields: return no matches (empty token set)
     ///   - Text fields: may return matches based on the similarity algorithm
     /// - Query fields not present in a record are ignored for that record's score
-    pub fn search(&self, query: &Record, options: SearchOptions) -> Result<Vec<SchemaSearchResult>, SchemaError> {
+    pub fn search(
+        &self,
+        query: &Record,
+        options: SearchOptions,
+    ) -> Result<Vec<SchemaSearchResult>, SchemaError> {
         // Validate query fields against schema (Bug 10 fix)
         for field_name in query.field_names() {
             if !self.schema.has_field(field_name) {
@@ -309,9 +314,10 @@ impl SchemaIndex {
                     }
                     Err(e) => {
                         // Fail fast on storage error - don't return partial results
-                        return Err(SchemaError::StorageError(
-                            format!("Failed to get record {}: {}", record_id, e)
-                        ));
+                        return Err(SchemaError::StorageError(format!(
+                            "Failed to get record {}: {}",
+                            record_id, e
+                        )));
                     }
                 }
             }
@@ -346,7 +352,11 @@ impl SchemaIndex {
         }
 
         // Sort by descending score
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Apply limit
         if let Some(limit) = options.limit {
@@ -376,7 +386,8 @@ impl SchemaIndex {
     /// Returns `Ok(Some(record))` if found, `Ok(None)` if the ID doesn't exist,
     /// or `Err` if there was a storage error (e.g., data corruption).
     pub fn get_record(&self, id: usize) -> Result<Option<Record>, SchemaError> {
-        self.storage.get_record(id)
+        self.storage
+            .get_record(id)
             .map_err(|e| SchemaError::StorageError(format!("Failed to get record {}: {}", id, e)))
     }
 
@@ -527,7 +538,9 @@ mod tests {
 
         // Should find MacBook Pro and MacBook Air
         assert!(results.len() >= 2);
-        assert!(results.iter().any(|r| r.record.get_field("name").unwrap().contains("MacBook")));
+        assert!(results
+            .iter()
+            .any(|r| r.record.get_field("name").unwrap().contains("MacBook")));
     }
 
     #[test]

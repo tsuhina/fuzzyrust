@@ -75,7 +75,10 @@ impl Default for Ngram {
 impl Ngram {
     #[must_use]
     pub fn new(n: usize) -> Self {
-        Self { n, ..Default::default() }
+        Self {
+            n,
+            ..Default::default()
+        }
     }
 
     /// Create from configuration
@@ -125,7 +128,7 @@ impl Similarity for Ngram {
     fn similarity(&self, a: &str, b: &str) -> f64 {
         ngram_similarity(a, b, self.n, self.pad, self.pad_char)
     }
-    
+
     fn name(&self) -> &'static str {
         "ngram"
     }
@@ -157,9 +160,7 @@ pub fn extract_ngrams(s: &str, n: usize, pad: bool, pad_char: char) -> Vec<Strin
         return vec![];
     }
 
-    chars.windows(n)
-        .map(|w| w.iter().collect())
-        .collect()
+    chars.windows(n).map(|w| w.iter().collect()).collect()
 }
 
 /// Extract n-grams as a set for fast comparison
@@ -181,17 +182,17 @@ pub fn ngram_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -
 
     let a_ngrams = extract_ngram_set(a, n, pad, pad_char);
     let b_ngrams = extract_ngram_set(b, n, pad, pad_char);
-    
+
     if a_ngrams.is_empty() && b_ngrams.is_empty() {
         return 1.0;
     }
-    
+
     if a_ngrams.is_empty() || b_ngrams.is_empty() {
         return 0.0;
     }
-    
+
     let intersection = a_ngrams.intersection(&b_ngrams).count();
-    
+
     // Sørensen-Dice coefficient
     (2.0 * intersection as f64) / (a_ngrams.len() + b_ngrams.len()) as f64
 }
@@ -209,14 +210,14 @@ pub fn ngram_jaccard_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char:
 
     let a_ngrams = extract_ngram_set(a, n, pad, pad_char);
     let b_ngrams = extract_ngram_set(b, n, pad, pad_char);
-    
+
     if a_ngrams.is_empty() && b_ngrams.is_empty() {
         return 1.0;
     }
-    
+
     let intersection = a_ngrams.intersection(&b_ngrams).count();
     let union = a_ngrams.union(&b_ngrams).count();
-    
+
     if union == 0 {
         1.0
     } else {
@@ -259,26 +260,26 @@ pub fn ngram_profile_similarity(a: &str, b: &str, n: usize) -> f64 {
     if a == b {
         return 1.0;
     }
-    
+
     let a_profile = build_profile(a, n);
     let b_profile = build_profile(b, n);
-    
+
     if a_profile.is_empty() && b_profile.is_empty() {
         return 1.0;
     }
-    
+
     let mut intersection = 0usize;
     let mut union = 0usize;
-    
+
     let all_keys: AHashSet<_> = a_profile.keys().chain(b_profile.keys()).collect();
-    
+
     for key in all_keys {
         let a_count = *a_profile.get(key).unwrap_or(&0);
         let b_count = *b_profile.get(key).unwrap_or(&0);
         intersection += a_count.min(b_count);
         union += a_count.max(b_count);
     }
-    
+
     if union == 0 {
         1.0
     } else {
@@ -289,16 +290,16 @@ pub fn ngram_profile_similarity(a: &str, b: &str, n: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_extract_ngrams() {
         let ngrams = extract_ngrams("abc", 2, false, ' ');
         assert_eq!(ngrams, vec!["ab", "bc"]);
-        
+
         let ngrams_padded = extract_ngrams("abc", 2, true, ' ');
         assert_eq!(ngrams_padded, vec![" a", "ab", "bc", "c "]);
     }
-    
+
     #[test]
     fn test_bigram_similarity() {
         // "night" with padding: " n", "ni", "ig", "gh", "ht", "t " (6 bigrams)
@@ -308,7 +309,7 @@ mod tests {
         assert!((bigram_similarity("night", "nacht") - 0.5).abs() < 0.01);
         assert!((bigram_similarity("abc", "abc") - 1.0).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_trigram_similarity() {
         let sim = trigram_similarity("hello", "hallo");

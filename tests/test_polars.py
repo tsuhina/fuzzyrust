@@ -3,6 +3,7 @@
 import polars as pl
 import pytest
 
+from fuzzyrust import FuzzyIndex
 from fuzzyrust.polars_ext import (
     dedupe_series,
     fuzzy_dedupe_rows,
@@ -10,7 +11,6 @@ from fuzzyrust.polars_ext import (
     match_dataframe,
     match_series,
 )
-from fuzzyrust import FuzzyIndex
 
 
 class TestMatchSeries:
@@ -208,10 +208,12 @@ class TestFuzzyDedupeRows:
 
     def test_basic_dedupe(self):
         """Basic DataFrame deduplication."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth"],
-            "email": ["john@test.com", "jon@test.com", "jane@test.com", "john@test.com"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth"],
+                "email": ["john@test.com", "jon@test.com", "jane@test.com", "john@test.com"],
+            }
+        )
         result = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.8)
 
         assert isinstance(result, pl.DataFrame)
@@ -225,15 +227,17 @@ class TestFuzzyDedupeRows:
 
     def test_multi_column_dedupe(self):
         """Deduplication using multiple columns."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "Jane Doe"],
-            "email": ["john@test.com", "jon@test.com", "jane@test.com"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "Jane Doe"],
+                "email": ["john@test.com", "jon@test.com", "jane@test.com"],
+            }
+        )
         result = fuzzy_dedupe_rows(
             df,
             columns=["name", "email"],
             algorithms={"name": "jaro_winkler", "email": "levenshtein"},
-            min_similarity=0.7
+            min_similarity=0.7,
         )
 
         assert len(result) == len(df)
@@ -241,10 +245,12 @@ class TestFuzzyDedupeRows:
 
     def test_keep_strategies(self):
         """Test different keep strategies."""
-        df = pl.DataFrame({
-            "name": ["John", "Jon", "Johnny"],
-            "data": ["complete", None, "partial"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John", "Jon", "Johnny"],
+                "data": ["complete", None, "partial"],
+            }
+        )
 
         # Keep first
         result_first = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.7, keep="first")
@@ -255,7 +261,9 @@ class TestFuzzyDedupeRows:
         canonical_last = result_last.filter(pl.col("_is_canonical"))
 
         # Keep most complete
-        result_complete = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.7, keep="most_complete")
+        result_complete = fuzzy_dedupe_rows(
+            df, columns=["name"], min_similarity=0.7, keep="most_complete"
+        )
         canonical_complete = result_complete.filter(pl.col("_is_canonical"))
 
         assert len(canonical_first) > 0
@@ -285,21 +293,26 @@ class TestMultiColumnFuzzyJoin:
 
     def test_multi_column_join(self):
         """Join on multiple columns."""
-        left = pl.DataFrame({
-            "name": ["John Smith", "Jane Doe"],
-            "city": ["New York", "Los Angeles"],
-        })
-        right = pl.DataFrame({
-            "customer": ["Jon Smith", "Jane Do"],
-            "location": ["NYC", "LA"],
-        })
+        left = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jane Doe"],
+                "city": ["New York", "Los Angeles"],
+            }
+        )
+        right = pl.DataFrame(
+            {
+                "customer": ["Jon Smith", "Jane Do"],
+                "location": ["NYC", "LA"],
+            }
+        )
         result = fuzzy_join(
-            left, right,
+            left,
+            right,
             on=[
                 ("name", "customer", {"algorithm": "jaro_winkler", "weight": 2.0}),
                 ("city", "location", {"algorithm": "levenshtein", "weight": 1.0}),
             ],
-            min_similarity=0.5
+            min_similarity=0.5,
         )
 
         assert isinstance(result, pl.DataFrame)
@@ -307,18 +320,20 @@ class TestMultiColumnFuzzyJoin:
 
     def test_simple_tuple_syntax(self):
         """Join with simple tuple syntax (no config dict)."""
-        left = pl.DataFrame({
-            "name": ["Apple"],
-            "country": ["USA"],
-        })
-        right = pl.DataFrame({
-            "company": ["Apple Inc"],
-            "region": ["United States"],
-        })
+        left = pl.DataFrame(
+            {
+                "name": ["Apple"],
+                "country": ["USA"],
+            }
+        )
+        right = pl.DataFrame(
+            {
+                "company": ["Apple Inc"],
+                "region": ["United States"],
+            }
+        )
         result = fuzzy_join(
-            left, right,
-            on=[("name", "company"), ("country", "region")],
-            min_similarity=0.5
+            left, right, on=[("name", "company"), ("country", "region")], min_similarity=0.5
         )
 
         assert isinstance(result, pl.DataFrame)
@@ -400,9 +415,7 @@ class TestExpressionNamespace:
         import fuzzyrust  # Ensure namespace is registered
 
         df = pl.DataFrame({"name": ["John", "Jon", "Jane"]})
-        result = df.with_columns(
-            score=pl.col("name").fuzzy.similarity("John")
-        )
+        result = df.with_columns(score=pl.col("name").fuzzy.similarity("John"))
 
         assert "score" in result.columns
         scores = result["score"].to_list()
@@ -412,13 +425,13 @@ class TestExpressionNamespace:
         """Similarity between two columns."""
         import fuzzyrust
 
-        df = pl.DataFrame({
-            "name1": ["John", "Jane"],
-            "name2": ["Jon", "Janet"],
-        })
-        result = df.with_columns(
-            score=pl.col("name1").fuzzy.similarity(pl.col("name2"))
+        df = pl.DataFrame(
+            {
+                "name1": ["John", "Jane"],
+                "name2": ["Jon", "Janet"],
+            }
         )
+        result = df.with_columns(score=pl.col("name1").fuzzy.similarity(pl.col("name2")))
 
         assert "score" in result.columns
         assert len(result["score"]) == 2
@@ -456,9 +469,7 @@ class TestExpressionNamespace:
         import fuzzyrust
 
         df = pl.DataFrame({"name": ["hello", "helo", "world"]})
-        result = df.with_columns(
-            dist=pl.col("name").fuzzy.distance("hello")
-        )
+        result = df.with_columns(dist=pl.col("name").fuzzy.distance("hello"))
 
         assert "dist" in result.columns
         distances = result["dist"].to_list()
@@ -470,9 +481,7 @@ class TestExpressionNamespace:
         import fuzzyrust
 
         df = pl.DataFrame({"name": ["Smith", "Smyth", "Johnson"]})
-        result = df.with_columns(
-            soundex=pl.col("name").fuzzy.phonetic("soundex")
-        )
+        result = df.with_columns(soundex=pl.col("name").fuzzy.phonetic("soundex"))
 
         assert "soundex" in result.columns
         # Smith and Smyth should have same Soundex
@@ -484,8 +493,6 @@ class TestExpressionNamespace:
         import fuzzyrust
 
         df = pl.DataFrame({"name": ["HELLO World", "  foo  bar  "]})
-        result = df.with_columns(
-            normalized=pl.col("name").fuzzy.normalize("lowercase")
-        )
+        result = df.with_columns(normalized=pl.col("name").fuzzy.normalize("lowercase"))
 
         assert result["normalized"][0] == "hello world"

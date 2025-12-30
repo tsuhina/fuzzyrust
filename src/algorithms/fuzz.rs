@@ -99,10 +99,7 @@ pub fn token_sort_ratio(s1: &str, s2: &str) -> f64 {
 
 /// Extract unique tokens from a string as a sorted set.
 fn token_set(s: &str) -> Vec<String> {
-    let mut tokens: Vec<String> = s
-        .split_whitespace()
-        .map(|t| t.to_lowercase())
-        .collect();
+    let mut tokens: Vec<String> = s.split_whitespace().map(|t| t.to_lowercase()).collect();
     tokens.sort_unstable();
     tokens.dedup();
     tokens
@@ -143,16 +140,36 @@ pub fn token_set_ratio(s1: &str, s2: &str) -> f64 {
     let diff2: Vec<_> = set2.difference(&set1).collect();
 
     // Build comparison strings
-    let intersection_str: String = intersection.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
+    let intersection_str: String = intersection
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
     let combined1: String = if diff1.is_empty() {
         intersection_str.clone()
     } else {
-        format!("{} {}", intersection_str, diff1.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" "))
+        format!(
+            "{} {}",
+            intersection_str,
+            diff1
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
     };
     let combined2: String = if diff2.is_empty() {
         intersection_str.clone()
     } else {
-        format!("{} {}", intersection_str, diff2.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" "))
+        format!(
+            "{} {}",
+            intersection_str,
+            diff2
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
     };
 
     // Compare intersection with each combined version
@@ -291,10 +308,7 @@ pub fn wratio_with_weights(s1: &str, s2: &str, partial_weight: f64, token_weight
     let token_sort = token_sort_ratio(s1, s2) * token_weight;
     let token_set = token_set_ratio(s1, s2) * token_weight;
 
-    base_ratio
-        .max(partial_score)
-        .max(token_sort)
-        .max(token_set)
+    base_ratio.max(partial_score).max(token_sort).max(token_set)
 }
 
 /// Compute basic similarity ratio (alias for levenshtein_similarity).

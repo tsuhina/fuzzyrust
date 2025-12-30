@@ -158,7 +158,10 @@ impl Schema {
     /// - All required fields are present
     /// - No unknown fields (optional, can be relaxed)
     /// - Field values match expected types (basic validation)
-    pub fn validate_record(&self, record_fields: &AHashMap<String, String>) -> Result<(), SchemaError> {
+    pub fn validate_record(
+        &self,
+        record_fields: &AHashMap<String, String>,
+    ) -> Result<(), SchemaError> {
         // Check required fields
         for field in &self.fields {
             if field.required && !record_fields.contains_key(&field.name) {
@@ -269,7 +272,9 @@ impl SchemaBuilder {
         let schema = Schema {
             fields: self.fields,
             field_map,
-            scoring_strategy: self.scoring_strategy.unwrap_or(ScoringStrategy::WeightedAverage),
+            scoring_strategy: self
+                .scoring_strategy
+                .unwrap_or(ScoringStrategy::WeightedAverage),
         };
 
         // Validate the complete schema

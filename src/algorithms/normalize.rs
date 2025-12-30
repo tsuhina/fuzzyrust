@@ -30,15 +30,9 @@ pub fn normalize_string(s: &str, mode: NormalizationMode) -> String {
             s.nfkd().collect::<String>()
         }
         NormalizationMode::RemovePunctuation => {
-            s.chars()
-                .filter(|c| !c.is_ascii_punctuation())
-                .collect()
+            s.chars().filter(|c| !c.is_ascii_punctuation()).collect()
         }
-        NormalizationMode::RemoveWhitespace => {
-            s.chars()
-                .filter(|c| !c.is_whitespace())
-                .collect()
-        }
+        NormalizationMode::RemoveWhitespace => s.chars().filter(|c| !c.is_whitespace()).collect(),
         NormalizationMode::Strict => {
             use unicode_normalization::UnicodeNormalization;
             s.nfkd()

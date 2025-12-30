@@ -7,6 +7,7 @@ This module tests the three long-term performance optimizations:
 """
 
 import pytest
+
 import fuzzyrust as fr
 
 
@@ -290,9 +291,12 @@ class TestDedupParallelEfficiency:
     def test_dedup_mixed(self):
         """Deduplication should handle mix of duplicates and unique items."""
         items = [
-            "hello", "helo",  # Similar pair
-            "world", "wrold",  # Similar pair
-            "apple", "banana",  # Truly unique items (very different)
+            "hello",
+            "helo",  # Similar pair
+            "world",
+            "wrold",  # Similar pair
+            "apple",
+            "banana",  # Truly unique items (very different)
         ]
 
         result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.85)
@@ -339,10 +343,7 @@ class TestDedupParallelEfficiency:
         items = [f"item_{i}" for i in range(100)]
 
         pairs = fr.find_duplicate_pairs(
-            items,
-            algorithm="jaro_winkler",
-            min_similarity=0.99,
-            window_size=10
+            items, algorithm="jaro_winkler", min_similarity=0.99, window_size=10
         )
 
         # With distinct items and high threshold, should find no pairs
@@ -354,10 +355,7 @@ class TestDedupParallelEfficiency:
 
         # With lowercase normalization, all should match
         pairs = fr.find_duplicate_pairs(
-            items,
-            algorithm="jaro_winkler",
-            min_similarity=0.99,
-            normalize="lowercase"
+            items, algorithm="jaro_winkler", min_similarity=0.99, normalize="lowercase"
         )
 
         # Should find all pairs as duplicates
@@ -371,11 +369,7 @@ class TestDedupParallelEfficiency:
         # Add some duplicates
         items.extend(["item_0100", "item_0200", "item_0300"])
 
-        result = fr.find_duplicates(
-            items,
-            algorithm="jaro_winkler",
-            min_similarity=0.99
-        )
+        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.99)
 
         # Should find the duplicate groups
         assert len(result.groups) == 3
@@ -414,17 +408,16 @@ class TestIntegration:
         """Test workflow: dedupe items, then build index from unique items."""
         # Start with duplicated data
         items = [
-            "hello", "hello", "helo",  # Duplicates
-            "world", "world",  # Duplicates
+            "hello",
+            "hello",
+            "helo",  # Duplicates
+            "world",
+            "world",  # Duplicates
             "unique",  # Unique
         ]
 
         # Dedupe
-        result = fr.find_duplicates(
-            items,
-            algorithm="jaro_winkler",
-            min_similarity=0.95
-        )
+        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.95)
 
         # Get unique items (one from each group + truly unique)
         unique_items = result.unique.copy()

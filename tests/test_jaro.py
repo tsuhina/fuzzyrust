@@ -83,7 +83,9 @@ class TestJaroLongStrings:
         result = fr.jaro_similarity(long_a, long_b)
         assert isinstance(result, float), f"Expected float, got {type(result).__name__}"
         # "aaa..." and "bbb..." have no matching characters, so Jaro similarity is 0.0
-        assert result == 0.0, f"Expected Jaro similarity of 0.0 for completely different strings, got {result}"
+        assert (
+            result == 0.0
+        ), f"Expected Jaro similarity of 0.0 for completely different strings, got {result}"
 
 
 if __name__ == "__main__":

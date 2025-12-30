@@ -29,7 +29,6 @@ import threading
 
 import pytest
 
-
 # =============================================================================
 # Edge Case Tests
 # =============================================================================
@@ -81,26 +80,30 @@ class TestUnicodeEdgeCases:
         import fuzzyrust as fr
 
         # Single emoji - should be treated as one character
-        assert fr.levenshtein("\U0001F44B", "\U0001F44B") == 0
-        assert fr.levenshtein("\U0001F44B", "\U0001F590") == 1
+        assert fr.levenshtein("\U0001f44b", "\U0001f44b") == 0
+        assert fr.levenshtein("\U0001f44b", "\U0001f590") == 1
 
         # Emoji in strings
-        assert fr.levenshtein("hello \U0001F44B", "hello \U0001F44B") == 0
-        assert fr.levenshtein("hello \U0001F44B", "hello \U0001F590") == 1
-        assert fr.levenshtein("hello \U0001F44B", "hello") == 2  # space + emoji
+        assert fr.levenshtein("hello \U0001f44b", "hello \U0001f44b") == 0
+        assert fr.levenshtein("hello \U0001f44b", "hello \U0001f590") == 1
+        assert fr.levenshtein("hello \U0001f44b", "hello") == 2  # space + emoji
 
         # Multiple emoji
-        assert fr.levenshtein("\U0001F600\U0001F603\U0001F604", "\U0001F600\U0001F603\U0001F604") == 0
-        assert fr.levenshtein("\U0001F600\U0001F603\U0001F604", "\U0001F600\U0001F603\U0001F601") == 1
+        assert (
+            fr.levenshtein("\U0001f600\U0001f603\U0001f604", "\U0001f600\U0001f603\U0001f604") == 0
+        )
+        assert (
+            fr.levenshtein("\U0001f600\U0001f603\U0001f604", "\U0001f600\U0001f603\U0001f601") == 1
+        )
 
         # Emoji similarity: 7 chars, 6 match = high jaro-winkler score
-        sim = fr.jaro_winkler_similarity("hello \U0001F44B", "hello \U0001F590")
+        sim = fr.jaro_winkler_similarity("hello \U0001f44b", "hello \U0001f590")
         # Jaro-Winkler for 6/7 matching chars with common prefix "hello "
         assert 0.90 <= sim <= 0.95, f"Expected Jaro-Winkler ~0.93 for 6/7 matching chars, got {sim}"
 
         # Complex emoji (with skin tone modifiers) - treated as single unit
         # Note: This tests handling of multi-codepoint emoji
-        assert fr.levenshtein("\U0001F44B\U0001F3FB", "\U0001F44B\U0001F3FB") == 0
+        assert fr.levenshtein("\U0001f44b\U0001f3fb", "\U0001f44b\U0001f3fb") == 0
 
     def test_combining_characters(self):
         """Test handling of combining characters."""
@@ -134,11 +137,11 @@ class TestUnicodeEdgeCases:
         import fuzzyrust as fr
 
         # Family emoji (man+woman+girl+boy) is a ZWJ sequence
-        family = "\U0001F468\u200d\U0001F469\u200d\U0001F467\u200d\U0001F466"
+        family = "\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466"
         # Same family should have distance 0
         assert fr.levenshtein(family, family) == 0
         # Different family composition
-        couple = "\U0001F468\u200d\U0001F469\u200d\U0001F466"
+        couple = "\U0001f468\u200d\U0001f469\u200d\U0001f466"
         # These are different sequences
         assert fr.levenshtein(family, couple) > 0
         # Similarity should still work
@@ -150,8 +153,8 @@ class TestUnicodeEdgeCases:
         import fuzzyrust as fr
 
         # US flag vs UK flag (both are pairs of regional indicators)
-        us_flag = "\U0001F1FA\U0001F1F8"
-        uk_flag = "\U0001F1EC\U0001F1E7"
+        us_flag = "\U0001f1fa\U0001f1f8"
+        uk_flag = "\U0001f1ec\U0001f1e7"
         assert fr.levenshtein(us_flag, us_flag) == 0
         # Different flags should have some distance
         assert fr.levenshtein(us_flag, uk_flag) > 0
@@ -182,15 +185,17 @@ class TestUnicodeEdgeCases:
         # Without normalization, NFD has extra combining character (5 vs 4 codepoints)
         # Jaro-Winkler handles this with reasonable similarity (~0.848)
         sim = fr.jaro_winkler_similarity(nfc, nfd)
-        assert 0.84 <= sim <= 0.90, f"Expected Jaro-Winkler 0.84-0.90 for NFC vs NFD forms, got {sim}"
+        assert (
+            0.84 <= sim <= 0.90
+        ), f"Expected Jaro-Winkler 0.84-0.90 for NFC vs NFD forms, got {sim}"
 
     def test_surrogates_and_supplementary_planes(self):
         """Test handling of characters outside BMP (supplementary planes)."""
         import fuzzyrust as fr
 
         # Mathematical symbols from Plane 1
-        math1 = "\U0001D400\U0001D401\U0001D402"  # Mathematical Bold Capital
-        math2 = "\U0001D400\U0001D401\U0001D403"  # One different
+        math1 = "\U0001d400\U0001d401\U0001d402"  # Mathematical Bold Capital
+        math2 = "\U0001d400\U0001d401\U0001d403"  # One different
         assert fr.levenshtein(math1, math1) == 0
         assert fr.levenshtein(math1, math2) == 1
         # Ancient scripts (e.g., Egyptian Hieroglyphs from Plane 1)
@@ -207,7 +212,9 @@ class TestUnicodeEdgeCases:
         assert fr.levenshtein(mixed1, mixed2) == 1
         # Similarity: 12/13 chars match with common prefix
         sim = fr.jaro_winkler_similarity(mixed1, mixed2)
-        assert 0.94 <= sim <= 0.98, f"Expected Jaro-Winkler ~0.96 for 12/13 matching chars, got {sim}"
+        assert (
+            0.94 <= sim <= 0.98
+        ), f"Expected Jaro-Winkler ~0.96 for 12/13 matching chars, got {sim}"
 
 
 class TestErrorHandling:
@@ -348,12 +355,16 @@ class TestCaseInsensitiveVariants:
 
         # hamming_ci should equal hamming on lowercase
         assert fr.hamming_ci(a_eq, b_eq) == fr.hamming(a_eq.lower(), b_eq.lower())
-        assert fr.hamming_similarity_ci(a_eq, b_eq) == fr.hamming_similarity(a_eq.lower(), b_eq.lower())
+        assert fr.hamming_similarity_ci(a_eq, b_eq) == fr.hamming_similarity(
+            a_eq.lower(), b_eq.lower()
+        )
 
         # LCS functions should be consistent
         assert fr.lcs_length_ci(a, b) == fr.lcs_length(a.lower(), b.lower())
         assert fr.lcs_string_ci(a, b) == fr.lcs_string(a.lower(), b.lower())
-        assert fr.longest_common_substring_ci(a, b) == fr.longest_common_substring(a.lower(), b.lower())
+        assert fr.longest_common_substring_ci(a, b) == fr.longest_common_substring(
+            a.lower(), b.lower()
+        )
 
 
 # =============================================================================
@@ -372,11 +383,13 @@ except ImportError:
     def given(*args, **kwargs):
         def decorator(func):
             return func
+
         return decorator
 
     def settings(*args, **kwargs):
         def decorator(func):
             return func
+
         return decorator
 
     def assume(condition):
@@ -519,8 +532,12 @@ class TestPropertyBased:
         dam_dist = fr.damerau_levenshtein(a, b)
         # Distance is bounded by max string length (at most replace all chars + insert/delete difference)
         max_dist = max(len(a), len(b))
-        assert 0 <= lev_dist <= max_dist, f"levenshtein({a!r}, {b!r}) = {lev_dist} is outside [0, {max_dist}]"
-        assert 0 <= dam_dist <= max_dist, f"damerau_levenshtein({a!r}, {b!r}) = {dam_dist} is outside [0, {max_dist}]"
+        assert (
+            0 <= lev_dist <= max_dist
+        ), f"levenshtein({a!r}, {b!r}) = {lev_dist} is outside [0, {max_dist}]"
+        assert (
+            0 <= dam_dist <= max_dist
+        ), f"damerau_levenshtein({a!r}, {b!r}) = {dam_dist} is outside [0, {max_dist}]"
 
     @given(st.text(min_size=0, max_size=50), st.text(min_size=0, max_size=50))
     def test_ngram_symmetry(self, a, b):
@@ -580,7 +597,9 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.levenshtein_similarity(a, b)
-        assert 0.0 <= sim <= 1.0, f"levenshtein_similarity({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
+        assert (
+            0.0 <= sim <= 1.0
+        ), f"levenshtein_similarity({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=50))
     def test_levenshtein_similarity_identity(self, s):
@@ -595,9 +614,13 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim_chars = fr.cosine_similarity_chars(a, b)
-        assert 0.0 <= sim_chars <= 1.0, f"cosine_similarity_chars({a!r}, {b!r}) = {sim_chars} is outside [0.0, 1.0]"
+        assert (
+            0.0 <= sim_chars <= 1.0
+        ), f"cosine_similarity_chars({a!r}, {b!r}) = {sim_chars} is outside [0.0, 1.0]"
         sim_ngrams = fr.cosine_similarity_ngrams(a, b)
-        assert 0.0 <= sim_ngrams <= 1.0, f"cosine_similarity_ngrams({a!r}, {b!r}) = {sim_ngrams} is outside [0.0, 1.0]"
+        assert (
+            0.0 <= sim_ngrams <= 1.0
+        ), f"cosine_similarity_ngrams({a!r}, {b!r}) = {sim_ngrams} is outside [0.0, 1.0]"
 
     @given(
         st.text(alphabet=string.ascii_letters + " ", min_size=1, max_size=50),
@@ -609,7 +632,9 @@ class TestPropertyBased:
         import fuzzyrust as fr
 
         sim = fr.cosine_similarity_words(a, b)
-        assert 0.0 <= sim <= 1.0, f"cosine_similarity_words({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
+        assert (
+            0.0 <= sim <= 1.0
+        ), f"cosine_similarity_words({a!r}, {b!r}) = {sim} is outside [0.0, 1.0]"
 
     @given(st.text(min_size=0, max_size=40))
     def test_ci_variants_consistency(self, s):
@@ -677,7 +702,9 @@ class TestBenchmarks:
         result = benchmark(fr.jaro_winkler_similarity, "hello", "hallo")
         # "hello" and "hallo" have high similarity (common prefix "h", similar structure)
         # Expected Jaro-Winkler similarity is approximately 0.88
-        assert 0.85 <= result <= 0.92, f"Expected Jaro-Winkler('hello', 'hallo') in [0.85, 0.92], got {result}"
+        assert (
+            0.85 <= result <= 0.92
+        ), f"Expected Jaro-Winkler('hello', 'hallo') in [0.85, 0.92], got {result}"
 
     def test_benchmark_batch_levenshtein(self, benchmark, sample_strings):
         """Benchmark batch Levenshtein processing."""
@@ -722,7 +749,9 @@ class TestBenchmarks:
         assert isinstance(result, list), f"Expected list, got {type(result).__name__}"
         # Verify result contains SearchResult objects with valid structure
         for r in result:
-            assert hasattr(r, "text") and hasattr(r, "distance"), f"SearchResult missing required attributes"
+            assert hasattr(r, "text") and hasattr(
+                r, "distance"
+            ), "SearchResult missing required attributes"
             assert r.distance <= 2, f"Result distance {r.distance} exceeds max_distance=2"
 
     def test_benchmark_ngram_index_build(self, benchmark, sample_strings):
@@ -747,7 +776,9 @@ class TestBenchmarks:
         assert isinstance(result, list), f"Expected list, got {type(result).__name__}"
         # Verify result contains MatchResult objects with valid structure and scores
         for r in result:
-            assert hasattr(r, "text") and hasattr(r, "score"), f"MatchResult missing required attributes"
+            assert hasattr(r, "text") and hasattr(
+                r, "score"
+            ), "MatchResult missing required attributes"
             assert r.score >= 0.5, f"Result score {r.score} below min_similarity=0.5"
 
     def test_benchmark_soundex(self, benchmark):
@@ -891,7 +922,9 @@ class TestBenchmarks:
         assert isinstance(result, list), f"Expected list, got {type(result).__name__}"
         # Verify result contains MatchResult objects with valid structure and scores
         for r in result:
-            assert hasattr(r, "text") and hasattr(r, "score"), f"MatchResult missing required attributes"
+            assert hasattr(r, "text") and hasattr(
+                r, "score"
+            ), "MatchResult missing required attributes"
             assert r.score >= 0.5, f"Result score {r.score} below min_similarity=0.5"
 
     def test_benchmark_find_duplicates_small(self, benchmark):

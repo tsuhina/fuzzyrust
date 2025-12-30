@@ -80,15 +80,18 @@ impl Similarity for Hamming {
 pub fn hamming_distance(a: &str, b: &str) -> Option<usize> {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
-    
+
     if a_chars.len() != b_chars.len() {
         return None;
     }
-    
-    Some(a_chars.iter()
-        .zip(b_chars.iter())
-        .filter(|(ac, bc)| ac != bc)
-        .count())
+
+    Some(
+        a_chars
+            .iter()
+            .zip(b_chars.iter())
+            .filter(|(ac, bc)| ac != bc)
+            .count(),
+    )
 }
 
 /// Hamming distance that pads shorter string with spaces.
@@ -97,19 +100,19 @@ pub fn hamming_distance(a: &str, b: &str) -> Option<usize> {
 pub fn hamming_distance_padded(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
-    
+
     let max_len = a_chars.len().max(b_chars.len());
-    
+
     let mut distance = 0;
     for i in 0..max_len {
         let a_char = a_chars.get(i);
         let b_char = b_chars.get(i);
-        
+
         if a_char != b_char {
             distance += 1;
         }
     }
-    
+
     distance
 }
 
@@ -119,7 +122,7 @@ pub fn hamming_distance_padded(a: &str, b: &str) -> usize {
 pub fn hamming_similarity(a: &str, b: &str) -> Option<f64> {
     let dist = hamming_distance(a, b)?;
     let len = a.chars().count();
-    
+
     if len == 0 {
         Some(1.0)
     } else {
@@ -130,7 +133,7 @@ pub fn hamming_similarity(a: &str, b: &str) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_hamming_basic() {
         assert_eq!(hamming_distance("", ""), Some(0));
@@ -138,7 +141,7 @@ mod tests {
         assert_eq!(hamming_distance("abc", "axc"), Some(1));
         assert_eq!(hamming_distance("karolin", "kathrin"), Some(3));
     }
-    
+
     #[test]
     fn test_hamming_different_lengths() {
         assert_eq!(hamming_distance("abc", "ab"), None);

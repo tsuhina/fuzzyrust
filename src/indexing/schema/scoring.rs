@@ -239,8 +239,8 @@ mod tests {
     #[test]
     fn test_minmax_scaling_basic() {
         let scores = vec![
-            FieldScore::new("field1", 0.4, 5.0), // min
-            FieldScore::new("field2", 0.9, 5.0), // max
+            FieldScore::new("field1", 0.4, 5.0),  // min
+            FieldScore::new("field2", 0.9, 5.0),  // max
             FieldScore::new("field3", 0.65, 5.0), // middle
         ];
 
@@ -288,8 +288,8 @@ mod tests {
     #[test]
     fn test_weighted_average_with_different_weights() {
         let scores = vec![
-            FieldScore::new("name", 0.9, 10.0),   // High score, high weight
-            FieldScore::new("tags", 0.3, 3.0),    // Low score, low weight
+            FieldScore::new("name", 0.9, 10.0), // High score, high weight
+            FieldScore::new("tags", 0.3, 3.0),  // Low score, low weight
         ];
 
         // (0.9 * 10 + 0.3 * 3) / (10 + 3) = (9 + 0.9) / 13 = 9.9 / 13 ≈ 0.762

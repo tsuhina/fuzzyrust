@@ -50,19 +50,19 @@
 // ```
 
 // Module declarations
-pub mod types;
 pub mod field;
-pub mod schema;
-pub mod storage;
 pub mod field_indices;
-pub mod scoring;
 pub mod index;
+pub mod schema;
+pub mod scoring;
+pub mod storage;
+pub mod types;
 
 // Re-export commonly used types for convenience
-pub use types::{FieldType, Algorithm};
 pub use field::Field;
-pub use schema::{Schema, SchemaBuilder, SchemaError};
-pub use storage::{Record, FieldColumn, OptimizedStorage, ColumnError};
-pub use field_indices::{FieldIndex, ShortTextIndex, LongTextIndex, TokenSetIndex};
-pub use scoring::{ScoringStrategy, WeightedAverage, MinMaxScaling};
+pub use field_indices::{FieldIndex, LongTextIndex, ShortTextIndex, TokenSetIndex};
 pub use index::{SchemaIndex, SchemaSearchResult, SearchOptions};
+pub use schema::{Schema, SchemaBuilder, SchemaError};
+pub use scoring::{MinMaxScaling, ScoringStrategy, WeightedAverage};
+pub use storage::{ColumnError, FieldColumn, OptimizedStorage, Record};
+pub use types::{Algorithm, FieldType};

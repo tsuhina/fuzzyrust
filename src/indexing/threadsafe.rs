@@ -32,7 +32,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 
 use super::bktree::{BkTree, SearchResult as BkSearchResult};
-use super::ngram_index::{NgramIndex, SearchMatch, IndexEntry};
+use super::ngram_index::{IndexEntry, NgramIndex, SearchMatch};
 use crate::algorithms::Similarity;
 
 /// Thread-safe wrapper for BkTree.
@@ -218,14 +218,27 @@ impl ThreadSafeNgramIndex {
     /// Create with minimum similarity threshold.
     pub fn with_min_similarity(n: usize, min_similarity: f64) -> Self {
         Self {
-            inner: Arc::new(RwLock::new(NgramIndex::with_min_similarity(n, min_similarity))),
+            inner: Arc::new(RwLock::new(NgramIndex::with_min_similarity(
+                n,
+                min_similarity,
+            ))),
         }
     }
 
     /// Create with all parameters.
-    pub fn with_params(n: usize, min_similarity: f64, min_ngram_ratio: f64, normalize: bool) -> Self {
+    pub fn with_params(
+        n: usize,
+        min_similarity: f64,
+        min_ngram_ratio: f64,
+        normalize: bool,
+    ) -> Self {
         Self {
-            inner: Arc::new(RwLock::new(NgramIndex::with_params(n, min_similarity, min_ngram_ratio, normalize))),
+            inner: Arc::new(RwLock::new(NgramIndex::with_params(
+                n,
+                min_similarity,
+                min_ngram_ratio,
+                normalize,
+            ))),
         }
     }
 
@@ -282,7 +295,9 @@ impl ThreadSafeNgramIndex {
         min_similarity: f64,
         limit: Option<usize>,
     ) -> Vec<SearchMatch> {
-        self.inner.read().search(query, similarity, min_similarity, limit)
+        self.inner
+            .read()
+            .search(query, similarity, min_similarity, limit)
     }
 
     /// Parallel search for large datasets.
@@ -295,7 +310,9 @@ impl ThreadSafeNgramIndex {
         min_similarity: f64,
         limit: Option<usize>,
     ) -> Vec<SearchMatch> {
-        self.inner.read().search_parallel(query, similarity, min_similarity, limit)
+        self.inner
+            .read()
+            .search_parallel(query, similarity, min_similarity, limit)
     }
 
     /// Check if the index contains an exact match.
@@ -372,8 +389,8 @@ impl Default for ThreadSafeNgramIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
     use crate::algorithms::JaroWinkler;
+    use std::thread;
 
     #[test]
     fn test_threadsafe_bktree_concurrent_reads() {

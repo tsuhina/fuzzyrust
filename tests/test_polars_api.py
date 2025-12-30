@@ -54,16 +54,18 @@ class TestBatchSimilarity:
             # All similarity scores must be in [0, 1] range
             for i, s in enumerate(result):
                 if s is not None:
-                    assert 0.0 <= s <= 1.0, f"Algorithm {algo} returned invalid score {s} at index {i}"
+                    assert (
+                        0.0 <= s <= 1.0
+                    ), f"Algorithm {algo} returned invalid score {s} at index {i}"
 
             # Check algorithm-specific expected ranges for kitten/sitting
             ks_min, ks_max, ss_min, ss_max = expected_ranges[algo]
-            assert ks_min <= result[0] <= ks_max, (
-                f"Algorithm {algo}: kitten/sitting score {result[0]} outside expected range [{ks_min}, {ks_max}]"
-            )
-            assert ss_min <= result[1] <= ss_max, (
-                f"Algorithm {algo}: saturday/sunday score {result[1]} outside expected range [{ss_min}, {ss_max}]"
-            )
+            assert (
+                ks_min <= result[0] <= ks_max
+            ), f"Algorithm {algo}: kitten/sitting score {result[0]} outside expected range [{ks_min}, {ks_max}]"
+            assert (
+                ss_min <= result[1] <= ss_max
+            ), f"Algorithm {algo}: saturday/sunday score {result[1]} outside expected range [{ss_min}, {ss_max}]"
 
     def test_handles_nulls(self):
         """Test null handling."""
@@ -128,10 +130,12 @@ class TestDedupeSNM:
 
     def test_finds_duplicates(self):
         """Test that duplicates are found."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth"],
-            "id": [1, 2, 3, 4],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth"],
+                "id": [1, 2, 3, 4],
+            }
+        )
 
         result = fr.dedupe_snm(
             df,
@@ -146,17 +150,22 @@ class TestDedupeSNM:
         # John Smith, Jon Smith, and John Smyth should be grouped together
         # At min_similarity=0.8, these similar names should form at least one group
         grouped = result.filter(pl.col("_group_id").is_not_null())
-        assert len(grouped) >= 2, f"Expected at least 2 grouped rows (John/Jon variants), got {len(grouped)}"
+        assert (
+            len(grouped) >= 2
+        ), f"Expected at least 2 grouped rows (John/Jon variants), got {len(grouped)}"
         # Verify the grouped names are the expected similar ones
         grouped_names = set(grouped["name"].to_list())
-        assert any(name in grouped_names for name in ["John Smith", "Jon Smith", "John Smyth"]), \
-            f"Expected Smith variants to be grouped, but got {grouped_names}"
+        assert any(
+            name in grouped_names for name in ["John Smith", "Jon Smith", "John Smyth"]
+        ), f"Expected Smith variants to be grouped, but got {grouped_names}"
 
     def test_keep_first(self):
         """Test keep='first' strategy."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "John Smyth"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "John Smyth"],
+            }
+        )
 
         result = fr.dedupe_snm(df, columns=["name"], keep="first")
         canonical = result.filter(pl.col("_is_canonical"))
@@ -166,14 +175,14 @@ class TestDedupeSNM:
 
     def test_keep_last(self):
         """Test keep='last' strategy."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "John Smyth"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "John Smyth"],
+            }
+        )
 
         result = fr.dedupe_snm(df, columns=["name"], keep="last")
-        canonical_rows = result.filter(
-            pl.col("_is_canonical") & pl.col("_group_id").is_not_null()
-        )
+        canonical_rows = result.filter(pl.col("_is_canonical") & pl.col("_group_id").is_not_null())
 
         if len(canonical_rows) > 0:
             # Last row in the group should be canonical
@@ -182,9 +191,11 @@ class TestDedupeSNM:
     def test_window_size_effect(self):
         """Test that window_size affects results."""
         # Create data where duplicates are far apart in sorted order
-        df = pl.DataFrame({
-            "name": ["aaa", "zzz duplicate", "zzz duplicte"],  # duplicates far in alphabet
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["aaa", "zzz duplicate", "zzz duplicte"],  # duplicates far in alphabet
+            }
+        )
 
         # Small window might miss distant duplicates
         small_window = fr.dedupe_snm(df, columns=["name"], window_size=2)
@@ -221,14 +232,18 @@ class TestMatchRecordsBatch:
 
     def test_basic_matching(self):
         """Test basic record matching."""
-        queries = pl.DataFrame({
-            "name": ["Jon Smith", "Jane Do"],
-            "city": ["New York", "LA"],
-        })
-        targets = pl.DataFrame({
-            "name": ["John Smith", "Jane Doe", "Bob Wilson"],
-            "city": ["New York", "Los Angeles", "Chicago"],
-        })
+        queries = pl.DataFrame(
+            {
+                "name": ["Jon Smith", "Jane Do"],
+                "city": ["New York", "LA"],
+            }
+        )
+        targets = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jane Doe", "Bob Wilson"],
+                "city": ["New York", "Los Angeles", "Chicago"],
+            }
+        )
 
         result = fr.match_records_batch(
             queries,
@@ -244,10 +259,12 @@ class TestMatchRecordsBatch:
     def test_with_weights(self):
         """Test that weights affect scoring."""
         queries = pl.DataFrame({"name": ["Jon Smith"], "email": ["jon@test.com"]})
-        targets = pl.DataFrame({
-            "name": ["John Smith", "Jon Jones"],
-            "email": ["john@test.com", "jon@test.com"],
-        })
+        targets = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Jones"],
+                "email": ["john@test.com", "jon@test.com"],
+            }
+        )
 
         # Heavy weight on email should prefer exact email match
         result = fr.match_records_batch(
@@ -261,8 +278,9 @@ class TestMatchRecordsBatch:
         assert len(result) > 0, "Expected at least one match"
         # With 10x weight on email, exact email match "jon@test.com" should win
         # Target index 1 has "jon@test.com" which matches query exactly
-        assert result["target_idx"][0] == 1, \
-            f"Expected target_idx 1 (Jon Jones with exact email), got {result['target_idx'][0]}"
+        assert (
+            result["target_idx"][0] == 1
+        ), f"Expected target_idx 1 (Jon Jones with exact email), got {result['target_idx'][0]}"
 
     def test_per_column_algorithms(self):
         """Test per-column algorithm specification."""
@@ -289,9 +307,11 @@ class TestFindSimilarPairs:
 
     def test_snm_method(self):
         """Test SNM method finds similar pairs."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth"],
+            }
+        )
 
         result = fr.find_similar_pairs(
             df,
@@ -309,9 +329,11 @@ class TestFindSimilarPairs:
 
     def test_full_method(self):
         """Test full pairwise comparison method."""
-        df = pl.DataFrame({
-            "name": ["hello", "hallo", "world"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["hello", "hallo", "world"],
+            }
+        )
 
         result = fr.find_similar_pairs(
             df,
@@ -325,9 +347,11 @@ class TestFindSimilarPairs:
 
     def test_no_duplicate_pairs(self):
         """Test that pairs are not duplicated (i,j) and (j,i)."""
-        df = pl.DataFrame({
-            "name": ["hello", "hallo"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["hello", "hallo"],
+            }
+        )
 
         result = fr.find_similar_pairs(
             df,
@@ -351,11 +375,19 @@ class TestIntegration:
     def test_full_workflow(self):
         """Test a complete deduplication workflow."""
         # Create sample data with duplicates
-        df = pl.DataFrame({
-            "id": [1, 2, 3, 4, 5],
-            "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth", "Bob Wilson"],
-            "email": ["john@test.com", "jon@test.com", "jane@test.com", "john@test.com", "bob@test.com"],
-        })
+        df = pl.DataFrame(
+            {
+                "id": [1, 2, 3, 4, 5],
+                "name": ["John Smith", "Jon Smith", "Jane Doe", "John Smyth", "Bob Wilson"],
+                "email": [
+                    "john@test.com",
+                    "jon@test.com",
+                    "jane@test.com",
+                    "john@test.com",
+                    "bob@test.com",
+                ],
+            }
+        )
 
         # Step 1: Find duplicates using SNM
         deduped = fr.dedupe_snm(
@@ -390,9 +422,11 @@ class TestPerformance:
     def test_handles_medium_dataset(self):
         """Test that the API handles medium-sized datasets."""
         n = 1000
-        df = pl.DataFrame({
-            "name": [f"Name {i % 100}" for i in range(n)],
-        })
+        df = pl.DataFrame(
+            {
+                "name": [f"Name {i % 100}" for i in range(n)],
+            }
+        )
 
         result = fr.dedupe_snm(
             df,

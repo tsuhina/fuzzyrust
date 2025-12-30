@@ -162,17 +162,21 @@ print("Fuzzy Join - Match messy data to clean reference:")
 print()
 
 # Your clean customer database
-customers = pl.DataFrame({
-    "id": [1, 2, 3, 4],
-    "name": ["Apple Inc.", "Microsoft Corporation", "Google LLC", "Amazon.com Inc."]
-})
+customers = pl.DataFrame(
+    {
+        "id": [1, 2, 3, 4],
+        "name": ["Apple Inc.", "Microsoft Corporation", "Google LLC", "Amazon.com Inc."],
+    }
+)
 
 # Incoming orders with typos and variations
-orders = pl.DataFrame({
-    "order_id": ["A1", "A2", "A3", "A4"],
-    "company": ["Appel", "Microsft Corp", "Googel", "Amzon Inc"],
-    "amount": [5000, 3000, 7000, 2000]
-})
+orders = pl.DataFrame(
+    {
+        "order_id": ["A1", "A2", "A3", "A4"],
+        "company": ["Appel", "Microsft Corp", "Googel", "Amzon Inc"],
+        "amount": [5000, 3000, 7000, 2000],
+    }
+)
 
 print("  Clean customer database:")
 print(customers)
@@ -183,10 +187,11 @@ print()
 
 # One line to match them
 matched = fuzzy_join(
-    orders, customers,
+    orders,
+    customers,
     left_on="company",
     right_on="name",
-    min_similarity=0.5  # Lower threshold to catch case differences like GOOGLE/Google
+    min_similarity=0.5,  # Lower threshold to catch case differences like GOOGLE/Google
 )
 
 print("  Fuzzy joined result:")
@@ -202,18 +207,22 @@ print("\nMulti-Column Fuzzy Join:")
 print()
 
 # Reference data
-reference = pl.DataFrame({
-    "ref_name": ["John Smith", "Jane Doe", "Bob Wilson"],
-    "ref_city": ["New York", "Los Angeles", "Chicago"],
-    "ref_id": [101, 102, 103]
-})
+reference = pl.DataFrame(
+    {
+        "ref_name": ["John Smith", "Jane Doe", "Bob Wilson"],
+        "ref_city": ["New York", "Los Angeles", "Chicago"],
+        "ref_id": [101, 102, 103],
+    }
+)
 
 # Data to match
-to_match = pl.DataFrame({
-    "name": ["Jon Smith", "Jane Do", "Robert Wilson"],
-    "city": ["New York", "LA", "Chicago"],
-    "value": [100, 200, 300]
-})
+to_match = pl.DataFrame(
+    {
+        "name": ["Jon Smith", "Jane Do", "Robert Wilson"],
+        "city": ["New York", "LA", "Chicago"],
+        "value": [100, 200, 300],
+    }
+)
 
 print("  Reference data:")
 print(reference)
@@ -224,12 +233,13 @@ print()
 
 # Multi-column join with per-field algorithms
 result = fuzzy_join(
-    to_match, reference,
+    to_match,
+    reference,
     on=[
         ("name", "ref_name", {"algorithm": "jaro_winkler", "weight": 2.0}),
         ("city", "ref_city", {"algorithm": "levenshtein", "weight": 1.0}),
     ],
-    min_similarity=0.5
+    min_similarity=0.5,
 )
 
 print("  Multi-column fuzzy join result:")
@@ -247,11 +257,13 @@ print("\nEntity Deduplication:")
 print()
 
 # Customer records with potential duplicates
-customers = pl.DataFrame({
-    "name": ["John Smith", "Jon Smyth", "Jane Doe", "John Smith Jr"],
-    "email": ["john@test.com", "john@test.com", "jane@test.com", "john.jr@test.com"],
-    "phone": ["555-1234", "555-1234", "555-9999", "555-1234"],
-})
+customers = pl.DataFrame(
+    {
+        "name": ["John Smith", "Jon Smyth", "Jane Doe", "John Smith Jr"],
+        "email": ["john@test.com", "john@test.com", "jane@test.com", "john.jr@test.com"],
+        "phone": ["555-1234", "555-1234", "555-9999", "555-1234"],
+    }
+)
 
 print("  Original data:")
 print(customers)
@@ -304,7 +316,7 @@ result = fuzzy_dedupe_rows(
     },
     weights={"name": 2.0, "email": 1.5, "phone": 1.0},
     min_similarity=0.5,
-    keep="first"  # or "last", "most_complete"
+    keep="first",  # or "last", "most_complete"
 )
 
 print("  With deduplication columns:")
@@ -330,9 +342,7 @@ print()
 df = pl.DataFrame({"name": ["John", "Jon", "Jane", "Bob"]})
 
 # Calculate similarity to a target
-result = df.with_columns(
-    score=pl.col("name").fuzzy.similarity("John", algorithm="jaro_winkler")
-)
+result = df.with_columns(score=pl.col("name").fuzzy.similarity("John", algorithm="jaro_winkler"))
 print("  Similarity scores:")
 print(result)
 print()

@@ -120,15 +120,12 @@ class FuzzyExprNamespace:
                 return _plugin_similarity(self._expr, other, algorithm=algo)
 
             # Fallback: use struct + map_elements
-            return (
-                pl.struct([self._expr.alias("_left"), other.alias("_right")])
-                .map_elements(
-                    lambda row: sim_func(
-                        str(row["_left"]) if row["_left"] is not None else "",
-                        str(row["_right"]) if row["_right"] is not None else "",
-                    ),
-                    return_dtype=pl.Float64,
-                )
+            return pl.struct([self._expr.alias("_left"), other.alias("_right")]).map_elements(
+                lambda row: sim_func(
+                    str(row["_left"]) if row["_left"] is not None else "",
+                    str(row["_right"]) if row["_right"] is not None else "",
+                ),
+                return_dtype=pl.Float64,
             )
 
     def is_similar(
@@ -170,9 +167,7 @@ class FuzzyExprNamespace:
         choices: list[str],
         algorithm: Union[
             str,
-            Literal[
-                "levenshtein", "damerau_levenshtein", "jaro", "jaro_winkler", "ngram"
-            ],
+            Literal["levenshtein", "damerau_levenshtein", "jaro", "jaro_winkler", "ngram"],
         ] = "jaro_winkler",
         min_similarity: float = 0.0,
     ) -> pl.Expr:
@@ -210,9 +205,7 @@ class FuzzyExprNamespace:
         choices: list[str],
         algorithm: Union[
             str,
-            Literal[
-                "levenshtein", "damerau_levenshtein", "jaro", "jaro_winkler", "ngram"
-            ],
+            Literal["levenshtein", "damerau_levenshtein", "jaro", "jaro_winkler", "ngram"],
         ] = "jaro_winkler",
         min_similarity: float = 0.0,
     ) -> pl.Expr:
@@ -255,8 +248,12 @@ class FuzzyExprNamespace:
     def normalize(
         self,
         mode: Literal[
-            "lowercase", "uppercase", "unicode_nfkd", "remove_punctuation",
-            "remove_whitespace", "strict"
+            "lowercase",
+            "uppercase",
+            "unicode_nfkd",
+            "remove_punctuation",
+            "remove_whitespace",
+            "strict",
         ] = "lowercase",
     ) -> pl.Expr:
         """
@@ -366,13 +363,10 @@ class FuzzyExprNamespace:
                 return_dtype=pl.Int64,
             )
         else:
-            return (
-                pl.struct([self._expr.alias("_left"), other.alias("_right")])
-                .map_elements(
-                    lambda row: dist_func(
-                        str(row["_left"]) if row["_left"] is not None else "",
-                        str(row["_right"]) if row["_right"] is not None else "",
-                    ),
-                    return_dtype=pl.Int64,
-                )
+            return pl.struct([self._expr.alias("_left"), other.alias("_right")]).map_elements(
+                lambda row: dist_func(
+                    str(row["_left"]) if row["_left"] is not None else "",
+                    str(row["_right"]) if row["_right"] is not None else "",
+                ),
+                return_dtype=pl.Int64,
             )

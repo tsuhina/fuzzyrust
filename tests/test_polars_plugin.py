@@ -14,9 +14,9 @@ import pytest
 
 import fuzzyrust as fr
 from fuzzyrust._plugin import (
+    _find_plugin_lib,
     is_plugin_available,
     use_native_plugin,
-    _find_plugin_lib,
 )
 
 
@@ -46,9 +46,10 @@ class TestPluginDetection:
             use_native_plugin(True)  # Reset to re-check
 
             # Check it's disabled
-            from fuzzyrust._plugin import _PLUGIN_AVAILABLE
             # Force re-evaluation by resetting the cached value
             import fuzzyrust._plugin as plugin_module
+            from fuzzyrust._plugin import _PLUGIN_AVAILABLE
+
             plugin_module._PLUGIN_AVAILABLE = None
 
             assert not is_plugin_available(), "Plugin should be disabled"
@@ -85,14 +86,14 @@ class TestPluginSimilarity:
 
     def test_similarity_column_to_column(self):
         """Test similarity between two columns using plugin."""
-        df = pl.DataFrame({
-            "left": ["hello", "world", "test", "fuzzy"],
-            "right": ["hallo", "word", "testing", "fuzzi"],
-        })
-
-        result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world", "test", "fuzzy"],
+                "right": ["hallo", "word", "testing", "fuzzi"],
+            }
         )
+
+        result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right")))
 
         assert "score" in result.columns
         assert len(result) == 4
@@ -103,37 +104,38 @@ class TestPluginSimilarity:
 
     def test_similarity_matches_fallback(self):
         """Verify plugin results match fallback implementation."""
-        df = pl.DataFrame({
-            "left": ["hello", "world", "test", "John Smith"],
-            "right": ["hallo", "word", "testing", "Jon Smith"],
-        })
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world", "test", "John Smith"],
+                "right": ["hallo", "word", "testing", "Jon Smith"],
+            }
+        )
 
         # Get plugin results
         use_native_plugin(True)
-        plugin_result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
-        )
+        plugin_result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right")))
 
         # Get fallback results by computing manually
         fallback_scores = [
-            fr.jaro_winkler_similarity(left, right)
-            for left, right in zip(df["left"], df["right"])
+            fr.jaro_winkler_similarity(left, right) for left, right in zip(df["left"], df["right"])
         ]
 
         # Compare
-        for i, (plugin_score, fallback_score) in enumerate(zip(
-            plugin_result["score"], fallback_scores
-        )):
-            assert abs(plugin_score - fallback_score) < 1e-10, (
-                f"Mismatch at row {i}: plugin={plugin_score}, fallback={fallback_score}"
-            )
+        for i, (plugin_score, fallback_score) in enumerate(
+            zip(plugin_result["score"], fallback_scores)
+        ):
+            assert (
+                abs(plugin_score - fallback_score) < 1e-10
+            ), f"Mismatch at row {i}: plugin={plugin_score}, fallback={fallback_score}"
 
     def test_similarity_different_algorithms(self):
         """Test similarity with different algorithms."""
-        df = pl.DataFrame({
-            "left": ["kitten", "saturday"],
-            "right": ["sitting", "sunday"],
-        })
+        df = pl.DataFrame(
+            {
+                "left": ["kitten", "saturday"],
+                "right": ["sitting", "sunday"],
+            }
+        )
 
         algorithms = ["levenshtein", "jaro", "jaro_winkler", "ngram", "cosine"]
 
@@ -148,14 +150,14 @@ class TestPluginSimilarity:
 
     def test_similarity_with_nulls(self):
         """Test similarity handles null values correctly."""
-        df = pl.DataFrame({
-            "left": ["hello", None, "test"],
-            "right": ["hallo", "world", None],
-        })
-
-        result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
+        df = pl.DataFrame(
+            {
+                "left": ["hello", None, "test"],
+                "right": ["hallo", "world", None],
+            }
         )
+
+        result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right")))
 
         # First row should have a valid score
         assert result["score"][0] is not None
@@ -171,10 +173,12 @@ class TestPluginIsMatch:
 
     def test_is_similar_column_to_column(self):
         """Test is_similar between two columns."""
-        df = pl.DataFrame({
-            "left": ["hello", "world", "xyz"],
-            "right": ["hallo", "word", "abc"],
-        })
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world", "xyz"],
+                "right": ["hallo", "word", "abc"],
+            }
+        )
 
         result = df.with_columns(
             is_match=pl.col("left").fuzzy.is_similar(pl.col("right"), min_similarity=0.8)
@@ -190,10 +194,12 @@ class TestPluginIsMatch:
 
     def test_is_similar_threshold_filtering(self):
         """Test that threshold correctly filters matches."""
-        df = pl.DataFrame({
-            "left": ["test", "test", "test"],
-            "right": ["test", "tset", "abcd"],  # exact, typo, different
-        })
+        df = pl.DataFrame(
+            {
+                "left": ["test", "test", "test"],
+                "right": ["test", "tset", "abcd"],  # exact, typo, different
+            }
+        )
 
         result = df.with_columns(
             match_90=pl.col("left").fuzzy.is_similar(pl.col("right"), min_similarity=0.9),
@@ -219,14 +225,14 @@ class TestPluginDistance:
 
     def test_distance_column_to_column(self):
         """Test distance between two columns."""
-        df = pl.DataFrame({
-            "left": ["hello", "world", "test"],
-            "right": ["hallo", "word", "test"],
-        })
-
-        result = df.with_columns(
-            dist=pl.col("left").fuzzy.distance(pl.col("right"))
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world", "test"],
+                "right": ["hallo", "word", "test"],
+            }
         )
+
+        result = df.with_columns(dist=pl.col("left").fuzzy.distance(pl.col("right")))
 
         assert "dist" in result.columns
 
@@ -239,20 +245,17 @@ class TestPluginDistance:
 
     def test_distance_matches_fallback(self):
         """Verify distance results match fallback."""
-        df = pl.DataFrame({
-            "left": ["kitten", "saturday"],
-            "right": ["sitting", "sunday"],
-        })
-
-        result = df.with_columns(
-            dist=pl.col("left").fuzzy.distance(pl.col("right"))
+        df = pl.DataFrame(
+            {
+                "left": ["kitten", "saturday"],
+                "right": ["sitting", "sunday"],
+            }
         )
 
+        result = df.with_columns(dist=pl.col("left").fuzzy.distance(pl.col("right")))
+
         # Compare with direct function calls
-        expected = [
-            fr.levenshtein(df["left"][i], df["right"][i])
-            for i in range(len(df))
-        ]
+        expected = [fr.levenshtein(df["left"][i], df["right"][i]) for i in range(len(df))]
 
         for i, (actual, exp) in enumerate(zip(result["dist"], expected)):
             assert actual == exp, f"Mismatch at row {i}: got {actual}, expected {exp}"
@@ -267,13 +270,13 @@ class TestPluginPhonetic:
 
     def test_soundex(self):
         """Test Soundex encoding via plugin."""
-        df = pl.DataFrame({
-            "name": ["Robert", "Rupert", "Smith", "Smyth"],
-        })
-
-        result = df.with_columns(
-            soundex=pl.col("name").fuzzy.phonetic("soundex")
+        df = pl.DataFrame(
+            {
+                "name": ["Robert", "Rupert", "Smith", "Smyth"],
+            }
         )
+
+        result = df.with_columns(soundex=pl.col("name").fuzzy.phonetic("soundex"))
 
         assert "soundex" in result.columns
 
@@ -284,13 +287,13 @@ class TestPluginPhonetic:
 
     def test_metaphone(self):
         """Test Metaphone encoding via plugin."""
-        df = pl.DataFrame({
-            "word": ["phone", "Stephen", "knight"],
-        })
-
-        result = df.with_columns(
-            metaphone=pl.col("word").fuzzy.phonetic("metaphone")
+        df = pl.DataFrame(
+            {
+                "word": ["phone", "Stephen", "knight"],
+            }
         )
+
+        result = df.with_columns(metaphone=pl.col("word").fuzzy.phonetic("metaphone"))
 
         assert "metaphone" in result.columns
 
@@ -300,29 +303,27 @@ class TestPluginPhonetic:
 
     def test_phonetic_matches_fallback(self):
         """Verify phonetic results match direct function calls."""
-        df = pl.DataFrame({
-            "name": ["John", "Jane", "Katherine", "Catherine"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John", "Jane", "Katherine", "Catherine"],
+            }
+        )
 
         # Soundex
-        result_soundex = df.with_columns(
-            code=pl.col("name").fuzzy.phonetic("soundex")
-        )
+        result_soundex = df.with_columns(code=pl.col("name").fuzzy.phonetic("soundex"))
         for i, name in enumerate(df["name"]):
             expected = fr.soundex(name)
-            assert result_soundex["code"][i] == expected, (
-                f"Soundex mismatch for {name}: got {result_soundex['code'][i]}, expected {expected}"
-            )
+            assert (
+                result_soundex["code"][i] == expected
+            ), f"Soundex mismatch for {name}: got {result_soundex['code'][i]}, expected {expected}"
 
         # Metaphone
-        result_metaphone = df.with_columns(
-            code=pl.col("name").fuzzy.phonetic("metaphone")
-        )
+        result_metaphone = df.with_columns(code=pl.col("name").fuzzy.phonetic("metaphone"))
         for i, name in enumerate(df["name"]):
             expected = fr.metaphone(name)
-            assert result_metaphone["code"][i] == expected, (
-                f"Metaphone mismatch for {name}: got {result_metaphone['code'][i]}, expected {expected}"
-            )
+            assert (
+                result_metaphone["code"][i] == expected
+            ), f"Metaphone mismatch for {name}: got {result_metaphone['code'][i]}, expected {expected}"
 
 
 class TestPluginExpressionIntegration:
@@ -334,26 +335,28 @@ class TestPluginExpressionIntegration:
 
     def test_chained_operations(self):
         """Test plugin works in chained expression operations."""
-        df = pl.DataFrame({
-            "name": ["John Smith", "Jon Smith", "Jane Doe"],
-            "ref": ["John Smith", "John Smith", "John Smith"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John Smith", "Jon Smith", "Jane Doe"],
+                "ref": ["John Smith", "John Smith", "John Smith"],
+            }
+        )
 
         result = df.with_columns(
             score=pl.col("name").fuzzy.similarity(pl.col("ref")),
-        ).filter(
-            pl.col("score") > 0.8
-        )
+        ).filter(pl.col("score") > 0.8)
 
         # John Smith exact match and Jon Smith should pass 0.8 threshold
         assert len(result) >= 2
 
     def test_multiple_fuzzy_columns(self):
         """Test multiple fuzzy operations in same query."""
-        df = pl.DataFrame({
-            "name1": ["hello", "world"],
-            "name2": ["hallo", "word"],
-        })
+        df = pl.DataFrame(
+            {
+                "name1": ["hello", "world"],
+                "name2": ["hallo", "word"],
+            }
+        )
 
         result = df.with_columns(
             sim=pl.col("name1").fuzzy.similarity(pl.col("name2")),
@@ -367,14 +370,14 @@ class TestPluginExpressionIntegration:
 
     def test_lazy_frame_support(self):
         """Test plugin works with lazy DataFrames."""
-        df = pl.DataFrame({
-            "left": ["hello", "world"],
-            "right": ["hallo", "word"],
-        }).lazy()
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world"],
+                "right": ["hallo", "word"],
+            }
+        ).lazy()
 
-        result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
-        ).collect()
+        result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right"))).collect()
 
         assert "score" in result.columns
         assert len(result) == 2
@@ -390,14 +393,14 @@ class TestPluginPerformance:
     def test_medium_dataset(self):
         """Test plugin handles medium-sized datasets."""
         n = 1000
-        df = pl.DataFrame({
-            "left": [f"string_{i}" for i in range(n)],
-            "right": [f"string_{i+1}" for i in range(n)],
-        })
-
-        result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
+        df = pl.DataFrame(
+            {
+                "left": [f"string_{i}" for i in range(n)],
+                "right": [f"string_{i+1}" for i in range(n)],
+            }
         )
+
+        result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right")))
 
         assert len(result) == n
         # All scores should be valid
@@ -406,21 +409,22 @@ class TestPluginPerformance:
 
     def test_plugin_vs_fallback_consistency(self):
         """Verify plugin and fallback produce identical results."""
-        df = pl.DataFrame({
-            "left": [f"test_{i}" for i in range(100)],
-            "right": [f"test_{i+5}" for i in range(100)],
-        })
+        df = pl.DataFrame(
+            {
+                "left": [f"test_{i}" for i in range(100)],
+                "right": [f"test_{i+5}" for i in range(100)],
+            }
+        )
 
         # Plugin results
         use_native_plugin(True)
-        plugin_result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
-        )["score"].to_list()
+        plugin_result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right")))[
+            "score"
+        ].to_list()
 
         # Fallback results (compute manually)
         fallback_result = [
-            fr.jaro_winkler_similarity(df["left"][i], df["right"][i])
-            for i in range(len(df))
+            fr.jaro_winkler_similarity(df["left"][i], df["right"][i]) for i in range(len(df))
         ]
 
         # Should be identical within floating point tolerance
@@ -435,14 +439,14 @@ class TestFallbackBehavior:
         """Test similarity works when plugin is disabled."""
         use_native_plugin(False)
 
-        df = pl.DataFrame({
-            "left": ["hello", "world"],
-            "right": ["hallo", "word"],
-        })
-
-        result = df.with_columns(
-            score=pl.col("left").fuzzy.similarity(pl.col("right"))
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world"],
+                "right": ["hallo", "word"],
+            }
         )
+
+        result = df.with_columns(score=pl.col("left").fuzzy.similarity(pl.col("right")))
 
         assert "score" in result.columns
         # Should still produce valid results
@@ -454,14 +458,14 @@ class TestFallbackBehavior:
 
     def test_literal_comparison_always_uses_fallback(self):
         """Test that literal string comparisons use fallback (not plugin)."""
-        df = pl.DataFrame({
-            "name": ["John", "Jon", "Jane"],
-        })
+        df = pl.DataFrame(
+            {
+                "name": ["John", "Jon", "Jane"],
+            }
+        )
 
         # Literal comparison should work regardless of plugin state
-        result = df.with_columns(
-            score=pl.col("name").fuzzy.similarity("John")
-        )
+        result = df.with_columns(score=pl.col("name").fuzzy.similarity("John"))
 
         assert "score" in result.columns
         # John vs John should be 1.0

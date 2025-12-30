@@ -15,17 +15,11 @@ use thiserror::Error;
 pub enum ColumnError {
     /// Attempted to push wrong type to column
     #[error("Type mismatch: attempted to push {attempted} to {expected} column")]
-    TypeMismatch {
-        expected: String,
-        attempted: String,
-    },
+    TypeMismatch { expected: String, attempted: String },
 
     /// Attempted to get wrong type from column
     #[error("Type mismatch: attempted to get {attempted} from {expected} column")]
-    GetTypeMismatch {
-        expected: String,
-        attempted: String,
-    },
+    GetTypeMismatch { expected: String, attempted: String },
 
     /// Index out of bounds
     #[error("Index {0} out of bounds for column of length {1}")]
@@ -280,7 +274,11 @@ impl OptimizedStorage {
     }
 
     /// Add a column for a field
-    pub fn add_column(&mut self, field_name: impl Into<String>, field_type: super::types::FieldType) {
+    pub fn add_column(
+        &mut self,
+        field_name: impl Into<String>,
+        field_type: super::types::FieldType,
+    ) {
         let field_name = field_name.into();
         let index = self.columns.len();
 
@@ -387,9 +385,7 @@ impl OptimizedStorage {
         match column {
             FieldColumn::Text(vec) => vec.get(record_id)?.as_ref().cloned(),
             FieldColumn::Tokens(vec) => {
-                vec.get(record_id)?
-                    .as_ref()
-                    .map(|tokens| tokens.join(", "))
+                vec.get(record_id)?.as_ref().map(|tokens| tokens.join(", "))
             }
         }
     }
@@ -465,7 +461,9 @@ mod tests {
     #[test]
     fn test_field_column_tokens() {
         let mut column = FieldColumn::new_tokens();
-        column.push_tokens(Some(vec!["tag1".to_string(), "tag2".to_string()])).unwrap();
+        column
+            .push_tokens(Some(vec!["tag1".to_string(), "tag2".to_string()]))
+            .unwrap();
         column.push_tokens(None).unwrap();
 
         assert_eq!(column.len(), 2);
@@ -513,10 +511,7 @@ mod tests {
         assert_eq!(retrieved2.get_field("name").unwrap(), "Bob");
 
         // Get specific field value
-        assert_eq!(
-            storage.get_field_value(id1, "name").unwrap(),
-            "Alice"
-        );
+        assert_eq!(storage.get_field_value(id1, "name").unwrap(), "Alice");
     }
 
     #[test]

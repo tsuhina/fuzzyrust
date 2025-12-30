@@ -32,11 +32,21 @@ pub struct SearchResult {
 
 impl SearchResult {
     pub fn new(id: usize, text: String, distance: usize) -> Self {
-        Self { id, text, distance, data: None }
+        Self {
+            id,
+            text,
+            distance,
+            data: None,
+        }
     }
 
     pub fn with_data(id: usize, text: String, distance: usize, data: u64) -> Self {
-        Self { id, text, distance, data: Some(data) }
+        Self {
+            id,
+            text,
+            distance,
+            data: Some(data),
+        }
     }
 }
 
@@ -118,14 +128,14 @@ impl BkTree {
             crate::algorithms::levenshtein::levenshtein(a, b)
         }))
     }
-    
+
     /// Create a new BK-tree with Damerau-Levenshtein distance
     pub fn with_damerau() -> Self {
         Self::with_distance(Arc::new(|a: &str, b: &str| {
             crate::algorithms::damerau::damerau_levenshtein(a, b)
         }))
     }
-    
+
     /// Create a new BK-tree with a custom distance function
     pub fn with_distance(distance_fn: DistanceFn) -> Self {
         Self {
@@ -202,7 +212,9 @@ impl BkTree {
             // ID increment with overflow check in debug mode
             #[cfg(debug_assertions)]
             {
-                self.next_id = self.next_id.checked_add(1)
+                self.next_id = self
+                    .next_id
+                    .checked_add(1)
                     .expect("BK-tree ID overflow - this should never happen in practice");
             }
             #[cfg(not(debug_assertions))]
@@ -254,7 +266,9 @@ impl BkTree {
                     // ID increment with overflow check in debug mode
                     #[cfg(debug_assertions)]
                     {
-                        self.next_id = self.next_id.checked_add(1)
+                        self.next_id = self
+                            .next_id
+                            .checked_add(1)
                             .expect("BK-tree ID overflow - this should never happen in practice");
                     }
                     #[cfg(not(debug_assertions))]
@@ -266,7 +280,7 @@ impl BkTree {
             }
         }
     }
-    
+
     /// Add multiple strings at once
     pub fn add_all<I, S>(&mut self, iter: I)
     where
@@ -277,20 +291,20 @@ impl BkTree {
             self.add(text);
         }
     }
-    
+
     /// Search for strings within a given distance
     pub fn search(&self, query: &str, max_distance: usize) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        
+
         if let Some(root) = &self.root {
             self.search_recursive(root, query, max_distance, &mut results);
         }
-        
+
         // Sort by distance
         results.sort_by_key(|r| r.distance);
         results
     }
-    
+
     fn search_recursive(
         &self,
         node: &BkNode,
@@ -320,7 +334,7 @@ impl BkTree {
             }
         }
     }
-    
+
     /// Find the k nearest neighbors
     pub fn find_nearest(&self, query: &str, k: usize) -> Vec<SearchResult> {
         if self.root.is_none() || k == 0 {
@@ -351,7 +365,7 @@ impl BkTree {
         results.truncate(k);
         results
     }
-    
+
     /// Check if the tree contains an exact match
     pub fn contains(&self, query: &str) -> bool {
         if let Some(root) = &self.root {
@@ -360,7 +374,7 @@ impl BkTree {
             false
         }
     }
-    
+
     fn contains_recursive(&self, node: &BkNode, query: &str) -> bool {
         let dist = (self.distance_fn)(query, &node.text);
 
@@ -375,17 +389,17 @@ impl BkTree {
             false
         }
     }
-    
+
     /// Get the number of items in the tree
     pub fn len(&self) -> usize {
         self.size
     }
-    
+
     /// Check if tree is empty
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
-    
+
     /// Clear the tree
     pub fn clear(&mut self) {
         self.root = None;
@@ -426,18 +440,20 @@ impl BkTree {
     /// let tree = BkTree::from_bytes(&bytes)?;
     /// ```
     pub fn from_bytes(data: &[u8]) -> Result<Self, bincode::Error> {
-        Self::from_bytes_with_distance(data, Arc::new(|a: &str, b: &str| {
-            crate::algorithms::levenshtein::levenshtein(a, b)
-        }))
+        Self::from_bytes_with_distance(
+            data,
+            Arc::new(|a: &str, b: &str| crate::algorithms::levenshtein::levenshtein(a, b)),
+        )
     }
 
     /// Deserialize a tree from bytes using Damerau-Levenshtein distance.
     ///
     /// Use this when the tree was originally created with `BkTree::with_damerau()`.
     pub fn from_bytes_damerau(data: &[u8]) -> Result<Self, bincode::Error> {
-        Self::from_bytes_with_distance(data, Arc::new(|a: &str, b: &str| {
-            crate::algorithms::damerau::damerau_levenshtein(a, b)
-        }))
+        Self::from_bytes_with_distance(
+            data,
+            Arc::new(|a: &str, b: &str| crate::algorithms::damerau::damerau_levenshtein(a, b)),
+        )
     }
 
     /// Deserialize a tree from bytes with a custom distance function.
@@ -538,7 +554,8 @@ impl BkTree {
     /// Item IDs will be reassigned during compaction.
     pub fn compact(&mut self) {
         // Collect all non-deleted items
-        let items: Vec<(String, Option<u64>)> = self.iter_active()
+        let items: Vec<(String, Option<u64>)> = self
+            .iter_active()
             .map(|(text, data)| (text.to_string(), data))
             .collect();
 
@@ -639,16 +656,20 @@ impl BkTree {
 
         // Also check the root node and nodes along the path to subtree roots
         let mut root_path_results = Vec::new();
-        self.search_root_path(root, query, max_distance, PARALLEL_SEARCH_DEPTH, &mut root_path_results);
+        self.search_root_path(
+            root,
+            query,
+            max_distance,
+            PARALLEL_SEARCH_DEPTH,
+            &mut root_path_results,
+        );
 
         // Search each subtree in parallel
         // Wrap raw pointers in a newtype that implements Send to enable parallel iteration
         let query_owned = query.to_string();
         let distance_fn = self.distance_fn.clone();
-        let sendable_roots: Vec<SendableNodePtr> = subtree_roots
-            .into_iter()
-            .map(SendableNodePtr)
-            .collect();
+        let sendable_roots: Vec<SendableNodePtr> =
+            subtree_roots.into_iter().map(SendableNodePtr).collect();
 
         let parallel_results: Vec<SearchResult> = sendable_roots
             .into_par_iter()
@@ -656,7 +677,13 @@ impl BkTree {
                 // SAFETY: We only read from the tree and nodes are not modified during search
                 let node = unsafe { &*node_ptr };
                 let mut results = Vec::new();
-                Self::search_subtree_recursive(node, &query_owned, max_distance, &distance_fn, &mut results);
+                Self::search_subtree_recursive(
+                    node,
+                    &query_owned,
+                    max_distance,
+                    &distance_fn,
+                    &mut results,
+                );
                 results
             })
             .collect();
@@ -738,7 +765,13 @@ impl BkTree {
 
         for (&child_dist, child_node) in &node.children {
             if child_dist >= min_dist && child_dist <= max_dist {
-                self.search_root_path(child_node, query, max_distance, remaining_depth - 1, results);
+                self.search_root_path(
+                    child_node,
+                    query,
+                    max_distance,
+                    remaining_depth - 1,
+                    results,
+                );
             }
         }
     }
@@ -769,7 +802,13 @@ impl BkTree {
 
         for (&child_dist, child_node) in &node.children {
             if child_dist >= min_dist && child_dist <= max_dist {
-                Self::search_subtree_recursive(child_node, query, max_distance, distance_fn, results);
+                Self::search_subtree_recursive(
+                    child_node,
+                    query,
+                    max_distance,
+                    distance_fn,
+                    results,
+                );
             }
         }
     }

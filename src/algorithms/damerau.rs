@@ -45,7 +45,9 @@ impl DamerauLevenshtein {
 
     #[must_use]
     pub fn with_max_distance(max_distance: usize) -> Self {
-        Self { max_distance: Some(max_distance) }
+        Self {
+            max_distance: Some(max_distance),
+        }
     }
 
     /// Compute distance with proper Option semantics.
@@ -81,8 +83,14 @@ impl EditDistance for DamerauLevenshtein {
 /// This version doesn't allow multiple edits on the same substring.
 #[inline]
 #[must_use]
-pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Option<usize>) -> Option<usize> {
-    if a == b { return Some(0); }
+pub fn damerau_levenshtein_distance_bounded(
+    a: &str,
+    b: &str,
+    max_distance: Option<usize>,
+) -> Option<usize> {
+    if a == b {
+        return Some(0);
+    }
 
     // Use SmallVec to avoid heap allocation for typical string lengths
     let a_chars: SmallVec<[char; 64]> = a.chars().collect();
@@ -91,8 +99,12 @@ pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Opti
     let m = a_chars.len();
     let n = b_chars.len();
 
-    if m == 0 { return Some(n); }
-    if n == 0 { return Some(m); }
+    if m == 0 {
+        return Some(n);
+    }
+    if n == 0 {
+        return Some(m);
+    }
 
     if let Some(max_d) = max_distance {
         if m.abs_diff(n) > max_d {
@@ -110,14 +122,19 @@ pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Opti
         let mut row_min = i;
 
         for j in 1..=n {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
 
-            curr_row[j] = (prev_row[j] + 1)              // deletion
-                .min(curr_row[j - 1] + 1)                // insertion
-                .min(prev_row[j - 1] + cost);            // substitution
+            curr_row[j] = (prev_row[j] + 1) // deletion
+                .min(curr_row[j - 1] + 1) // insertion
+                .min(prev_row[j - 1] + cost); // substitution
 
             // Transposition check
-            if i > 1 && j > 1
+            if i > 1
+                && j > 1
                 && a_chars[i - 1] == b_chars[j - 2]
                 && a_chars[i - 2] == b_chars[j - 1]
             {
@@ -147,7 +164,10 @@ pub fn damerau_levenshtein_distance_bounded(a: &str, b: &str, max_distance: Opti
 /// This function returns `usize::MAX` when threshold is exceeded.
 #[inline]
 #[must_use]
-#[deprecated(since = "0.2.0", note = "Use damerau_levenshtein_distance_bounded for proper Option semantics")]
+#[deprecated(
+    since = "0.2.0",
+    note = "Use damerau_levenshtein_distance_bounded for proper Option semantics"
+)]
 pub fn damerau_levenshtein_distance(a: &str, b: &str, max_distance: Option<usize>) -> usize {
     damerau_levenshtein_distance_bounded(a, b, max_distance).unwrap_or(usize::MAX)
 }
@@ -166,8 +186,12 @@ pub fn true_damerau_levenshtein(a: &str, b: &str) -> usize {
     let m = a_chars.len();
     let n = b_chars.len();
 
-    if m == 0 { return n; }
-    if n == 0 { return m; }
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
 
     // For very long strings, fall back to space-efficient algorithm
     // to prevent DoS via excessive memory allocation (O(m*n) space)
@@ -208,9 +232,9 @@ pub fn true_damerau_levenshtein(a: &str, b: &str) -> usize {
                 1
             };
 
-            d[i + 1][j + 1] = (d[i][j] + cost)           // substitution
-                .min(d[i + 1][j] + 1)                    // insertion
-                .min(d[i][j + 1] + 1)                    // deletion
+            d[i + 1][j + 1] = (d[i][j] + cost) // substitution
+                .min(d[i + 1][j] + 1) // insertion
+                .min(d[i][j + 1] + 1) // deletion
                 .min(d[i1][j1] + (i - i1 - 1) + 1 + (j - j1 - 1)); // transposition
         }
 
@@ -262,11 +286,20 @@ mod tests {
     #[test]
     fn test_damerau_bounded_returns_none_when_exceeded() {
         // Exceeds threshold - returns None
-        assert_eq!(damerau_levenshtein_distance_bounded("abcdef", "ghijkl", Some(3)), None);
+        assert_eq!(
+            damerau_levenshtein_distance_bounded("abcdef", "ghijkl", Some(3)),
+            None
+        );
         // Within threshold - returns actual distance
-        assert_eq!(damerau_levenshtein_distance_bounded("abc", "acb", Some(2)), Some(1));
+        assert_eq!(
+            damerau_levenshtein_distance_bounded("abc", "acb", Some(2)),
+            Some(1)
+        );
         // Equal strings always return Some(0)
-        assert_eq!(damerau_levenshtein_distance_bounded("abc", "abc", Some(0)), Some(0));
+        assert_eq!(
+            damerau_levenshtein_distance_bounded("abc", "abc", Some(0)),
+            Some(0)
+        );
     }
 
     #[test]

@@ -5,18 +5,20 @@ from typing import Union
 from fuzzyrust.enums import Algorithm
 
 # Valid algorithm names (lowercase)
-VALID_ALGORITHMS = frozenset({
-    "levenshtein",
-    "damerau_levenshtein",
-    "jaro",
-    "jaro_winkler",
-    "ngram",
-    "bigram",
-    "trigram",
-    "lcs",
-    "cosine",
-    "jaccard",  # Also valid for some functions
-})
+VALID_ALGORITHMS = frozenset(
+    {
+        "levenshtein",
+        "damerau_levenshtein",
+        "jaro",
+        "jaro_winkler",
+        "ngram",
+        "bigram",
+        "trigram",
+        "lcs",
+        "cosine",
+        "jaccard",  # Also valid for some functions
+    }
+)
 
 
 def normalize_algorithm(algorithm: Union[str, Algorithm]) -> str:
@@ -55,9 +57,7 @@ def normalize_algorithm(algorithm: Union[str, Algorithm]) -> str:
             f"Valid options: {sorted(VALID_ALGORITHMS | enum_values)}"
         )
 
-    raise TypeError(
-        f"algorithm must be str or Algorithm enum, got {type(algorithm).__name__}"
-    )
+    raise TypeError(f"algorithm must be str or Algorithm enum, got {type(algorithm).__name__}")
 
 
 __all__ = ["normalize_algorithm", "VALID_ALGORITHMS"]

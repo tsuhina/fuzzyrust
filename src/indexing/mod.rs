@@ -9,10 +9,10 @@
 pub mod bktree;
 pub mod ngram_index;
 pub mod schema;
-pub mod threadsafe;
 pub mod sharded;
+pub mod threadsafe;
 
 pub use bktree::*;
 pub use ngram_index::*;
-pub use threadsafe::*;
 pub use sharded::*;
+pub use threadsafe::*;

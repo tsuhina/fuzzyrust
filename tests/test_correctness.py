@@ -8,11 +8,11 @@ Compares FuzzyRust results with established libraries:
 These tests ensure mathematical correctness and compatibility.
 """
 
+import jellyfish
 import pytest
 import rapidfuzz
 from rapidfuzz import distance as rf_distance
 from rapidfuzz import fuzz as rf_fuzz
-import jellyfish
 
 import fuzzyrust as fr
 
@@ -38,15 +38,18 @@ class TestLevenshteinCorrectness:
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.levenshtein(s1, s2)
             rf_result = rf_distance.Levenshtein.distance(s1, s2)
-            assert fr_result == rf_result, f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
+            assert (
+                fr_result == rf_result
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
 
     def test_levenshtein_similarity_matches_rapidfuzz(self):
         """Levenshtein similarity should match RapidFuzz."""
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.levenshtein_similarity(s1, s2)
             rf_result = rf_distance.Levenshtein.normalized_similarity(s1, s2)
-            assert fr_result == pytest.approx(rf_result, abs=0.001), \
-                f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
+            assert fr_result == pytest.approx(
+                rf_result, abs=0.001
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
 
 
 class TestDamerauLevenshteinCorrectness:
@@ -70,8 +73,9 @@ class TestDamerauLevenshteinCorrectness:
             fr_result = fr.damerau_levenshtein(s1, s2)
             rf_result = rf_distance.DamerauLevenshtein.distance(s1, s2)
             # Allow small differences due to OSA vs true Damerau-Levenshtein
-            assert abs(fr_result - rf_result) <= 1, \
-                f"Large mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
+            assert (
+                abs(fr_result - rf_result) <= 1
+            ), f"Large mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
 
     def test_damerau_vs_levenshtein_transposition(self):
         """Damerau-Levenshtein should count transposition as 1 edit."""
@@ -98,16 +102,18 @@ class TestJaroCorrectness:
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.jaro_similarity(s1, s2)
             rf_result = rf_distance.Jaro.similarity(s1, s2)
-            assert fr_result == pytest.approx(rf_result, abs=0.001), \
-                f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
+            assert fr_result == pytest.approx(
+                rf_result, abs=0.001
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
 
     def test_jaro_matches_jellyfish(self):
         """Jaro similarity should match Jellyfish."""
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.jaro_similarity(s1, s2)
             jf_result = jellyfish.jaro_similarity(s1, s2)
-            assert fr_result == pytest.approx(jf_result, abs=0.001), \
-                f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {jf_result}"
+            assert fr_result == pytest.approx(
+                jf_result, abs=0.001
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {jf_result}"
 
 
 class TestJaroWinklerCorrectness:
@@ -125,16 +131,18 @@ class TestJaroWinklerCorrectness:
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.jaro_winkler_similarity(s1, s2)
             rf_result = rf_distance.JaroWinkler.similarity(s1, s2)
-            assert fr_result == pytest.approx(rf_result, abs=0.01), \
-                f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
+            assert fr_result == pytest.approx(
+                rf_result, abs=0.01
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
 
     def test_jaro_winkler_matches_jellyfish(self):
         """Jaro-Winkler should match Jellyfish."""
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.jaro_winkler_similarity(s1, s2)
             jf_result = jellyfish.jaro_winkler_similarity(s1, s2)
-            assert fr_result == pytest.approx(jf_result, abs=0.01), \
-                f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {jf_result}"
+            assert fr_result == pytest.approx(
+                jf_result, abs=0.01
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {jf_result}"
 
 
 class TestHammingCorrectness:
@@ -152,14 +160,18 @@ class TestHammingCorrectness:
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.hamming(s1, s2)
             rf_result = rf_distance.Hamming.distance(s1, s2)
-            assert fr_result == rf_result, f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
+            assert (
+                fr_result == rf_result
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {rf_result}"
 
     def test_hamming_matches_jellyfish(self):
         """Hamming distance should match Jellyfish."""
         for s1, s2 in self.TEST_PAIRS:
             fr_result = fr.hamming(s1, s2)
             jf_result = jellyfish.hamming_distance(s1, s2)
-            assert fr_result == jf_result, f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {jf_result}"
+            assert (
+                fr_result == jf_result
+            ), f"Mismatch for {s1!r}, {s2!r}: {fr_result} vs {jf_result}"
 
 
 class TestSoundexCorrectness:
@@ -194,8 +206,9 @@ class TestSoundexCorrectness:
             ("Smith", "Smythe"),
         ]
         for name1, name2 in similar_pairs:
-            assert fr.soundex(name1) == fr.soundex(name2), \
-                f"{name1} and {name2} should have same Soundex"
+            assert fr.soundex(name1) == fr.soundex(
+                name2
+            ), f"{name1} and {name2} should have same Soundex"
 
 
 class TestMetaphoneCorrectness:
@@ -219,7 +232,9 @@ class TestMetaphoneCorrectness:
         """Metaphone should produce non-empty output for words."""
         for word in self.TEST_WORDS:
             result = fr.metaphone(word)
-            assert isinstance(result, str), f"Expected str, got {type(result).__name__} for {word!r}"
+            assert isinstance(
+                result, str
+            ), f"Expected str, got {type(result).__name__} for {word!r}"
             assert len(result) > 0, f"Empty metaphone for {word!r}"
 
     def test_metaphone_similar_sounds(self):
@@ -261,8 +276,9 @@ class TestRatioCorrectness:
             result = fr.ratio(s1, s2)
             rf_result = rf_fuzz.ratio(s1, s2) / 100.0  # Convert RapidFuzz to 0.0-1.0 scale
             min_expected, max_expected = expected_ranges[(s1, s2)]
-            assert min_expected <= result <= max_expected, \
-                f"ratio({s1!r}, {s2!r}) = {result}, expected in [{min_expected}, {max_expected}], RapidFuzz = {rf_result}"
+            assert (
+                min_expected <= result <= max_expected
+            ), f"ratio({s1!r}, {s2!r}) = {result}, expected in [{min_expected}, {max_expected}], RapidFuzz = {rf_result}"
 
     def test_partial_ratio_reasonable_values(self):
         """partial_ratio() should return reasonable values compared to RapidFuzz."""
@@ -270,15 +286,19 @@ class TestRatioCorrectness:
         # partial_ratio finds best partial match, so "hello" in "hello world" should be high
         expected_ranges = {
             ("hello world", "hello"): (0.90, 1.0),  # "hello" is fully contained
-            ("fuzzy wuzzy was a bear", "wuzzy fuzzy was a hare"): (0.70, 0.95),  # Good partial match
+            ("fuzzy wuzzy was a bear", "wuzzy fuzzy was a hare"): (
+                0.70,
+                0.95,
+            ),  # Good partial match
             ("new york mets", "new york yankees"): (0.65, 0.90),  # "new york" matches well
         }
         for s1, s2 in self.TEST_PAIRS:
             result = fr.partial_ratio(s1, s2)
             rf_result = rf_fuzz.partial_ratio(s1, s2) / 100.0  # Convert RapidFuzz to 0.0-1.0 scale
             min_expected, max_expected = expected_ranges[(s1, s2)]
-            assert min_expected <= result <= max_expected, \
-                f"partial_ratio({s1!r}, {s2!r}) = {result}, expected in [{min_expected}, {max_expected}], RapidFuzz = {rf_result}"
+            assert (
+                min_expected <= result <= max_expected
+            ), f"partial_ratio({s1!r}, {s2!r}) = {result}, expected in [{min_expected}, {max_expected}], RapidFuzz = {rf_result}"
 
     def test_token_sort_ratio_reasonable_values(self):
         """token_sort_ratio() should return reasonable values compared to RapidFuzz."""
@@ -295,10 +315,13 @@ class TestRatioCorrectness:
         }
         for s1, s2 in self.TEST_PAIRS:
             result = fr.token_sort_ratio(s1, s2)
-            rf_result = rf_fuzz.token_sort_ratio(s1, s2) / 100.0  # Convert RapidFuzz to 0.0-1.0 scale
+            rf_result = (
+                rf_fuzz.token_sort_ratio(s1, s2) / 100.0
+            )  # Convert RapidFuzz to 0.0-1.0 scale
             min_expected, max_expected = expected_ranges[(s1, s2)]
-            assert min_expected <= result <= max_expected, \
-                f"token_sort_ratio({s1!r}, {s2!r}) = {result}, expected in [{min_expected}, {max_expected}], RapidFuzz = {rf_result}"
+            assert (
+                min_expected <= result <= max_expected
+            ), f"token_sort_ratio({s1!r}, {s2!r}) = {result}, expected in [{min_expected}, {max_expected}], RapidFuzz = {rf_result}"
 
 
 class TestMathematicalProperties:
@@ -344,7 +367,10 @@ class TestMathematicalProperties:
         """All distances should be non-negative and bounded by max string length."""
         # Define expected distances for each pair
         expected = {
-            ("hello", "world"): (4, 4),  # 4 chars differ: h->w, e->o, l->r, o->l, l->d = 4 substitutions
+            ("hello", "world"): (
+                4,
+                4,
+            ),  # 4 chars differ: h->w, e->o, l->r, o->l, l->d = 4 substitutions
             ("", "test"): (4, 4),  # 4 insertions needed
             ("abc", "abc"): (0, 0),  # Identical strings
         }
@@ -352,10 +378,12 @@ class TestMathematicalProperties:
             lev_expected, dam_expected = expected[(s1, s2)]
             lev_result = fr.levenshtein(s1, s2)
             dam_result = fr.damerau_levenshtein(s1, s2)
-            assert lev_result == lev_expected, \
-                f"levenshtein({s1!r}, {s2!r}) = {lev_result}, expected {lev_expected}"
-            assert dam_result == dam_expected, \
-                f"damerau_levenshtein({s1!r}, {s2!r}) = {dam_result}, expected {dam_expected}"
+            assert (
+                lev_result == lev_expected
+            ), f"levenshtein({s1!r}, {s2!r}) = {lev_result}, expected {lev_expected}"
+            assert (
+                dam_result == dam_expected
+            ), f"damerau_levenshtein({s1!r}, {s2!r}) = {dam_result}, expected {dam_expected}"
 
     def test_similarity_bounds(self):
         """Similarity should be in [0, 1] with specific expected ranges for known pairs."""
@@ -370,12 +398,14 @@ class TestMathematicalProperties:
         for s1, s2 in expected_ranges:
             (jw_min, jw_max), (lev_min, lev_max) = expected_ranges[(s1, s2)]
             sim_jw = fr.jaro_winkler_similarity(s1, s2)
-            assert jw_min <= sim_jw <= jw_max, \
-                f"Jaro-Winkler({s1!r}, {s2!r}) = {sim_jw}, expected in [{jw_min}, {jw_max}]"
+            assert (
+                jw_min <= sim_jw <= jw_max
+            ), f"Jaro-Winkler({s1!r}, {s2!r}) = {sim_jw}, expected in [{jw_min}, {jw_max}]"
 
             sim_lev = fr.levenshtein_similarity(s1, s2)
-            assert lev_min <= sim_lev <= lev_max, \
-                f"Levenshtein similarity({s1!r}, {s2!r}) = {sim_lev}, expected in [{lev_min}, {lev_max}]"
+            assert (
+                lev_min <= sim_lev <= lev_max
+            ), f"Levenshtein similarity({s1!r}, {s2!r}) = {sim_lev}, expected in [{lev_min}, {lev_max}]"
 
 
 class TestLCSCorrectness:

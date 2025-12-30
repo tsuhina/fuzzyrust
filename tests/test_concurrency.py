@@ -27,12 +27,16 @@ class TestThreadSafetyDocumentation:
     def test_ngram_index_docstring_warning(self):
         """NgramIndex should have thread safety warning."""
         docstring = fr.NgramIndex.__doc__ or ""
-        assert "thread" in docstring.lower(), "Missing thread-safety warning in NgramIndex docstring"
+        assert (
+            "thread" in docstring.lower()
+        ), "Missing thread-safety warning in NgramIndex docstring"
 
     def test_fuzzy_index_docstring_warning(self):
         """FuzzyIndex should have thread safety warning."""
         docstring = fr.FuzzyIndex.__doc__ or ""
-        assert "thread" in docstring.lower(), "Missing thread-safety warning in FuzzyIndex docstring"
+        assert (
+            "thread" in docstring.lower()
+        ), "Missing thread-safety warning in FuzzyIndex docstring"
 
 
 class TestSeparateIndicesPerThread:
@@ -61,6 +65,7 @@ class TestSeparateIndicesPerThread:
 
     def test_ngram_index_separate_instances(self):
         """Separate NgramIndex instances should work in parallel."""
+
         def worker(thread_id):
             index = fr.NgramIndex(ngram_size=2)
             for i in range(100):
@@ -77,6 +82,7 @@ class TestSeparateIndicesPerThread:
 
     def test_fuzzy_index_separate_instances(self):
         """Separate FuzzyIndex instances should work in parallel."""
+
         def worker(thread_id):
             items = [f"item_{thread_id}_{i}" for i in range(100)]
             index = fr.FuzzyIndex(items, algorithm="ngram")

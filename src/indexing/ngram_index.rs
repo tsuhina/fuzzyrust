@@ -12,10 +12,10 @@
 
 use std::borrow::Cow;
 
+use crate::algorithms::Similarity;
 use ahash::{AHashMap, AHashSet};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::algorithms::Similarity;
 
 // ============================================================================
 // Posting List Compression
@@ -45,7 +45,10 @@ impl CompressedPostingList {
     /// Panics if IDs are not sorted in ascending order.
     pub fn from_sorted_ids(ids: &[usize]) -> Self {
         if ids.is_empty() {
-            return Self { data: Vec::new(), len: 0 };
+            return Self {
+                data: Vec::new(),
+                len: 0,
+            };
         }
 
         // Pre-allocate with estimated size (average ~2 bytes per ID for typical data)
@@ -59,7 +62,10 @@ impl CompressedPostingList {
             prev = id;
         }
 
-        Self { data, len: ids.len() }
+        Self {
+            data,
+            len: ids.len(),
+        }
     }
 
     /// Decode all IDs from the compressed format.
@@ -227,7 +233,12 @@ impl NgramIndex {
     /// * `min_similarity` - Minimum similarity score for search results
     /// * `min_ngram_ratio` - Minimum ratio of query n-grams that must match (0.0 to 1.0)
     /// * `normalize` - Whether to lowercase text for case-insensitive n-gram matching
-    pub fn with_params(n: usize, min_similarity: f64, min_ngram_ratio: f64, normalize: bool) -> Self {
+    pub fn with_params(
+        n: usize,
+        min_similarity: f64,
+        min_ngram_ratio: f64,
+        normalize: bool,
+    ) -> Self {
         // Validate and clamp n-gram size
         let n = if n == 0 { 1 } else { n.min(MAX_NGRAM_SIZE) };
         Self {
@@ -250,12 +261,12 @@ impl NgramIndex {
         s.hash(&mut hasher);
         hasher.finish()
     }
-    
+
     /// Add a string to the index
     pub fn add(&mut self, text: impl Into<String>) -> usize {
         self.add_with_data(text, None)
     }
-    
+
     /// Add a string with associated data
     pub fn add_with_data(&mut self, text: impl Into<String>, data: Option<u64>) -> usize {
         let text = text.into();
@@ -275,10 +286,7 @@ impl NgramIndex {
 
         for ngram in ngrams {
             let hash = Self::hash_string(&ngram);
-            self.index
-                .entry(hash)
-                .or_default()
-                .push(id);
+            self.index.entry(hash).or_default().push(id);
         }
 
         // Store hash -> id mapping for O(1) contains lookup
@@ -290,7 +298,7 @@ impl NgramIndex {
         self.entries.push(IndexEntry { id, text, data });
         id
     }
-    
+
     /// Add multiple strings
     pub fn add_all<I, S>(&mut self, iter: I)
     where
@@ -361,10 +369,7 @@ impl NgramIndex {
             // Add ngrams to index
             for ngram in ngrams {
                 let hash = Self::hash_string(&ngram);
-                self.index
-                    .entry(hash)
-                    .or_default()
-                    .push(id);
+                self.index.entry(hash).or_default().push(id);
             }
 
             // Add to exact lookup
@@ -372,7 +377,11 @@ impl NgramIndex {
             self.exact_lookup.insert(hash, id);
 
             // Add entry
-            self.entries.push(IndexEntry { id, text, data: None });
+            self.entries.push(IndexEntry {
+                id,
+                text,
+                data: None,
+            });
         }
     }
 
@@ -425,10 +434,7 @@ impl NgramIndex {
 
             for ngram in ngrams {
                 let hash = Self::hash_string(&ngram);
-                self.index
-                    .entry(hash)
-                    .or_default()
-                    .push(id);
+                self.index.entry(hash).or_default().push(id);
             }
 
             let hash = Self::hash_string(&normalized);
@@ -437,7 +443,7 @@ impl NgramIndex {
             self.entries.push(IndexEntry { id, text, data });
         }
     }
-    
+
     /// Get candidates that share at least one n-gram with the query
     pub fn get_candidates(&self, query: &str) -> Vec<usize> {
         // Normalize query to match indexed n-grams when normalize is enabled
@@ -468,7 +474,7 @@ impl NgramIndex {
 
         candidate_ids.into_iter().collect()
     }
-    
+
     /// Get candidates with a minimum n-gram overlap ratio
     pub fn get_candidates_with_min_ratio(&self, query: &str, min_ratio: f64) -> Vec<usize> {
         // Normalize query to match indexed n-grams when normalize is enabled
@@ -477,7 +483,9 @@ impl NgramIndex {
         } else {
             query.to_string()
         };
-        let query_ngrams: AHashSet<String> = extract_ngrams(&normalized_query, self.n).into_iter().collect();
+        let query_ngrams: AHashSet<String> = extract_ngrams(&normalized_query, self.n)
+            .into_iter()
+            .collect();
         let query_ngram_count = query_ngrams.len();
 
         if query_ngram_count == 0 {
@@ -517,12 +525,12 @@ impl NgramIndex {
             .map(|(id, _)| id)
             .collect()
     }
-    
+
     /// Get text for a specific ID
     pub fn get_text(&self, id: usize) -> Option<String> {
         self.entries.get(id).map(|e| e.text.clone())
     }
-    
+
     /// Search with a similarity function
     pub fn search<S: Similarity + ?Sized>(
         &self,
@@ -536,34 +544,42 @@ impl NgramIndex {
         } else {
             self.get_candidates(query)
         };
-        
+
         let mut matches: Vec<SearchMatch> = candidates
             .into_iter()
             .filter_map(|id| {
                 if let Some(entry) = self.entries.get(id) {
-                     let sim = similarity.similarity(query, &entry.text);
-                     if sim >= min_similarity.max(self.min_similarity) {
+                    let sim = similarity.similarity(query, &entry.text);
+                    if sim >= min_similarity.max(self.min_similarity) {
                         Some(SearchMatch {
                             id: entry.id,
                             text: entry.text.clone(),
                             similarity: sim,
                             data: entry.data,
                         })
-                     } else {
-                         None
-                     }
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
             })
             .collect();
-        
+
         // Sort by similarity descending
         #[cfg(debug_assertions)]
         for m in &matches {
-            debug_assert!(!m.similarity.is_nan(), "NaN similarity detected for text: {}", m.text);
+            debug_assert!(
+                !m.similarity.is_nan(),
+                "NaN similarity detected for text: {}",
+                m.text
+            );
         }
-        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some(limit) = limit {
             matches.truncate(limit);
@@ -585,22 +601,22 @@ impl NgramIndex {
         } else {
             self.get_candidates(query)
         };
-        
+
         let mut matches: Vec<SearchMatch> = candidates
             .into_par_iter()
             .filter_map(|id| {
                 if let Some(entry) = self.entries.get(id) {
                     let sim = similarity.similarity(query, &entry.text);
-                     if sim >= min_similarity.max(self.min_similarity) {
+                    if sim >= min_similarity.max(self.min_similarity) {
                         Some(SearchMatch {
                             id: entry.id,
                             text: entry.text.clone(),
                             similarity: sim,
                             data: entry.data,
                         })
-                     } else {
-                         None
-                     }
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -609,9 +625,17 @@ impl NgramIndex {
 
         #[cfg(debug_assertions)]
         for m in &matches {
-            debug_assert!(!m.similarity.is_nan(), "NaN similarity detected for text: {}", m.text);
+            debug_assert!(
+                !m.similarity.is_nan(),
+                "NaN similarity detected for text: {}",
+                m.text
+            );
         }
-        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some(limit) = limit {
             matches.truncate(limit);
@@ -633,12 +657,12 @@ impl NgramIndex {
             .map(|query| self.search_parallel(query, similarity, min_similarity, limit))
             .collect()
     }
-    
+
     /// Get index size
     pub fn len(&self) -> usize {
         self.entries.len()
     }
-    
+
     /// Check if empty
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
@@ -655,15 +679,19 @@ impl NgramIndex {
         let hash = Self::hash_string(&normalized_query);
         // Check if hash exists and verify the actual text matches (handle hash collisions)
         // Compare normalized versions when normalize is enabled
-        self.exact_lookup.get(&hash)
+        self.exact_lookup
+            .get(&hash)
             .map(|&id| {
-                self.entries.get(id).map(|e| {
-                    if self.normalize {
-                        e.text.to_lowercase() == normalized_query
-                    } else {
-                        e.text == query
-                    }
-                }).unwrap_or(false)
+                self.entries
+                    .get(id)
+                    .map(|e| {
+                        if self.normalize {
+                            e.text.to_lowercase() == normalized_query
+                        } else {
+                            e.text == query
+                        }
+                    })
+                    .unwrap_or(false)
             })
             .unwrap_or(false)
     }
@@ -757,7 +785,7 @@ impl NgramIndex {
             (compressed_bytes, uncompressed_bytes, ratio)
         })
     }
-    
+
     /// Get entry by ID
     pub fn get(&self, id: usize) -> Option<&IndexEntry> {
         self.entries.get(id)
@@ -813,10 +841,7 @@ fn extract_ngrams(s: &str, n: usize) -> Vec<String> {
         return vec![];
     }
 
-    chars
-        .windows(n)
-        .map(|w| w.iter().collect())
-        .collect()
+    chars.windows(n).map(|w| w.iter().collect()).collect()
 }
 
 /// Combined index using both n-grams and BK-tree for optimal performance
@@ -853,11 +878,11 @@ impl HybridIndex {
     pub fn add(&mut self, text: impl Into<String>) -> usize {
         self.ngram_index.add(text)
     }
-    
+
     pub fn add_with_data(&mut self, text: impl Into<String>, data: Option<u64>) -> usize {
         self.ngram_index.add_with_data(text, data)
     }
-    
+
     pub fn search<S: Similarity + Send + Sync + ?Sized>(
         &self,
         query: &str,
@@ -866,13 +891,14 @@ impl HybridIndex {
         limit: Option<usize>,
     ) -> Vec<SearchMatch> {
         // Use parallel search for better performance
-        self.ngram_index.search_parallel(query, similarity, min_similarity, limit)
+        self.ngram_index
+            .search_parallel(query, similarity, min_similarity, limit)
     }
-    
+
     pub fn len(&self) -> usize {
         self.ngram_index.len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.ngram_index.is_empty()
     }
@@ -890,7 +916,8 @@ impl HybridIndex {
         min_similarity: f64,
         limit: Option<usize>,
     ) -> Vec<Vec<SearchMatch>> {
-        self.ngram_index.batch_search(queries, similarity, min_similarity, limit)
+        self.ngram_index
+            .batch_search(queries, similarity, min_similarity, limit)
     }
 }
 

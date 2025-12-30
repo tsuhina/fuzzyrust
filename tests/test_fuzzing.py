@@ -10,11 +10,10 @@ Tests cover mathematical invariants and edge cases:
 """
 
 import pytest
-from hypothesis import given, settings, assume, HealthCheck
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
 import fuzzyrust as fr
-
 
 # Custom strategies for text generation
 # Limit string length to avoid extremely slow tests
@@ -82,7 +81,9 @@ class TestDamerauLevenshteinInvariants:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_triangle_inequality(self, a, b, c):
         """Triangle inequality holds"""
-        assert fr.damerau_levenshtein(a, c) <= fr.damerau_levenshtein(a, b) + fr.damerau_levenshtein(b, c)
+        assert fr.damerau_levenshtein(a, c) <= fr.damerau_levenshtein(
+            a, b
+        ) + fr.damerau_levenshtein(b, c)
 
     @given(st.text())
     @settings(max_examples=200)
@@ -183,9 +184,7 @@ class TestNgramInvariants:
     @settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow])
     def test_jaccard_symmetry(self, a, b):
         """N-gram Jaccard is symmetric"""
-        assert fr.ngram_jaccard(a, b, 2) == pytest.approx(
-            fr.ngram_jaccard(b, a, 2), abs=1e-10
-        )
+        assert fr.ngram_jaccard(a, b, 2) == pytest.approx(fr.ngram_jaccard(b, a, 2), abs=1e-10)
 
 
 class TestCosineInvariants:
@@ -246,19 +245,28 @@ class TestLCSInvariants:
 class TestPhoneticInvariants:
     """Property-based tests for phonetic algorithms."""
 
-    @given(st.text(alphabet=st.characters(whitelist_categories=('L',)), min_size=0, max_size=50))
+    @given(st.text(alphabet=st.characters(whitelist_categories=("L",)), min_size=0, max_size=50))
     @settings(max_examples=200)
     def test_soundex_deterministic(self, a):
         """Soundex is deterministic"""
         assert fr.soundex(a) == fr.soundex(a)
 
-    @given(st.text(alphabet=st.characters(whitelist_categories=('L',)), min_size=0, max_size=50))
+    @given(st.text(alphabet=st.characters(whitelist_categories=("L",)), min_size=0, max_size=50))
     @settings(max_examples=200)
     def test_metaphone_deterministic(self, a):
         """Metaphone is deterministic"""
         assert fr.metaphone(a) == fr.metaphone(a)
 
-    @given(st.text(alphabet=st.characters(whitelist_categories=('L',), whitelist_characters='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'), min_size=1, max_size=50))
+    @given(
+        st.text(
+            alphabet=st.characters(
+                whitelist_categories=("L",),
+                whitelist_characters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            ),
+            min_size=1,
+            max_size=50,
+        )
+    )
     @settings(max_examples=200)
     def test_soundex_length(self, a):
         """Soundex code is exactly 4 characters (for ASCII alphabetic input)"""
@@ -343,7 +351,7 @@ class TestNormalizationInvariants:
         # The normalized string should not have uppercase letters
         assert result == result.lower()
 
-    @given(st.from_regex(r'[A-Za-z0-9 !@#$%^&*()_+\-=\[\]{}|;:,.<>?]*', fullmatch=True))
+    @given(st.from_regex(r"[A-Za-z0-9 !@#$%^&*()_+\-=\[\]{}|;:,.<>?]*", fullmatch=True))
     @settings(max_examples=200)
     def test_strict_idempotent(self, a):
         """Strict normalization is idempotent (for ASCII characters)"""

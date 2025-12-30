@@ -30,17 +30,17 @@ class TestParameterValidation:
     def test_min_similarity_nan(self):
         """NaN min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=float('nan'))
+            fr.find_best_matches(["a"], "b", min_similarity=float("nan"))
 
     def test_min_similarity_infinity(self):
         """Infinity min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=float('inf'))
+            fr.find_best_matches(["a"], "b", min_similarity=float("inf"))
 
     def test_min_similarity_negative_infinity(self):
         """Negative infinity min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=float('-inf'))
+            fr.find_best_matches(["a"], "b", min_similarity=float("-inf"))
 
     def test_ngram_size_zero(self):
         """Zero ngram_size should raise ValidationError."""
@@ -249,37 +249,37 @@ class TestMathematicalProperties:
             # Jaro-Winkler
             jw_ab = fr.jaro_winkler_similarity(a, b)
             jw_ba = fr.jaro_winkler_similarity(b, a)
-            assert jw_ab == pytest.approx(jw_ba, abs=1e-9), (
-                f"Jaro-Winkler not symmetric for ({a!r}, {b!r}): {jw_ab} != {jw_ba}"
-            )
+            assert jw_ab == pytest.approx(
+                jw_ba, abs=1e-9
+            ), f"Jaro-Winkler not symmetric for ({a!r}, {b!r}): {jw_ab} != {jw_ba}"
 
             # Jaro
             j_ab = fr.jaro_similarity(a, b)
             j_ba = fr.jaro_similarity(b, a)
-            assert j_ab == pytest.approx(j_ba, abs=1e-9), (
-                f"Jaro not symmetric for ({a!r}, {b!r}): {j_ab} != {j_ba}"
-            )
+            assert j_ab == pytest.approx(
+                j_ba, abs=1e-9
+            ), f"Jaro not symmetric for ({a!r}, {b!r}): {j_ab} != {j_ba}"
 
             # Levenshtein similarity
             lev_ab = fr.levenshtein_similarity(a, b)
             lev_ba = fr.levenshtein_similarity(b, a)
-            assert lev_ab == pytest.approx(lev_ba, abs=1e-9), (
-                f"Levenshtein similarity not symmetric for ({a!r}, {b!r}): {lev_ab} != {lev_ba}"
-            )
+            assert lev_ab == pytest.approx(
+                lev_ba, abs=1e-9
+            ), f"Levenshtein similarity not symmetric for ({a!r}, {b!r}): {lev_ab} != {lev_ba}"
 
             # N-gram similarity
             ng_ab = fr.ngram_similarity(a, b)
             ng_ba = fr.ngram_similarity(b, a)
-            assert ng_ab == pytest.approx(ng_ba, abs=1e-9), (
-                f"N-gram similarity not symmetric for ({a!r}, {b!r}): {ng_ab} != {ng_ba}"
-            )
+            assert ng_ab == pytest.approx(
+                ng_ba, abs=1e-9
+            ), f"N-gram similarity not symmetric for ({a!r}, {b!r}): {ng_ab} != {ng_ba}"
 
             # Cosine similarity (chars)
             cos_ab = fr.cosine_similarity_chars(a, b)
             cos_ba = fr.cosine_similarity_chars(b, a)
-            assert cos_ab == pytest.approx(cos_ba, abs=1e-9), (
-                f"Cosine similarity not symmetric for ({a!r}, {b!r}): {cos_ab} != {cos_ba}"
-            )
+            assert cos_ab == pytest.approx(
+                cos_ba, abs=1e-9
+            ), f"Cosine similarity not symmetric for ({a!r}, {b!r}): {cos_ab} != {cos_ba}"
 
     def test_distance_symmetry(self):
         """
@@ -297,16 +297,16 @@ class TestMathematicalProperties:
             # Levenshtein distance
             lev_ab = fr.levenshtein(a, b)
             lev_ba = fr.levenshtein(b, a)
-            assert lev_ab == lev_ba, (
-                f"Levenshtein distance not symmetric for ({a!r}, {b!r}): {lev_ab} != {lev_ba}"
-            )
+            assert (
+                lev_ab == lev_ba
+            ), f"Levenshtein distance not symmetric for ({a!r}, {b!r}): {lev_ab} != {lev_ba}"
 
             # Damerau-Levenshtein distance
             dam_ab = fr.damerau_levenshtein(a, b)
             dam_ba = fr.damerau_levenshtein(b, a)
-            assert dam_ab == dam_ba, (
-                f"Damerau-Levenshtein distance not symmetric for ({a!r}, {b!r}): {dam_ab} != {dam_ba}"
-            )
+            assert (
+                dam_ab == dam_ba
+            ), f"Damerau-Levenshtein distance not symmetric for ({a!r}, {b!r}): {dam_ab} != {dam_ba}"
 
     def test_identical_strings_max_similarity(self):
         """
@@ -323,40 +323,32 @@ class TestMathematicalProperties:
         ]
         for s in test_strings:
             # Jaro-Winkler
-            assert fr.jaro_winkler_similarity(s, s) == 1.0, (
-                f"Jaro-Winkler({s!r}, {s!r}) != 1.0"
-            )
+            assert fr.jaro_winkler_similarity(s, s) == 1.0, f"Jaro-Winkler({s!r}, {s!r}) != 1.0"
 
             # Jaro
-            assert fr.jaro_similarity(s, s) == 1.0, (
-                f"Jaro({s!r}, {s!r}) != 1.0"
-            )
+            assert fr.jaro_similarity(s, s) == 1.0, f"Jaro({s!r}, {s!r}) != 1.0"
 
             # Levenshtein similarity
-            assert fr.levenshtein_similarity(s, s) == 1.0, (
-                f"Levenshtein similarity({s!r}, {s!r}) != 1.0"
-            )
+            assert (
+                fr.levenshtein_similarity(s, s) == 1.0
+            ), f"Levenshtein similarity({s!r}, {s!r}) != 1.0"
 
             # Damerau-Levenshtein similarity
-            assert fr.damerau_levenshtein_similarity(s, s) == 1.0, (
-                f"Damerau-Levenshtein similarity({s!r}, {s!r}) != 1.0"
-            )
+            assert (
+                fr.damerau_levenshtein_similarity(s, s) == 1.0
+            ), f"Damerau-Levenshtein similarity({s!r}, {s!r}) != 1.0"
 
             # N-gram similarity
-            assert fr.ngram_similarity(s, s) == 1.0, (
-                f"N-gram similarity({s!r}, {s!r}) != 1.0"
-            )
+            assert fr.ngram_similarity(s, s) == 1.0, f"N-gram similarity({s!r}, {s!r}) != 1.0"
 
             # Cosine similarity (chars)
-            assert fr.cosine_similarity_chars(s, s) == 1.0, (
-                f"Cosine similarity chars({s!r}, {s!r}) != 1.0"
-            )
+            assert (
+                fr.cosine_similarity_chars(s, s) == 1.0
+            ), f"Cosine similarity chars({s!r}, {s!r}) != 1.0"
 
             # LCS similarity (skip empty strings - edge case)
             if s:
-                assert fr.lcs_similarity(s, s) == 1.0, (
-                    f"LCS similarity({s!r}, {s!r}) != 1.0"
-                )
+                assert fr.lcs_similarity(s, s) == 1.0, f"LCS similarity({s!r}, {s!r}) != 1.0"
 
     def test_identical_strings_zero_distance(self):
         """
@@ -373,20 +365,14 @@ class TestMathematicalProperties:
         ]
         for s in test_strings:
             # Levenshtein
-            assert fr.levenshtein(s, s) == 0, (
-                f"Levenshtein({s!r}, {s!r}) != 0"
-            )
+            assert fr.levenshtein(s, s) == 0, f"Levenshtein({s!r}, {s!r}) != 0"
 
             # Damerau-Levenshtein
-            assert fr.damerau_levenshtein(s, s) == 0, (
-                f"Damerau-Levenshtein({s!r}, {s!r}) != 0"
-            )
+            assert fr.damerau_levenshtein(s, s) == 0, f"Damerau-Levenshtein({s!r}, {s!r}) != 0"
 
             # Hamming (only for non-empty strings)
             if s:
-                assert fr.hamming(s, s) == 0, (
-                    f"Hamming({s!r}, {s!r}) != 0"
-                )
+                assert fr.hamming(s, s) == 0, f"Hamming({s!r}, {s!r}) != 0"
 
     def test_similarity_bounds(self):
         """
@@ -405,33 +391,23 @@ class TestMathematicalProperties:
         for a, b in test_pairs:
             # Jaro-Winkler
             jw = fr.jaro_winkler_similarity(a, b)
-            assert 0.0 <= jw <= 1.0, (
-                f"Jaro-Winkler({a!r}, {b!r})={jw} out of bounds"
-            )
+            assert 0.0 <= jw <= 1.0, f"Jaro-Winkler({a!r}, {b!r})={jw} out of bounds"
 
             # Jaro
             j = fr.jaro_similarity(a, b)
-            assert 0.0 <= j <= 1.0, (
-                f"Jaro({a!r}, {b!r})={j} out of bounds"
-            )
+            assert 0.0 <= j <= 1.0, f"Jaro({a!r}, {b!r})={j} out of bounds"
 
             # Levenshtein similarity
             lev = fr.levenshtein_similarity(a, b)
-            assert 0.0 <= lev <= 1.0, (
-                f"Levenshtein similarity({a!r}, {b!r})={lev} out of bounds"
-            )
+            assert 0.0 <= lev <= 1.0, f"Levenshtein similarity({a!r}, {b!r})={lev} out of bounds"
 
             # N-gram similarity
             ng = fr.ngram_similarity(a, b)
-            assert 0.0 <= ng <= 1.0, (
-                f"N-gram similarity({a!r}, {b!r})={ng} out of bounds"
-            )
+            assert 0.0 <= ng <= 1.0, f"N-gram similarity({a!r}, {b!r})={ng} out of bounds"
 
             # Cosine similarity
             cos = fr.cosine_similarity_chars(a, b)
-            assert 0.0 <= cos <= 1.0, (
-                f"Cosine similarity({a!r}, {b!r})={cos} out of bounds"
-            )
+            assert 0.0 <= cos <= 1.0, f"Cosine similarity({a!r}, {b!r})={cos} out of bounds"
 
     def test_distance_non_negative(self):
         """
@@ -448,15 +424,11 @@ class TestMathematicalProperties:
         for a, b in test_pairs:
             # Levenshtein
             lev = fr.levenshtein(a, b)
-            assert lev >= 0, (
-                f"Levenshtein({a!r}, {b!r})={lev} is negative"
-            )
+            assert lev >= 0, f"Levenshtein({a!r}, {b!r})={lev} is negative"
 
             # Damerau-Levenshtein
             dam = fr.damerau_levenshtein(a, b)
-            assert dam >= 0, (
-                f"Damerau-Levenshtein({a!r}, {b!r})={dam} is negative"
-            )
+            assert dam >= 0, f"Damerau-Levenshtein({a!r}, {b!r})={dam} is negative"
 
     def test_lcs_length_bounds(self):
         """
@@ -473,9 +445,9 @@ class TestMathematicalProperties:
         for a, b in test_pairs:
             lcs_len = fr.lcs_length(a, b)
             max_possible = min(len(a), len(b))
-            assert 0 <= lcs_len <= max_possible, (
-                f"LCS length({a!r}, {b!r})={lcs_len} out of bounds [0, {max_possible}]"
-            )
+            assert (
+                0 <= lcs_len <= max_possible
+            ), f"LCS length({a!r}, {b!r})={lcs_len} out of bounds [0, {max_possible}]"
 
     def test_levenshtein_upper_bound(self):
         """
@@ -492,9 +464,7 @@ class TestMathematicalProperties:
         for a, b in test_pairs:
             dist = fr.levenshtein(a, b)
             upper = max(len(a), len(b))
-            assert dist <= upper, (
-                f"Levenshtein({a!r}, {b!r})={dist} > max(len)={upper}"
-            )
+            assert dist <= upper, f"Levenshtein({a!r}, {b!r})={dist} > max(len)={upper}"
 
     def test_completely_different_strings(self):
         """
@@ -506,9 +476,15 @@ class TestMathematicalProperties:
 
         # All similarity metrics should return 0.0 for completely disjoint strings
         assert fr.jaro_similarity(a, b) == 0.0, "Jaro should be 0.0 for disjoint strings"
-        assert fr.jaro_winkler_similarity(a, b) == 0.0, "Jaro-Winkler should be 0.0 for disjoint strings"
-        assert fr.levenshtein_similarity(a, b) == 0.0, "Levenshtein similarity should be 0.0 for equal-length disjoint strings"
-        assert fr.ngram_similarity(a, b) == 0.0, "N-gram similarity should be 0.0 for disjoint strings"
+        assert (
+            fr.jaro_winkler_similarity(a, b) == 0.0
+        ), "Jaro-Winkler should be 0.0 for disjoint strings"
+        assert (
+            fr.levenshtein_similarity(a, b) == 0.0
+        ), "Levenshtein similarity should be 0.0 for equal-length disjoint strings"
+        assert (
+            fr.ngram_similarity(a, b) == 0.0
+        ), "N-gram similarity should be 0.0 for disjoint strings"
 
     def test_single_character_edit_distance(self):
         """
@@ -519,7 +495,9 @@ class TestMathematicalProperties:
 
         # Single insertion
         assert fr.levenshtein("hello", "helloo") == 1, "Single insertion should be distance 1"
-        assert fr.levenshtein("hello", "hhello") == 1, "Single prefix insertion should be distance 1"
+        assert (
+            fr.levenshtein("hello", "hhello") == 1
+        ), "Single prefix insertion should be distance 1"
 
         # Single deletion
         assert fr.levenshtein("hello", "hell") == 1, "Single deletion should be distance 1"

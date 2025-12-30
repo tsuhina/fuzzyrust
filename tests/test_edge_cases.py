@@ -102,8 +102,13 @@ class TestEmptyStrings:
         # Results are returned but with score 0.0 (default min_similarity is 0.0)
         assert len(matches) == 2, f"Expected 2 results for empty query, got {len(matches)} matches"
         for match in matches:
-            assert match.score == 0.0, f"Expected score 0.0 for empty query match, got {match.score}"
-            assert match.text in ["apple", "banana"], f"Expected 'apple' or 'banana', got {match.text}"
+            assert (
+                match.score == 0.0
+            ), f"Expected score 0.0 for empty query match, got {match.score}"
+            assert match.text in [
+                "apple",
+                "banana",
+            ], f"Expected 'apple' or 'banana', got {match.text}"
 
     def test_find_best_matches_empty_choices(self):
         """Empty choices list should return empty results."""
@@ -180,7 +185,9 @@ class TestUnicodeEdgeCases:
         # Composed "é" (1 codepoint) vs decomposed "e" + combining accent (2 codepoints)
         # Distance is 2: the codepoints are completely different (é ≠ e, é ≠ \u0301)
         dist = fr.levenshtein(composed, decomposed)
-        assert dist == 2, f"Expected distance 2 between composed (1 codepoint) and decomposed (2 codepoints), got {dist}"
+        assert (
+            dist == 2
+        ), f"Expected distance 2 between composed (1 codepoint) and decomposed (2 codepoints), got {dist}"
 
     def test_emoji(self):
         """Emoji should be handled correctly."""
@@ -198,7 +205,9 @@ class TestUnicodeEdgeCases:
 
         # Family has 7 codepoints, single has 1, so distance should be 6
         dist = fr.levenshtein(family, single)
-        assert dist == 6, f"Expected distance 6 between family emoji (7 codepoints) and single emoji (1 codepoint), got {dist}"
+        assert (
+            dist == 6
+        ), f"Expected distance 6 between family emoji (7 codepoints) and single emoji (1 codepoint), got {dist}"
 
         sim = fr.jaro_winkler_similarity(family, family)
         assert sim == 1.0
@@ -219,7 +228,9 @@ class TestUnicodeEdgeCases:
         # (delete all 5 Arabic chars, insert all 4 Hebrew chars = 9 ops,
         # but optimal is replace 4 + delete 1 = 5 ops)
         dist = fr.levenshtein(arabic, hebrew)
-        assert dist == 5, f"Expected distance 5 between Arabic (5 chars) and Hebrew (4 chars), got {dist}"
+        assert (
+            dist == 5
+        ), f"Expected distance 5 between Arabic (5 chars) and Hebrew (4 chars), got {dist}"
 
     def test_surrogate_pairs(self):
         """Supplementary plane characters (emoji, etc) should work."""
@@ -229,7 +240,9 @@ class TestUnicodeEdgeCases:
 
         # All 5 characters differ (fraktur vs ASCII), so distance should be 5
         dist = fr.levenshtein(s1, s2)
-        assert dist == 5, f"Expected distance 5 between fraktur and ASCII (all 5 chars differ), got {dist}"
+        assert (
+            dist == 5
+        ), f"Expected distance 5 between fraktur and ASCII (all 5 chars differ), got {dist}"
 
     def test_null_character_in_string(self):
         """Null characters within strings should work."""
@@ -267,11 +280,13 @@ class TestAdversarialInputs:
     def test_prefix_suffix_overlap(self):
         """Strings with common prefix and suffix."""
         s1 = "prefix_middle_suffix"  # 20 chars
-        s2 = "prefix_other_suffix"   # 19 chars
+        s2 = "prefix_other_suffix"  # 19 chars
         sim = fr.jaro_winkler_similarity(s1, s2)
         # Common prefix "prefix_" (7 chars) and suffix "_suffix" (7 chars)
         # Jaro-Winkler should give high score for shared prefix/suffix
-        assert 0.75 <= sim <= 0.90, f"Expected Jaro-Winkler 0.75-0.90 for shared prefix/suffix strings, got {sim}"
+        assert (
+            0.75 <= sim <= 0.90
+        ), f"Expected Jaro-Winkler 0.75-0.90 for shared prefix/suffix strings, got {sim}"
 
     def test_single_character_strings(self):
         """Single character strings."""
@@ -339,9 +354,15 @@ class TestBoundaryConditions:
             jw_score = fr.jaro_winkler_similarity(s1, s2)
             lev_score = fr.levenshtein_similarity(s1, s2)
             ng_score = fr.ngram_similarity(s1, s2)
-            assert jw_score == 1.0, f"Jaro-Winkler for identical '{s1}' should be 1.0, got {jw_score}"
-            assert lev_score == 1.0, f"Levenshtein similarity for identical '{s1}' should be 1.0, got {lev_score}"
-            assert ng_score == 1.0, f"N-gram similarity for identical '{s1}' should be 1.0, got {ng_score}"
+            assert (
+                jw_score == 1.0
+            ), f"Jaro-Winkler for identical '{s1}' should be 1.0, got {jw_score}"
+            assert (
+                lev_score == 1.0
+            ), f"Levenshtein similarity for identical '{s1}' should be 1.0, got {lev_score}"
+            assert (
+                ng_score == 1.0
+            ), f"N-gram similarity for identical '{s1}' should be 1.0, got {ng_score}"
 
     def test_min_similarity(self):
         """Different strings should have specific expected similarity values."""
@@ -349,28 +370,41 @@ class TestBoundaryConditions:
         jw_abc_xyz = fr.jaro_winkler_similarity("abc", "xyz")
         lev_abc_xyz = fr.levenshtein_similarity("abc", "xyz")
         ng_abc_xyz = fr.ngram_similarity("abc", "xyz")
-        assert jw_abc_xyz == 0.0, f"Jaro-Winkler for 'abc' vs 'xyz' (no common chars) should be 0.0, got {jw_abc_xyz}"
-        assert lev_abc_xyz == 0.0, f"Levenshtein similarity for 'abc' vs 'xyz' (all chars differ) should be 0.0, got {lev_abc_xyz}"
-        assert ng_abc_xyz == 0.0, f"N-gram similarity for 'abc' vs 'xyz' (no common n-grams) should be 0.0, got {ng_abc_xyz}"
+        assert (
+            jw_abc_xyz == 0.0
+        ), f"Jaro-Winkler for 'abc' vs 'xyz' (no common chars) should be 0.0, got {jw_abc_xyz}"
+        assert (
+            lev_abc_xyz == 0.0
+        ), f"Levenshtein similarity for 'abc' vs 'xyz' (all chars differ) should be 0.0, got {lev_abc_xyz}"
+        assert (
+            ng_abc_xyz == 0.0
+        ), f"N-gram similarity for 'abc' vs 'xyz' (no common n-grams) should be 0.0, got {ng_abc_xyz}"
 
         # Test case: "hello" vs "world" - some shared letters (l, o)
         jw_hello_world = fr.jaro_winkler_similarity("hello", "world")
         lev_hello_world = fr.levenshtein_similarity("hello", "world")
         ng_hello_world = fr.ngram_similarity("hello", "world")
         # Jaro-Winkler: shares 'l' and 'o', but low similarity due to positions
-        assert 0.0 <= jw_hello_world <= 0.5, f"Jaro-Winkler for 'hello' vs 'world' should be in [0.0, 0.5], got {jw_hello_world}"
+        assert (
+            0.0 <= jw_hello_world <= 0.5
+        ), f"Jaro-Winkler for 'hello' vs 'world' should be in [0.0, 0.5], got {jw_hello_world}"
         # Levenshtein: 4 edits out of 5 chars = 0.2 similarity (use approx for float comparison)
-        assert lev_hello_world == pytest.approx(0.2, abs=0.001), \
-            f"Levenshtein similarity for 'hello' vs 'world' (4 edits) should be ~0.2, got {lev_hello_world}"
+        assert (
+            lev_hello_world == pytest.approx(0.2, abs=0.001)
+        ), f"Levenshtein similarity for 'hello' vs 'world' (4 edits) should be ~0.2, got {lev_hello_world}"
         # N-gram: shares 'ld' bigram only (if any), very low
-        assert 0.0 <= ng_hello_world <= 0.25, f"N-gram similarity for 'hello' vs 'world' should be in [0.0, 0.25], got {ng_hello_world}"
+        assert (
+            0.0 <= ng_hello_world <= 0.25
+        ), f"N-gram similarity for 'hello' vs 'world' should be in [0.0, 0.25], got {ng_hello_world}"
 
         # Test case: empty vs non-empty
         jw_empty = fr.jaro_winkler_similarity("", "test")
         lev_empty = fr.levenshtein_similarity("", "test")
         ng_empty = fr.ngram_similarity("", "test")
         assert jw_empty == 0.0, f"Jaro-Winkler for '' vs 'test' should be 0.0, got {jw_empty}"
-        assert lev_empty == 0.0, f"Levenshtein similarity for '' vs 'test' should be 0.0, got {lev_empty}"
+        assert (
+            lev_empty == 0.0
+        ), f"Levenshtein similarity for '' vs 'test' should be 0.0, got {lev_empty}"
         assert ng_empty == 0.0, f"N-gram similarity for '' vs 'test' should be 0.0, got {ng_empty}"
 
     def test_distance_non_negative(self):
@@ -378,26 +412,42 @@ class TestBoundaryConditions:
         # Test case: "abc" vs "xyz" - all 3 characters differ
         lev_abc_xyz = fr.levenshtein("abc", "xyz")
         dam_abc_xyz = fr.damerau_levenshtein("abc", "xyz")
-        assert lev_abc_xyz == 3, f"Levenshtein distance for 'abc' vs 'xyz' should be 3 (replace all), got {lev_abc_xyz}"
-        assert dam_abc_xyz == 3, f"Damerau-Levenshtein distance for 'abc' vs 'xyz' should be 3, got {dam_abc_xyz}"
+        assert (
+            lev_abc_xyz == 3
+        ), f"Levenshtein distance for 'abc' vs 'xyz' should be 3 (replace all), got {lev_abc_xyz}"
+        assert (
+            dam_abc_xyz == 3
+        ), f"Damerau-Levenshtein distance for 'abc' vs 'xyz' should be 3, got {dam_abc_xyz}"
 
         # Test case: "hello" vs "world" - 4 edits needed
         lev_hello_world = fr.levenshtein("hello", "world")
         dam_hello_world = fr.damerau_levenshtein("hello", "world")
-        assert lev_hello_world == 4, f"Levenshtein distance for 'hello' vs 'world' should be 4, got {lev_hello_world}"
-        assert dam_hello_world == 4, f"Damerau-Levenshtein distance for 'hello' vs 'world' should be 4, got {dam_hello_world}"
+        assert (
+            lev_hello_world == 4
+        ), f"Levenshtein distance for 'hello' vs 'world' should be 4, got {lev_hello_world}"
+        assert (
+            dam_hello_world == 4
+        ), f"Damerau-Levenshtein distance for 'hello' vs 'world' should be 4, got {dam_hello_world}"
 
         # Test case: "" vs "test" - insert 4 characters
         lev_empty = fr.levenshtein("", "test")
         dam_empty = fr.damerau_levenshtein("", "test")
-        assert lev_empty == 4, f"Levenshtein distance for '' vs 'test' should be 4 (insert all), got {lev_empty}"
-        assert dam_empty == 4, f"Damerau-Levenshtein distance for '' vs 'test' should be 4, got {dam_empty}"
+        assert (
+            lev_empty == 4
+        ), f"Levenshtein distance for '' vs 'test' should be 4 (insert all), got {lev_empty}"
+        assert (
+            dam_empty == 4
+        ), f"Damerau-Levenshtein distance for '' vs 'test' should be 4, got {dam_empty}"
 
         # Test case: "same" vs "same" - identical strings
         lev_same = fr.levenshtein("same", "same")
         dam_same = fr.damerau_levenshtein("same", "same")
-        assert lev_same == 0, f"Levenshtein distance for identical strings should be 0, got {lev_same}"
-        assert dam_same == 0, f"Damerau-Levenshtein distance for identical strings should be 0, got {dam_same}"
+        assert (
+            lev_same == 0
+        ), f"Levenshtein distance for identical strings should be 0, got {lev_same}"
+        assert (
+            dam_same == 0
+        ), f"Damerau-Levenshtein distance for identical strings should be 0, got {dam_same}"
 
     def test_symmetric_distance(self):
         """Distance should be symmetric."""
@@ -445,7 +495,9 @@ class TestIndexEdgeCases:
         # Should find matches and first result should be exact match
         assert len(results) >= 1, "Expected at least one match for duplicate items"
         assert results[0].text == "hello", f"Expected 'hello', got {results[0].text}"
-        assert results[0].distance == 0, f"Expected distance 0 for exact match, got {results[0].distance}"
+        assert (
+            results[0].distance == 0
+        ), f"Expected distance 0 for exact match, got {results[0].distance}"
 
     def test_ngram_index_single_item(self):
         """N-gram index with single item."""
@@ -454,7 +506,9 @@ class TestIndexEdgeCases:
         results = index.search("hello", min_similarity=0.5)
         assert len(results) >= 1, "Expected at least one match"
         assert results[0].text == "hello", f"Expected 'hello', got {results[0].text}"
-        assert results[0].score == 1.0, f"Expected score 1.0 for exact match, got {results[0].score}"
+        assert (
+            results[0].score == 1.0
+        ), f"Expected score 1.0 for exact match, got {results[0].score}"
 
     def test_hybrid_index_single_item(self):
         """Hybrid index with single item."""
@@ -463,7 +517,9 @@ class TestIndexEdgeCases:
         results = index.search("hello", min_similarity=0.5)
         assert len(results) >= 1, "Expected at least one match"
         assert results[0].text == "hello", f"Expected 'hello', got {results[0].text}"
-        assert results[0].score == 1.0, f"Expected score 1.0 for exact match, got {results[0].score}"
+        assert (
+            results[0].score == 1.0
+        ), f"Expected score 1.0 for exact match, got {results[0].score}"
 
     def test_index_empty_search(self):
         """Searching with empty query."""
@@ -472,7 +528,9 @@ class TestIndexEdgeCases:
         tree.add("world")
         # Empty string is distance 5 from "hello" and "world" (5 chars each)
         results = tree.search("", max_distance=5)
-        assert len(results) == 2, f"Expected 2 results for empty query with max_distance=5, got {len(results)}"
+        assert (
+            len(results) == 2
+        ), f"Expected 2 results for empty query with max_distance=5, got {len(results)}"
         texts = {r.text for r in results}
         assert texts == {"hello", "world"}, f"Expected {{'hello', 'world'}}, got {texts}"
 
@@ -484,7 +542,9 @@ class TestIndexEdgeCases:
         assert len(results) >= 1, "Expected at least one match for 'cafe' in unicode corpus"
         # The best match should be "café"
         assert results[0].text == "café", f"Expected 'café' as best match, got {results[0].text}"
-        assert results[0].score >= 0.7, f"Expected score >= 0.7 for 'cafe' vs 'café', got {results[0].score}"
+        assert (
+            results[0].score >= 0.7
+        ), f"Expected score >= 0.7 for 'cafe' vs 'café', got {results[0].score}"
 
 
 class TestEmptyStringsCoverage:

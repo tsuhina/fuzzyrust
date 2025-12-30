@@ -159,9 +159,7 @@ def fuzzy_is_match(left, right, algorithm: str = "jaro_winkler", threshold: floa
     )
 
 
-def fuzzy_best_match(
-    query, targets: list, algorithm: str = "jaro_winkler", min_score: float = 0.0
-):
+def fuzzy_best_match(query, targets: list, algorithm: str = "jaro_winkler", min_score: float = 0.0):
     """Find best match from targets using native plugin.
 
     Args:

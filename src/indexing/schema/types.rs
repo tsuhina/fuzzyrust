@@ -235,9 +235,15 @@ impl FieldType {
     /// Get the default algorithm for this field type
     pub fn default_algorithm(&self) -> &Algorithm {
         match self {
-            FieldType::ShortText { default_algorithm, .. } => default_algorithm,
-            FieldType::LongText { default_algorithm, .. } => default_algorithm,
-            FieldType::TokenSet { default_algorithm, .. } => default_algorithm,
+            FieldType::ShortText {
+                default_algorithm, ..
+            } => default_algorithm,
+            FieldType::LongText {
+                default_algorithm, ..
+            } => default_algorithm,
+            FieldType::TokenSet {
+                default_algorithm, ..
+            } => default_algorithm,
         }
     }
 

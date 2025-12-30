@@ -42,7 +42,7 @@ impl Similarity for Lcs {
     fn similarity(&self, a: &str, b: &str) -> f64 {
         lcs_similarity(a, b)
     }
-    
+
     fn name(&self) -> &'static str {
         "lcs"
     }
@@ -53,18 +53,18 @@ impl Similarity for Lcs {
 pub fn lcs_length(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
-    
+
     let m = a_chars.len();
     let n = b_chars.len();
-    
+
     if m == 0 || n == 0 {
         return 0;
     }
-    
+
     // Space-optimized: only keep current and previous row
     let mut prev: Vec<usize> = vec![0; n + 1];
     let mut curr: Vec<usize> = vec![0; n + 1];
-    
+
     for i in 1..=m {
         curr[0] = 0; // Reset first element for this row
         for j in 1..=n {
@@ -104,7 +104,7 @@ pub fn lcs_string(a: &str, b: &str) -> String {
 
     // Full DP table needed for backtracking
     let mut dp: Vec<Vec<usize>> = vec![vec![0; n + 1]; m + 1];
-    
+
     for i in 1..=m {
         for j in 1..=n {
             if a_chars[i - 1] == b_chars[j - 1] {
@@ -114,12 +114,12 @@ pub fn lcs_string(a: &str, b: &str) -> String {
             }
         }
     }
-    
+
     // Backtrack to find the LCS
     let mut lcs = Vec::with_capacity(dp[m][n]);
     let mut i = m;
     let mut j = n;
-    
+
     while i > 0 && j > 0 {
         if a_chars[i - 1] == b_chars[j - 1] {
             lcs.push(a_chars[i - 1]);
@@ -131,7 +131,7 @@ pub fn lcs_string(a: &str, b: &str) -> String {
             j -= 1;
         }
     }
-    
+
     lcs.reverse();
     lcs.into_iter().collect()
 }
@@ -143,20 +143,20 @@ pub fn lcs_similarity(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
-    
+
     let len_a = a.chars().count();
     let len_b = b.chars().count();
-    
+
     if len_a == 0 && len_b == 0 {
         return 1.0;
     }
-    
+
     if len_a == 0 || len_b == 0 {
         return 0.0;
     }
-    
+
     let lcs_len = lcs_length(a, b);
-    
+
     // Dice coefficient formula
     (2.0 * lcs_len as f64) / (len_a + len_b) as f64
 }
@@ -167,15 +167,15 @@ pub fn lcs_similarity_max(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
-    
+
     let len_a = a.chars().count();
     let len_b = b.chars().count();
     let max_len = len_a.max(len_b);
-    
+
     if max_len == 0 {
         return 1.0;
     }
-    
+
     lcs_length(a, b) as f64 / max_len as f64
 }
 
@@ -184,18 +184,18 @@ pub fn lcs_similarity_max(a: &str, b: &str) -> f64 {
 pub fn longest_common_substring_length(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
-    
+
     let m = a_chars.len();
     let n = b_chars.len();
-    
+
     if m == 0 || n == 0 {
         return 0;
     }
-    
+
     let mut prev: Vec<usize> = vec![0; n + 1];
     let mut curr: Vec<usize> = vec![0; n + 1];
     let mut max_len = 0;
-    
+
     for i in 1..=m {
         curr[0] = 0; // Reset first element for this row
         for j in 1..=n {
@@ -237,7 +237,7 @@ pub fn longest_common_substring(a: &str, b: &str) -> String {
     let mut dp: Vec<Vec<usize>> = vec![vec![0; n + 1]; m + 1];
     let mut max_len = 0;
     let mut end_idx = 0;
-    
+
     for i in 1..=m {
         for j in 1..=n {
             if a_chars[i - 1] == b_chars[j - 1] {
@@ -249,14 +249,14 @@ pub fn longest_common_substring(a: &str, b: &str) -> String {
             }
         }
     }
-    
+
     a_chars[end_idx - max_len..end_idx].iter().collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_lcs_length() {
         assert_eq!(lcs_length("", ""), 0);
@@ -265,13 +265,13 @@ mod tests {
         assert_eq!(lcs_length("ABCDGH", "AEDFHR"), 3); // ADH
         assert_eq!(lcs_length("AGGTAB", "GXTXAYB"), 4); // GTAB
     }
-    
+
     #[test]
     fn test_lcs_string() {
         assert_eq!(lcs_string("ABCDGH", "AEDFHR"), "ADH");
         assert_eq!(lcs_string("AGGTAB", "GXTXAYB"), "GTAB");
     }
-    
+
     #[test]
     fn test_longest_common_substring() {
         assert_eq!(longest_common_substring_length("abcdef", "zbcdf"), 3); // bcd

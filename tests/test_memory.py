@@ -6,6 +6,7 @@ Uses tracemalloc for memory tracking.
 
 import gc
 import tracemalloc
+
 import pytest
 
 

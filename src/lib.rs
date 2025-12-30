@@ -9,18 +9,18 @@
 //! - Unicode support
 
 pub mod algorithms;
-pub mod indexing;
 pub mod dedup;
+pub mod indexing;
 pub mod metrics;
 
 // Polars plugin module (enabled with polars-plugin feature)
 #[cfg(feature = "polars-plugin")]
 pub mod polars;
 
-use pyo3::prelude::*;
-use pyo3::create_exception;
-use std::borrow::Cow;
 use algorithms::normalize::NormalizationMode;
+use pyo3::create_exception;
+use pyo3::prelude::*;
+use std::borrow::Cow;
 
 // ============================================================================
 // Custom Python Exceptions
@@ -45,15 +45,9 @@ create_exception!(fuzzyrust, SchemaError, FuzzyRustError);
 
 // Re-exports for Rust users (explicit to avoid conflicts with pyfunction wrappers)
 pub use algorithms::{
-    Similarity, EditDistance,
-    levenshtein as levenshtein_mod,
-    damerau as damerau_mod,
-    jaro as jaro_mod,
-    hamming as hamming_mod,
-    ngram as ngram_mod,
-    phonetic as phonetic_mod,
-    lcs as lcs_mod,
-    cosine as cosine_mod,
+    cosine as cosine_mod, damerau as damerau_mod, hamming as hamming_mod, jaro as jaro_mod,
+    lcs as lcs_mod, levenshtein as levenshtein_mod, ngram as ngram_mod, phonetic as phonetic_mod,
+    EditDistance, Similarity,
 };
 pub use indexing::{bktree, ngram_index};
 
@@ -172,20 +166,26 @@ fn parse_normalization_mode(norm: &str) -> PyResult<NormalizationMode> {
 ///
 /// Centralizes algorithm dispatch to avoid duplicating match statements.
 /// Returns a trait object that can be used with indices and deduplication.
-fn get_similarity_metric(algorithm: &str) -> PyResult<Box<dyn algorithms::Similarity + Send + Sync>> {
+fn get_similarity_metric(
+    algorithm: &str,
+) -> PyResult<Box<dyn algorithms::Similarity + Send + Sync>> {
     get_similarity_metric_with_normalize(algorithm, None)
 }
 
 /// Get a boxed similarity metric with optional normalization.
 ///
 /// When `normalize` is Some("lowercase"), the metric will compare strings case-insensitively.
-fn get_similarity_metric_with_normalize(algorithm: &str, normalize: Option<&str>) -> PyResult<Box<dyn algorithms::Similarity + Send + Sync>> {
+fn get_similarity_metric_with_normalize(
+    algorithm: &str,
+    normalize: Option<&str>,
+) -> PyResult<Box<dyn algorithms::Similarity + Send + Sync>> {
     let use_case_insensitive = matches!(normalize, Some("lowercase"));
 
     macro_rules! wrap_metric {
         ($metric:expr, $case_insensitive:expr) => {
             if $case_insensitive {
-                Box::new(algorithms::CaseInsensitive($metric)) as Box<dyn algorithms::Similarity + Send + Sync>
+                Box::new(algorithms::CaseInsensitive($metric))
+                    as Box<dyn algorithms::Similarity + Send + Sync>
             } else {
                 Box::new($metric) as Box<dyn algorithms::Similarity + Send + Sync>
             }
@@ -299,8 +299,20 @@ pub struct SearchResult {
 impl SearchResult {
     #[new]
     #[pyo3(signature = (id, text, score, distance=None, data=None))]
-    fn new(id: usize, text: String, score: f64, distance: Option<usize>, data: Option<u64>) -> Self {
-        Self { id, text, score, distance, data }
+    fn new(
+        id: usize,
+        text: String,
+        score: f64,
+        distance: Option<usize>,
+        data: Option<u64>,
+    ) -> Self {
+        Self {
+            id,
+            text,
+            score,
+            distance,
+            data,
+        }
     }
 
     fn __repr__(&self) -> String {
@@ -323,8 +335,8 @@ impl SearchResult {
     }
 
     fn __hash__(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         self.id.hash(&mut hasher);
         self.text.hash(&mut hasher);
@@ -363,7 +375,10 @@ impl MatchResult {
 
     fn __repr__(&self) -> String {
         match self.id {
-            Some(id) => format!("MatchResult(text='{}', score={:.3}, id={})", self.text, self.score, id),
+            Some(id) => format!(
+                "MatchResult(text='{}', score={:.3}, id={})",
+                self.text, self.score, id
+            ),
             None => format!("MatchResult(text='{}', score={:.3})", self.text, self.score),
         }
     }
@@ -377,8 +392,8 @@ impl MatchResult {
     }
 
     fn __hash__(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         self.text.hash(&mut hasher);
         // Convert score to bits for stable hashing (round to 9 decimal places)
@@ -409,20 +424,28 @@ pub struct DeduplicationResult {
 impl DeduplicationResult {
     #[new]
     fn new(groups: Vec<Vec<String>>, unique: Vec<String>, total_duplicates: usize) -> Self {
-        Self { groups, unique, total_duplicates }
+        Self {
+            groups,
+            unique,
+            total_duplicates,
+        }
     }
 
     fn __repr__(&self) -> String {
         format!(
             "DeduplicationResult(groups={}, unique={}, total_duplicates={})",
-            self.groups.len(), self.unique.len(), self.total_duplicates
+            self.groups.len(),
+            self.unique.len(),
+            self.total_duplicates
         )
     }
 
     fn __str__(&self) -> String {
         format!(
             "{} duplicate groups, {} unique items, {} total duplicates",
-            self.groups.len(), self.unique.len(), self.total_duplicates
+            self.groups.len(),
+            self.unique.len(),
+            self.total_duplicates
         )
     }
 }
@@ -448,18 +471,29 @@ pub struct AlgorithmComparison {
 impl AlgorithmComparison {
     #[new]
     fn new(algorithm: String, score: f64, matches: Vec<MatchResult>) -> Self {
-        Self { algorithm, score, matches }
+        Self {
+            algorithm,
+            score,
+            matches,
+        }
     }
 
     fn __repr__(&self) -> String {
         format!(
             "AlgorithmComparison(algorithm='{}', score={:.3}, matches={})",
-            self.algorithm, self.score, self.matches.len()
+            self.algorithm,
+            self.score,
+            self.matches.len()
         )
     }
 
     fn __str__(&self) -> String {
-        format!("{}: {:.3} ({} matches)", self.algorithm, self.score, self.matches.len())
+        format!(
+            "{}: {:.3} ({} matches)",
+            self.algorithm,
+            self.score,
+            self.matches.len()
+        )
     }
 }
 
@@ -488,14 +522,23 @@ pub struct ConfusionMatrixResult {
 impl ConfusionMatrixResult {
     #[new]
     fn new(tp: usize, fp: usize, fn_count: usize, tn: usize) -> Self {
-        Self { tp, fp, fn_count, tn }
+        Self {
+            tp,
+            fp,
+            fn_count,
+            tn,
+        }
     }
 
     /// Calculate precision from confusion matrix values.
     fn precision(&self) -> f64 {
         let denominator = self.tp + self.fp;
         if denominator == 0 {
-            if self.fn_count == 0 { 1.0 } else { 0.0 }
+            if self.fn_count == 0 {
+                1.0
+            } else {
+                0.0
+            }
         } else {
             self.tp as f64 / denominator as f64
         }
@@ -505,7 +548,11 @@ impl ConfusionMatrixResult {
     fn recall(&self) -> f64 {
         let denominator = self.tp + self.fn_count;
         if denominator == 0 {
-            if self.fp == 0 { 1.0 } else { 0.0 }
+            if self.fp == 0 {
+                1.0
+            } else {
+                0.0
+            }
         } else {
             self.tp as f64 / denominator as f64
         }
@@ -534,7 +581,12 @@ impl ConfusionMatrixResult {
     fn __str__(&self) -> String {
         format!(
             "TP={}, FP={}, FN={}, TN={} (precision={:.3}, recall={:.3})",
-            self.tp, self.fp, self.fn_count, self.tn, self.precision(), self.recall()
+            self.tp,
+            self.fp,
+            self.fn_count,
+            self.tn,
+            self.precision(),
+            self.recall()
         )
     }
 }
@@ -553,13 +605,24 @@ impl ConfusionMatrixResult {
 /// Use `levenshtein_bounded()` if you prefer `None` semantics.
 #[pyfunction]
 #[pyo3(signature = (a, b, max_distance=None, normalize=None))]
-fn levenshtein(a: &str, b: &str, max_distance: Option<usize>, normalize: Option<&str>) -> PyResult<usize> {
+fn levenshtein(
+    a: &str,
+    b: &str,
+    max_distance: Option<usize>,
+    normalize: Option<&str>,
+) -> PyResult<usize> {
     let (a, b) = apply_normalization(a, b, normalize)?;
     match max_distance {
-        Some(max_d) => Ok(algorithms::levenshtein::levenshtein_distance_bounded(&a, &b, Some(max_d))
-            .unwrap_or_else(|| max_d.saturating_add(1))),
-        None => Ok(algorithms::levenshtein::levenshtein_distance_bounded(&a, &b, None)
-            .expect("unbounded distance should always return Some")),
+        Some(max_d) => {
+            Ok(
+                algorithms::levenshtein::levenshtein_distance_bounded(&a, &b, Some(max_d))
+                    .unwrap_or_else(|| max_d.saturating_add(1)),
+            )
+        }
+        None => Ok(
+            algorithms::levenshtein::levenshtein_distance_bounded(&a, &b, None)
+                .expect("unbounded distance should always return Some"),
+        ),
     }
 }
 
@@ -572,9 +635,18 @@ fn levenshtein(a: &str, b: &str, max_distance: Option<usize>, normalize: Option<
 /// Returns `Some(distance)` if within threshold, `None` if exceeded.
 #[pyfunction]
 #[pyo3(signature = (a, b, max_distance, normalize=None))]
-fn levenshtein_bounded(a: &str, b: &str, max_distance: usize, normalize: Option<&str>) -> PyResult<Option<usize>> {
+fn levenshtein_bounded(
+    a: &str,
+    b: &str,
+    max_distance: usize,
+    normalize: Option<&str>,
+) -> PyResult<Option<usize>> {
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::levenshtein::levenshtein_distance_bounded(&a, &b, Some(max_distance)))
+    Ok(algorithms::levenshtein::levenshtein_distance_bounded(
+        &a,
+        &b,
+        Some(max_distance),
+    ))
 }
 
 /// Compute normalized Levenshtein similarity (0.0 to 1.0).
@@ -627,7 +699,12 @@ fn jaro_winkler_similarity_grapheme(
     prefix_weight: f64,
     max_prefix_length: usize,
 ) -> f64 {
-    algorithms::jaro::jaro_winkler_similarity_grapheme_params(a, b, prefix_weight, max_prefix_length)
+    algorithms::jaro::jaro_winkler_similarity_grapheme_params(
+        a,
+        b,
+        prefix_weight,
+        max_prefix_length,
+    )
 }
 
 // ============================================================================
@@ -681,13 +758,24 @@ fn levenshtein_similarity_simd(a: &str, b: &str) -> f64 {
 /// Use `damerau_levenshtein_bounded()` if you prefer `None` semantics.
 #[pyfunction]
 #[pyo3(signature = (a, b, max_distance=None, normalize=None))]
-fn damerau_levenshtein(a: &str, b: &str, max_distance: Option<usize>, normalize: Option<&str>) -> PyResult<usize> {
+fn damerau_levenshtein(
+    a: &str,
+    b: &str,
+    max_distance: Option<usize>,
+    normalize: Option<&str>,
+) -> PyResult<usize> {
     let (a, b) = apply_normalization(a, b, normalize)?;
     match max_distance {
-        Some(max_d) => Ok(algorithms::damerau::damerau_levenshtein_distance_bounded(&a, &b, Some(max_d))
-            .unwrap_or_else(|| max_d.saturating_add(1))),
-        None => Ok(algorithms::damerau::damerau_levenshtein_distance_bounded(&a, &b, None)
-            .expect("unbounded distance should always return Some")),
+        Some(max_d) => {
+            Ok(
+                algorithms::damerau::damerau_levenshtein_distance_bounded(&a, &b, Some(max_d))
+                    .unwrap_or_else(|| max_d.saturating_add(1)),
+            )
+        }
+        None => Ok(
+            algorithms::damerau::damerau_levenshtein_distance_bounded(&a, &b, None)
+                .expect("unbounded distance should always return Some"),
+        ),
     }
 }
 
@@ -700,9 +788,18 @@ fn damerau_levenshtein(a: &str, b: &str, max_distance: Option<usize>, normalize:
 /// Returns `Some(distance)` if within threshold, `None` if exceeded.
 #[pyfunction]
 #[pyo3(signature = (a, b, max_distance, normalize=None))]
-fn damerau_levenshtein_bounded(a: &str, b: &str, max_distance: usize, normalize: Option<&str>) -> PyResult<Option<usize>> {
+fn damerau_levenshtein_bounded(
+    a: &str,
+    b: &str,
+    max_distance: usize,
+    normalize: Option<&str>,
+) -> PyResult<Option<usize>> {
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::damerau::damerau_levenshtein_distance_bounded(&a, &b, Some(max_distance)))
+    Ok(algorithms::damerau::damerau_levenshtein_distance_bounded(
+        &a,
+        &b,
+        Some(max_distance),
+    ))
 }
 
 /// Compute normalized Damerau-Levenshtein similarity.
@@ -735,17 +832,29 @@ fn jaro_similarity(a: &str, b: &str, normalize: Option<&str>) -> PyResult<f64> {
 /// * `normalize` - Optional normalization mode: "lowercase", "unicode_nfkd", "remove_punctuation", "remove_whitespace", "strict"
 #[pyfunction]
 #[pyo3(signature = (a, b, prefix_weight=0.1, max_prefix_length=4, normalize=None))]
-fn jaro_winkler_similarity(a: &str, b: &str, prefix_weight: f64, max_prefix_length: usize, normalize: Option<&str>) -> PyResult<f64> {
+fn jaro_winkler_similarity(
+    a: &str,
+    b: &str,
+    prefix_weight: f64,
+    max_prefix_length: usize,
+    normalize: Option<&str>,
+) -> PyResult<f64> {
     validate_prefix_weight(prefix_weight)?;
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::jaro::jaro_winkler_similarity_params(&a, &b, prefix_weight, max_prefix_length))
+    Ok(algorithms::jaro::jaro_winkler_similarity_params(
+        &a,
+        &b,
+        prefix_weight,
+        max_prefix_length,
+    ))
 }
 
 /// Compute Hamming distance (strings must have equal length).
 #[pyfunction]
 fn hamming(a: &str, b: &str) -> PyResult<usize> {
-    algorithms::hamming::hamming_distance(a, b)
-        .ok_or_else(|| ValidationError::new_err("Strings must have equal length for Hamming distance"))
+    algorithms::hamming::hamming_distance(a, b).ok_or_else(|| {
+        ValidationError::new_err("Strings must have equal length for Hamming distance")
+    })
 }
 
 /// Compute n-gram similarity (Sørensen-Dice coefficient).
@@ -754,10 +863,18 @@ fn hamming(a: &str, b: &str) -> PyResult<usize> {
 /// * `normalize` - Optional normalization mode: "lowercase", "unicode_nfkd", "remove_punctuation", "remove_whitespace", "strict"
 #[pyfunction]
 #[pyo3(signature = (a, b, ngram_size=3, pad=true, normalize=None))]
-fn ngram_similarity(a: &str, b: &str, ngram_size: usize, pad: bool, normalize: Option<&str>) -> PyResult<f64> {
+fn ngram_similarity(
+    a: &str,
+    b: &str,
+    ngram_size: usize,
+    pad: bool,
+    normalize: Option<&str>,
+) -> PyResult<f64> {
     validate_ngram_size(ngram_size, "ngram_size")?;
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::ngram::ngram_similarity(&a, &b, ngram_size, pad, ' '))
+    Ok(algorithms::ngram::ngram_similarity(
+        &a, &b, ngram_size, pad, ' ',
+    ))
 }
 
 /// Compute n-gram Jaccard similarity.
@@ -766,10 +883,18 @@ fn ngram_similarity(a: &str, b: &str, ngram_size: usize, pad: bool, normalize: O
 /// * `normalize` - Optional normalization mode: "lowercase", "unicode_nfkd", "remove_punctuation", "remove_whitespace", "strict"
 #[pyfunction]
 #[pyo3(signature = (a, b, ngram_size=3, pad=true, normalize=None))]
-fn ngram_jaccard(a: &str, b: &str, ngram_size: usize, pad: bool, normalize: Option<&str>) -> PyResult<f64> {
+fn ngram_jaccard(
+    a: &str,
+    b: &str,
+    ngram_size: usize,
+    pad: bool,
+    normalize: Option<&str>,
+) -> PyResult<f64> {
     validate_ngram_size(ngram_size, "ngram_size")?;
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::ngram::ngram_jaccard_similarity(&a, &b, ngram_size, pad, ' '))
+    Ok(algorithms::ngram::ngram_jaccard_similarity(
+        &a, &b, ngram_size, pad, ' ',
+    ))
 }
 
 /// Extract n-grams from a string.
@@ -946,10 +1071,17 @@ fn cosine_similarity_words(a: &str, b: &str, normalize: Option<&str>) -> PyResul
 /// * `normalize` - Optional normalization mode: "lowercase", "unicode_nfkd", "remove_punctuation", "remove_whitespace", "strict"
 #[pyfunction]
 #[pyo3(signature = (a, b, ngram_size=3, normalize=None))]
-fn cosine_similarity_ngrams(a: &str, b: &str, ngram_size: usize, normalize: Option<&str>) -> PyResult<f64> {
+fn cosine_similarity_ngrams(
+    a: &str,
+    b: &str,
+    ngram_size: usize,
+    normalize: Option<&str>,
+) -> PyResult<f64> {
     validate_ngram_size(ngram_size, "ngram_size")?;
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::cosine::cosine_similarity_ngrams(&a, &b, ngram_size))
+    Ok(algorithms::cosine::cosine_similarity_ngrams(
+        &a, &b, ngram_size,
+    ))
 }
 
 /// Compute Soundex phonetic similarity (0.0 to 1.0).
@@ -995,7 +1127,9 @@ fn trigram_similarity(a: &str, b: &str) -> f64 {
 #[pyo3(signature = (a, b, ngram_size=3))]
 fn ngram_profile_similarity(a: &str, b: &str, ngram_size: usize) -> PyResult<f64> {
     validate_ngram_size(ngram_size, "ngram_size")?;
-    Ok(algorithms::ngram::ngram_profile_similarity(a, b, ngram_size))
+    Ok(algorithms::ngram::ngram_profile_similarity(
+        a, b, ngram_size,
+    ))
 }
 
 /// Compute Hamming distance with padding.
@@ -1012,8 +1146,9 @@ fn hamming_distance_padded(a: &str, b: &str) -> usize {
 /// Raises ValidationError if strings have different lengths.
 #[pyfunction]
 fn hamming_similarity(a: &str, b: &str) -> PyResult<f64> {
-    algorithms::hamming::hamming_similarity(a, b)
-        .ok_or_else(|| ValidationError::new_err("Strings must have equal length for Hamming similarity"))
+    algorithms::hamming::hamming_similarity(a, b).ok_or_else(|| {
+        ValidationError::new_err("Strings must have equal length for Hamming similarity")
+    })
 }
 
 /// Compute LCS similarity using max length as denominator.
@@ -1221,7 +1356,11 @@ fn extract(
                 .enumerate()
                 .map(|(i, s)| {
                     let score = algorithms::fuzz::wratio(&query, s);
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .filter(|r| r.score >= min_similarity)
                 .collect()
@@ -1231,14 +1370,22 @@ fn extract(
                 .enumerate()
                 .map(|(i, s)| {
                     let score = algorithms::fuzz::wratio(&query, s);
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .filter(|r| r.score >= min_similarity)
                 .collect()
         }
     });
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
     results
 }
@@ -1277,7 +1424,11 @@ fn extract_one(
                 .enumerate()
                 .map(|(i, s)| {
                     let score = algorithms::fuzz::wratio(&query, s);
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .collect()
         } else {
@@ -1286,7 +1437,11 @@ fn extract_one(
                 .enumerate()
                 .map(|(i, s)| {
                     let score = algorithms::fuzz::wratio(&query, s);
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .collect()
         }
@@ -1295,7 +1450,11 @@ fn extract_one(
     results
         .into_iter()
         .filter(|r| r.score >= min_similarity)
-        .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
 }
 
 // ============================================================================
@@ -1317,7 +1476,11 @@ where
             .enumerate()
             .map(|(i, s)| {
                 let score = scorer(s, query);
-                MatchResult { text: s.clone(), score, id: Some(i) }
+                MatchResult {
+                    text: s.clone(),
+                    score,
+                    id: Some(i),
+                }
             })
             .collect()
     } else {
@@ -1326,7 +1489,11 @@ where
             .enumerate()
             .map(|(i, s)| {
                 let score = scorer(s, query);
-                MatchResult { text: s.clone(), score, id: Some(i) }
+                MatchResult {
+                    text: s.clone(),
+                    score,
+                    id: Some(i),
+                }
             })
             .collect()
     }
@@ -1344,7 +1511,12 @@ where
 /// * `normalize` - Optional normalization mode. Use "lowercase" for case-insensitive comparison.
 #[pyfunction]
 #[pyo3(signature = (strings, query, normalize=None))]
-fn batch_levenshtein(py: Python<'_>, strings: Vec<String>, query: &str, normalize: Option<&str>) -> Vec<MatchResult> {
+fn batch_levenshtein(
+    py: Python<'_>,
+    strings: Vec<String>,
+    query: &str,
+    normalize: Option<&str>,
+) -> Vec<MatchResult> {
     let query = query.to_string();
     py.allow_threads(|| {
         if matches!(normalize, Some("lowercase")) {
@@ -1353,7 +1525,11 @@ fn batch_levenshtein(py: Python<'_>, strings: Vec<String>, query: &str, normaliz
                 algorithms::levenshtein::levenshtein_similarity(&s.to_lowercase(), q)
             })
         } else {
-            batch_similarity_internal(&strings, &query, algorithms::levenshtein::levenshtein_similarity)
+            batch_similarity_internal(
+                &strings,
+                &query,
+                algorithms::levenshtein::levenshtein_similarity,
+            )
         }
     })
 }
@@ -1370,7 +1546,12 @@ fn batch_levenshtein(py: Python<'_>, strings: Vec<String>, query: &str, normaliz
 /// * `normalize` - Optional normalization mode. Use "lowercase" for case-insensitive comparison.
 #[pyfunction]
 #[pyo3(signature = (strings, query, normalize=None))]
-fn batch_jaro_winkler(py: Python<'_>, strings: Vec<String>, query: &str, normalize: Option<&str>) -> Vec<MatchResult> {
+fn batch_jaro_winkler(
+    py: Python<'_>,
+    strings: Vec<String>,
+    query: &str,
+    normalize: Option<&str>,
+) -> Vec<MatchResult> {
     let query = query.to_string();
     py.allow_threads(|| {
         if matches!(normalize, Some("lowercase")) {
@@ -1427,7 +1608,11 @@ fn find_best_matches(
                     } else {
                         similarity_fn(s, &query)
                     };
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .filter(|r| r.score >= min_similarity)
                 .collect()
@@ -1441,7 +1626,11 @@ fn find_best_matches(
                     } else {
                         similarity_fn(s, &query)
                     };
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .filter(|r| r.score >= min_similarity)
                 .collect()
@@ -1471,7 +1660,11 @@ fn find_best_matches(
         }
     }
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
 
     Ok(results)
@@ -1539,7 +1732,9 @@ fn batch_similarity_pairs(
                     "jaro_winkler" => {
                         crate::algorithms::jaro::jaro_winkler_similarity(&a_cmp, &b_cmp)
                     }
-                    "ngram" => crate::algorithms::ngram::ngram_similarity(&a_cmp, &b_cmp, 3, true, ' '),
+                    "ngram" => {
+                        crate::algorithms::ngram::ngram_similarity(&a_cmp, &b_cmp, 3, true, ' ')
+                    }
                     "cosine" => crate::algorithms::cosine::cosine_similarity_chars(&a_cmp, &b_cmp),
                     _ => return None,
                 };
@@ -1697,7 +1892,11 @@ fn batch_similarity(
                     } else {
                         similarity_fn(s, &query)
                     };
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .collect()
         } else {
@@ -1710,7 +1909,11 @@ fn batch_similarity(
                     } else {
                         similarity_fn(s, &query)
                     };
-                    MatchResult { text: s.clone(), score, id: Some(i) }
+                    MatchResult {
+                        text: s.clone(),
+                        score,
+                        id: Some(i),
+                    }
                 })
                 .collect()
         }
@@ -1764,7 +1967,12 @@ fn jaro_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
 /// Equivalent to `jaro_winkler_similarity(a, b, normalize="lowercase")`.
 #[pyfunction]
 #[pyo3(signature = (a, b, prefix_weight=0.1, max_prefix_length=4))]
-fn jaro_winkler_similarity_ci(a: &str, b: &str, prefix_weight: f64, max_prefix_length: usize) -> PyResult<f64> {
+fn jaro_winkler_similarity_ci(
+    a: &str,
+    b: &str,
+    prefix_weight: f64,
+    max_prefix_length: usize,
+) -> PyResult<f64> {
     jaro_winkler_similarity(a, b, prefix_weight, max_prefix_length, Some("lowercase"))
 }
 
@@ -1856,8 +2064,9 @@ fn metaphone_similarity_ci(a: &str, b: &str, max_length: usize) -> f64 {
 fn hamming_ci(a: &str, b: &str) -> PyResult<usize> {
     let a_lower = a.to_lowercase();
     let b_lower = b.to_lowercase();
-    algorithms::hamming::hamming_distance(&a_lower, &b_lower)
-        .ok_or_else(|| ValidationError::new_err("Strings must have equal length for Hamming distance"))
+    algorithms::hamming::hamming_distance(&a_lower, &b_lower).ok_or_else(|| {
+        ValidationError::new_err("Strings must have equal length for Hamming distance")
+    })
 }
 
 /// Case-insensitive Hamming similarity (0.0 to 1.0).
@@ -1868,8 +2077,9 @@ fn hamming_ci(a: &str, b: &str) -> PyResult<usize> {
 fn hamming_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
     let a_lower = a.to_lowercase();
     let b_lower = b.to_lowercase();
-    algorithms::hamming::hamming_similarity(&a_lower, &b_lower)
-        .ok_or_else(|| ValidationError::new_err("Strings must have equal length for Hamming similarity"))
+    algorithms::hamming::hamming_similarity(&a_lower, &b_lower).ok_or_else(|| {
+        ValidationError::new_err("Strings must have equal length for Hamming similarity")
+    })
 }
 
 /// Case-insensitive LCS length.
@@ -1922,7 +2132,9 @@ fn longest_common_substring_ci(a: &str, b: &str) -> PyResult<String> {
             MAX_LEN
         )));
     }
-    Ok(algorithms::lcs::longest_common_substring(&a_lower, &b_lower))
+    Ok(algorithms::lcs::longest_common_substring(
+        &a_lower, &b_lower,
+    ))
 }
 
 // ============================================================================
@@ -1990,11 +2202,13 @@ fn find_duplicates(
             } else {
                 dedup::DedupMethod::SortedNeighborhood { window_size }
             }
-        },
-        _ => return Err(ValidationError::new_err(format!(
-            "Unknown deduplication method: '{}'. Valid: auto, brute_force, snm",
-            method
-        ))),
+        }
+        _ => {
+            return Err(ValidationError::new_err(format!(
+                "Unknown deduplication method: '{}'. Valid: auto, brute_force, snm",
+                method
+            )))
+        }
     };
 
     // Parse normalization mode
@@ -2025,7 +2239,12 @@ fn find_duplicates(
 
     // Choose similarity function based on algorithm
     let metric = get_similarity_metric(algorithm)?;
-    let result = dedup::find_duplicates_with_metric(&processed_items, metric.as_ref(), min_similarity, dedup_method);
+    let result = dedup::find_duplicates_with_metric(
+        &processed_items,
+        metric.as_ref(),
+        min_similarity,
+        dedup_method,
+    );
 
     // If we normalized, map back to original strings
     let final_result = if let Some(items) = original_items {
@@ -2061,7 +2280,12 @@ fn find_duplicates(
             .flat_map(|unique_item| {
                 index_map
                     .get(unique_item)
-                    .map(|indices| indices.iter().map(|&i| items[i].clone()).collect::<Vec<_>>())
+                    .map(|indices| {
+                        indices
+                            .iter()
+                            .map(|&i| items[i].clone())
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default()
             })
             .collect();
@@ -2165,7 +2389,11 @@ fn find_duplicate_pairs(
 
             if score >= min_similarity {
                 // Always store with smaller index first for consistency
-                let (a, b) = if idx_i < idx_j { (idx_i, idx_j) } else { (idx_j, idx_i) };
+                let (a, b) = if idx_i < idx_j {
+                    (idx_i, idx_j)
+                } else {
+                    (idx_j, idx_i)
+                };
                 pairs.push((a, b, score));
             }
         }
@@ -2229,7 +2457,11 @@ fn recall(true_matches: Vec<(usize, usize)>, predicted_matches: Vec<(usize, usiz
 /// F-beta score between 0.0 and 1.0
 #[pyfunction]
 #[pyo3(signature = (true_matches, predicted_matches, beta=1.0))]
-fn f_score(true_matches: Vec<(usize, usize)>, predicted_matches: Vec<(usize, usize)>, beta: f64) -> PyResult<f64> {
+fn f_score(
+    true_matches: Vec<(usize, usize)>,
+    predicted_matches: Vec<(usize, usize)>,
+    beta: f64,
+) -> PyResult<f64> {
     if beta < 0.0 {
         return Err(ValidationError::new_err(format!(
             "beta must be non-negative, got {}",
@@ -2310,9 +2542,7 @@ fn compare_algorithms(
     // Build metrics outside py.allow_threads (requires PyResult handling)
     let metrics: Vec<(String, Box<dyn algorithms::Similarity + Send + Sync>)> = algos
         .iter()
-        .filter_map(|algo| {
-            get_similarity_metric(algo).ok().map(|m| (algo.clone(), m))
-        })
+        .filter_map(|algo| get_similarity_metric(algo).ok().map(|m| (algo.clone(), m)))
         .collect();
 
     // Release GIL during parallel computation
@@ -2362,7 +2592,11 @@ fn compare_algorithms(
     });
 
     // Sort by average score (highest first)
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     results
 }
@@ -2447,7 +2681,7 @@ impl PyBkTree {
         };
         Self { inner }
     }
-    
+
     /// Add a string to the tree.
     /// Returns true if added successfully, false if duplicate or tree depth exceeded.
     fn add(&mut self, text: String) -> bool {
@@ -2459,12 +2693,12 @@ impl PyBkTree {
     fn add_with_data(&mut self, text: String, data: u64) -> bool {
         self.inner.add_with_data(text, Some(data))
     }
-    
+
     /// Add multiple strings.
     fn add_all(&mut self, texts: Vec<String>) {
         self.inner.add_all(texts);
     }
-    
+
     /// Search for strings within a given edit distance or above a similarity threshold.
     ///
     /// # Arguments
@@ -2492,7 +2726,7 @@ impl PyBkTree {
             (None, Some(sim)) => {
                 if !(0.0..=1.0).contains(&sim) {
                     return Err(ValidationError::new_err(
-                        "min_similarity must be between 0.0 and 1.0"
+                        "min_similarity must be between 0.0 and 1.0",
                     ));
                 }
                 // Convert similarity to max_distance based on query length
@@ -2502,12 +2736,12 @@ impl PyBkTree {
             }
             (Some(_), Some(_)) => {
                 return Err(ValidationError::new_err(
-                    "Cannot specify both max_distance and min_similarity"
+                    "Cannot specify both max_distance and min_similarity",
                 ));
             }
             (None, None) => {
                 return Err(ValidationError::new_err(
-                    "Must specify either max_distance or min_similarity"
+                    "Must specify either max_distance or min_similarity",
                 ));
             }
         };
@@ -2521,12 +2755,13 @@ impl PyBkTree {
                 let query_lower = query_owned.to_lowercase();
                 // For case-insensitive search, we need to search and compare lowercase
                 // This is a workaround since the underlying BkTree doesn't support case-insensitive natively
-                self.inner.search(&query_lower, effective_max_distance)
+                self.inner
+                    .search(&query_lower, effective_max_distance)
                     .into_iter()
                     .filter(|r| {
                         let dist = algorithms::levenshtein::levenshtein(
                             &r.text.to_lowercase(),
-                            &query_lower
+                            &query_lower,
                         );
                         dist <= effective_max_distance
                     })
@@ -2542,9 +2777,7 @@ impl PyBkTree {
             .collect();
 
         // Sort by distance (ascending) for consistent results
-        converted.sort_by(|a, b| {
-            a.distance.cmp(&b.distance)
-        });
+        converted.sort_by(|a, b| a.distance.cmp(&b.distance));
 
         // Apply limit if specified
         if let Some(lim) = limit {
@@ -2595,7 +2828,7 @@ impl PyBkTree {
                             .filter(|r| {
                                 let dist = algorithms::levenshtein::levenshtein(
                                     &r.text.to_lowercase(),
-                                    &search_query
+                                    &search_query,
                                 );
                                 dist <= max_distance
                             })
@@ -2637,9 +2870,7 @@ impl PyBkTree {
         let effective_limit = limit;
 
         let query = query.to_string();
-        let results = py.allow_threads(|| {
-            self.inner.find_nearest(&query, effective_limit)
-        });
+        let results = py.allow_threads(|| self.inner.find_nearest(&query, effective_limit));
 
         Ok(results
             .into_iter()
@@ -2676,7 +2907,7 @@ impl PyBkTree {
             (None, Some(sim)) => {
                 if !(0.0..=1.0).contains(&sim) {
                     return Err(ValidationError::new_err(
-                        "min_similarity must be between 0.0 and 1.0"
+                        "min_similarity must be between 0.0 and 1.0",
                     ));
                 }
                 // Convert similarity to max_distance based on query length
@@ -2685,19 +2916,20 @@ impl PyBkTree {
             }
             (Some(_), Some(_)) => {
                 return Err(ValidationError::new_err(
-                    "Cannot specify both max_distance and min_similarity"
+                    "Cannot specify both max_distance and min_similarity",
                 ));
             }
             (None, None) => {
                 return Err(ValidationError::new_err(
-                    "Must specify either max_distance or min_similarity"
+                    "Must specify either max_distance or min_similarity",
                 ));
             }
         };
 
         let query_owned = query.to_string();
         let results = py.allow_threads(|| {
-            self.inner.search_parallel(&query_owned, effective_max_distance, limit)
+            self.inner
+                .search_parallel(&query_owned, effective_max_distance, limit)
         });
 
         Ok(results
@@ -2722,9 +2954,7 @@ impl PyBkTree {
         limit: usize,
     ) -> PyResult<Vec<SearchResult>> {
         let query = query.to_string();
-        let results = py.allow_threads(|| {
-            self.inner.find_nearest_parallel(&query, limit)
-        });
+        let results = py.allow_threads(|| self.inner.find_nearest_parallel(&query, limit));
 
         Ok(results
             .into_iter()
@@ -2778,9 +3008,7 @@ impl PyBkTree {
             Arc::new(|a: &str, b: &str| algorithms::damerau::damerau_levenshtein(a, b)),
         )
         .map(|inner| Self { inner })
-        .map_err(|e| {
-            pyo3::exceptions::PyIOError::new_err(format!("Deserialization failed: {}", e))
-        })
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("Deserialization failed: {}", e)))
     }
 
     // =========================================================================
@@ -2849,20 +3077,25 @@ impl PyNgramIndex {
         }
         validate_ngram_ratio(min_ngram_ratio)?;
         Ok(Self {
-            inner: indexing::ngram_index::NgramIndex::with_params(ngram_size, 0.0, min_ngram_ratio, normalize),
+            inner: indexing::ngram_index::NgramIndex::with_params(
+                ngram_size,
+                0.0,
+                min_ngram_ratio,
+                normalize,
+            ),
         })
     }
-    
+
     /// Add a string to the index.
     fn add(&mut self, text: String) -> usize {
         self.inner.add(text)
     }
-    
+
     /// Add a string with associated data.
     fn add_with_data(&mut self, text: String, data: u64) -> usize {
         self.inner.add_with_data(text, Some(data))
     }
-    
+
     /// Add multiple strings.
     fn add_all(&mut self, texts: Vec<String>) {
         self.inner.add_all(texts);
@@ -2901,13 +3134,11 @@ impl PyNgramIndex {
 
         let query = query.to_string();
         let results = py.allow_threads(|| {
-            self.inner.search_parallel(&query, metric.as_ref(), min_similarity, limit)
+            self.inner
+                .search_parallel(&query, metric.as_ref(), min_similarity, limit)
         });
 
-        Ok(results
-            .into_iter()
-            .map(convert_search_match)
-            .collect())
+        Ok(results.into_iter().map(convert_search_match).collect())
     }
 
     /// Batch search for multiple queries.
@@ -2932,17 +3163,13 @@ impl PyNgramIndex {
         let metric = get_similarity_metric_with_normalize(algorithm, normalize)?;
 
         let results = py.allow_threads(|| {
-            self.inner.batch_search(&queries, metric.as_ref(), min_similarity, limit)
+            self.inner
+                .batch_search(&queries, metric.as_ref(), min_similarity, limit)
         });
 
         Ok(results
             .into_iter()
-            .map(|matches| {
-                matches
-                    .into_iter()
-                    .map(convert_search_match)
-                    .collect()
-            })
+            .map(|matches| matches.into_iter().map(convert_search_match).collect())
             .collect())
     }
 
@@ -3083,24 +3310,28 @@ impl PyHybridIndex {
         }
         validate_ngram_ratio(min_ngram_ratio)?;
         Ok(Self {
-            inner: indexing::ngram_index::HybridIndex::with_params(ngram_size, min_ngram_ratio, normalize),
+            inner: indexing::ngram_index::HybridIndex::with_params(
+                ngram_size,
+                min_ngram_ratio,
+                normalize,
+            ),
         })
     }
-    
+
     fn add(&mut self, text: String) -> usize {
         self.inner.add(text)
     }
-    
+
     fn add_with_data(&mut self, text: String, data: u64) -> usize {
         self.inner.add_with_data(text, Some(data))
     }
-    
+
     fn add_all(&mut self, texts: Vec<String>) {
         for text in texts {
             self.inner.add(text);
         }
     }
-    
+
     /// Search for similar strings.
     ///
     /// # Arguments
@@ -3126,13 +3357,11 @@ impl PyHybridIndex {
 
         let query = query.to_string();
         let results = py.allow_threads(|| {
-            self.inner.search(&query, metric.as_ref(), min_similarity, limit)
+            self.inner
+                .search(&query, metric.as_ref(), min_similarity, limit)
         });
 
-        Ok(results
-            .into_iter()
-            .map(convert_search_match)
-            .collect())
+        Ok(results.into_iter().map(convert_search_match).collect())
     }
 
     /// Batch search for multiple queries (parallel processing).
@@ -3157,17 +3386,13 @@ impl PyHybridIndex {
         let metric = get_similarity_metric_with_normalize(algorithm, normalize)?;
 
         let results = py.allow_threads(|| {
-            self.inner.batch_search(&queries, metric.as_ref(), min_similarity, limit)
+            self.inner
+                .batch_search(&queries, metric.as_ref(), min_similarity, limit)
         });
 
         Ok(results
             .into_iter()
-            .map(|matches| {
-                matches
-                    .into_iter()
-                    .map(convert_search_match)
-                    .collect()
-            })
+            .map(|matches| matches.into_iter().map(convert_search_match).collect())
             .collect())
     }
 
@@ -3261,9 +3486,7 @@ impl PyThreadSafeBkTree {
     /// Search for strings within a given edit distance. Thread-safe.
     fn search(&self, py: Python<'_>, query: &str, max_distance: usize) -> Vec<SearchResult> {
         let query = query.to_string();
-        let results = py.allow_threads(|| {
-            self.inner.search(&query, max_distance)
-        });
+        let results = py.allow_threads(|| self.inner.search(&query, max_distance));
         results
             .into_iter()
             .map(|r| {
@@ -3283,9 +3506,7 @@ impl PyThreadSafeBkTree {
     /// Find the k nearest neighbors. Thread-safe.
     fn find_nearest(&self, py: Python<'_>, query: &str, k: usize) -> Vec<SearchResult> {
         let query = query.to_string();
-        let results = py.allow_threads(|| {
-            self.inner.find_nearest(&query, k)
-        });
+        let results = py.allow_threads(|| self.inner.find_nearest(&query, k));
         results
             .into_iter()
             .map(|r| {
@@ -3378,7 +3599,12 @@ struct PyThreadSafeNgramIndex {
 impl PyThreadSafeNgramIndex {
     #[new]
     #[pyo3(signature = (ngram_size=3, min_similarity=0.0, min_ngram_ratio=0.0, case_insensitive=false))]
-    fn new(ngram_size: usize, min_similarity: f64, min_ngram_ratio: f64, case_insensitive: bool) -> Self {
+    fn new(
+        ngram_size: usize,
+        min_similarity: f64,
+        min_ngram_ratio: f64,
+        case_insensitive: bool,
+    ) -> Self {
         Self {
             inner: indexing::threadsafe::ThreadSafeNgramIndex::with_params(
                 ngram_size,
@@ -3422,27 +3648,34 @@ impl PyThreadSafeNgramIndex {
         let query = query.to_string();
         let algorithm = algorithm.to_string();
 
-        let results: Result<Vec<indexing::ngram_index::SearchMatch>, String> = py.allow_threads(|| {
-            match algorithm.as_str() {
+        let results: Result<Vec<indexing::ngram_index::SearchMatch>, String> =
+            py.allow_threads(|| match algorithm.as_str() {
                 "jaro_winkler" | "jaro-winkler" => {
                     let sim = algorithms::JaroWinkler::new();
-                    Ok(self.inner.search_parallel(&query, &sim, min_similarity, limit))
+                    Ok(self
+                        .inner
+                        .search_parallel(&query, &sim, min_similarity, limit))
                 }
                 "levenshtein" => {
                     let sim = algorithms::Levenshtein::new();
-                    Ok(self.inner.search_parallel(&query, &sim, min_similarity, limit))
+                    Ok(self
+                        .inner
+                        .search_parallel(&query, &sim, min_similarity, limit))
                 }
                 "damerau" | "damerau_levenshtein" | "damerau-levenshtein" => {
                     let sim = algorithms::DamerauLevenshtein::new();
-                    Ok(self.inner.search_parallel(&query, &sim, min_similarity, limit))
+                    Ok(self
+                        .inner
+                        .search_parallel(&query, &sim, min_similarity, limit))
                 }
                 "ngram" => {
                     let sim = algorithms::Ngram::new(3);
-                    Ok(self.inner.search_parallel(&query, &sim, min_similarity, limit))
+                    Ok(self
+                        .inner
+                        .search_parallel(&query, &sim, min_similarity, limit))
                 }
                 _ => Err(format!("Unknown algorithm: {}", algorithm)),
-            }
-        });
+            });
 
         let results = results.map_err(|e| AlgorithmError::new_err(e))?;
 
@@ -3557,9 +3790,7 @@ impl PyShardedBkTree {
     /// Search all shards in parallel.
     fn search(&self, py: Python<'_>, query: &str, max_distance: usize) -> Vec<SearchResult> {
         let query = query.to_string();
-        let results = py.allow_threads(|| {
-            self.inner.search(&query, max_distance)
-        });
+        let results = py.allow_threads(|| self.inner.search(&query, max_distance));
         results
             .into_iter()
             .map(|r| {
@@ -3579,9 +3810,7 @@ impl PyShardedBkTree {
     /// Find k nearest neighbors across all shards.
     fn find_nearest(&self, py: Python<'_>, query: &str, k: usize) -> Vec<SearchResult> {
         let query = query.to_string();
-        let results = py.allow_threads(|| {
-            self.inner.find_nearest(&query, k)
-        });
+        let results = py.allow_threads(|| self.inner.find_nearest(&query, k));
         results
             .into_iter()
             .map(|r| {
@@ -3708,8 +3937,8 @@ impl PyShardedNgramIndex {
         let query = query.to_string();
         let algorithm = algorithm.to_string();
 
-        let results: Result<Vec<indexing::ngram_index::SearchMatch>, String> = py.allow_threads(|| {
-            match algorithm.as_str() {
+        let results: Result<Vec<indexing::ngram_index::SearchMatch>, String> =
+            py.allow_threads(|| match algorithm.as_str() {
                 "jaro_winkler" | "jaro-winkler" => {
                     let sim = algorithms::JaroWinkler::new();
                     Ok(self.inner.search(&query, &sim, min_similarity, limit))
@@ -3727,8 +3956,7 @@ impl PyShardedNgramIndex {
                     Ok(self.inner.search(&query, &sim, min_similarity, limit))
                 }
                 _ => Err(format!("Unknown algorithm: {}", algorithm)),
-            }
-        });
+            });
 
         let results = results.map_err(|e| AlgorithmError::new_err(e))?;
 
@@ -3815,7 +4043,9 @@ impl SchemaSearchResult {
     fn __repr__(&self) -> String {
         format!(
             "SchemaSearchResult(id={}, score={:.3}, fields={})",
-            self.id, self.score, self.record.len()
+            self.id,
+            self.score,
+            self.record.len()
         )
     }
 
@@ -3853,7 +4083,11 @@ impl Schema {
 
     /// Get required field names
     fn required_fields(&self) -> Vec<String> {
-        self.inner.required_fields().into_iter().map(|s| s.to_string()).collect()
+        self.inner
+            .required_fields()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     fn __repr__(&self) -> String {
@@ -3912,7 +4146,12 @@ impl SchemaBuilder {
             "short_text" => "jaro_winkler",
             "long_text" => "ngram",
             "token_set" => "jaccard",
-            _ => return Err(SchemaError::new_err(format!("Unknown field type: '{}'. Valid: short_text, long_text, token_set", field_type))),
+            _ => {
+                return Err(SchemaError::new_err(format!(
+                    "Unknown field type: '{}'. Valid: short_text, long_text, token_set",
+                    field_type
+                )))
+            }
         };
 
         let algo_str = algorithm.unwrap_or(default_algo);
@@ -3939,8 +4178,13 @@ impl SchemaBuilder {
                     separator: sep_str.to_string(),
                     default_algorithm: parsed_algorithm.clone(),
                 }
-            },
-            _ => return Err(SchemaError::new_err(format!("Unknown field type: '{}'. Valid: short_text, long_text, token_set", field_type))),
+            }
+            _ => {
+                return Err(SchemaError::new_err(format!(
+                    "Unknown field type: '{}'. Valid: short_text, long_text, token_set",
+                    field_type
+                )))
+            }
         };
 
         // Parse normalization
@@ -3968,7 +4212,12 @@ impl SchemaBuilder {
         let scoring = match strategy.to_lowercase().as_str() {
             "weighted_average" => schema::ScoringStrategy::WeightedAverage,
             "minmax_scaling" | "minmax" => schema::ScoringStrategy::MinMaxScaling,
-            _ => return Err(SchemaError::new_err(format!("Unknown scoring strategy: '{}'. Valid: weighted_average, minmax_scaling", strategy))),
+            _ => {
+                return Err(SchemaError::new_err(format!(
+                    "Unknown scoring strategy: '{}'. Valid: weighted_average, minmax_scaling",
+                    strategy
+                )))
+            }
         };
 
         self.scoring = Some(scoring);
@@ -3988,7 +4237,10 @@ impl SchemaBuilder {
 
         match builder.build() {
             Ok(schema) => Ok(Schema { inner: schema }),
-            Err(e) => Err(SchemaError::new_err(format!("Schema validation failed: {}", e))),
+            Err(e) => Err(SchemaError::new_err(format!(
+                "Schema validation failed: {}",
+                e
+            ))),
         }
     }
 }
@@ -4011,7 +4263,11 @@ impl SchemaIndex {
 
     /// Add a record to the index
     #[pyo3(signature = (record, data=None))]
-    fn add(&mut self, record: std::collections::HashMap<String, String>, data: Option<u64>) -> PyResult<usize> {
+    fn add(
+        &mut self,
+        record: std::collections::HashMap<String, String>,
+        data: Option<u64>,
+    ) -> PyResult<usize> {
         let mut rec = schema::Record::new();
         for (key, value) in record {
             rec.set_field(key, value);
@@ -4186,7 +4442,6 @@ fn parse_algorithm(algo: &str) -> PyResult<schema::types::Algorithm> {
         ))),
     }
 }
-
 
 // ============================================================================
 // Python Module

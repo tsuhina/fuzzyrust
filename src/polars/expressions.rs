@@ -120,12 +120,13 @@ fn pl_fuzzy_similarity(inputs: &[Series], kwargs: SimilarityKwargs) -> PolarsRes
         .downcast_iter()
         .zip(right.downcast_iter())
         .flat_map(|(left_chunk, right_chunk)| {
-            left_chunk.iter().zip(right_chunk.iter()).map(move |(a, b)| {
-                match (a, b) {
+            left_chunk
+                .iter()
+                .zip(right_chunk.iter())
+                .map(move |(a, b)| match (a, b) {
                     (Some(a), Some(b)) => Some(algorithm.compute(a, b)),
                     _ => None,
-                }
-            })
+                })
         })
         .collect();
 
@@ -152,12 +153,13 @@ fn pl_fuzzy_is_match(inputs: &[Series], kwargs: IsMatchKwargs) -> PolarsResult<S
         .downcast_iter()
         .zip(right.downcast_iter())
         .flat_map(|(left_chunk, right_chunk)| {
-            left_chunk.iter().zip(right_chunk.iter()).map(move |(a, b)| {
-                match (a, b) {
+            left_chunk
+                .iter()
+                .zip(right_chunk.iter())
+                .map(move |(a, b)| match (a, b) {
                     (Some(a), Some(b)) => Some(algorithm.compute(a, b) >= threshold),
                     _ => None,
-                }
-            })
+                })
         })
         .collect();
 
@@ -277,11 +279,7 @@ fn build_target_index(targets: &[String]) -> TargetIndex {
 
         for ngram in unique_ngrams {
             let hash = hash_ngram(&ngram);
-            index
-                .ngram_to_targets
-                .entry(hash)
-                .or_default()
-                .push(idx);
+            index.ngram_to_targets.entry(hash).or_default().push(idx);
         }
     }
 
@@ -296,10 +294,7 @@ fn extract_ngrams(s: &str, n: usize) -> Vec<String> {
         return vec![];
     }
 
-    chars
-        .windows(n)
-        .map(|w| w.iter().collect())
-        .collect()
+    chars.windows(n).map(|w| w.iter().collect()).collect()
 }
 
 /// Hash an n-gram string for index lookup.
@@ -334,9 +329,7 @@ fn find_best_match_indexed(
         if score >= min_score {
             match best_match {
                 None => best_match = Some((idx, score)),
-                Some((_, best_score)) if score > best_score => {
-                    best_match = Some((idx, score))
-                }
+                Some((_, best_score)) if score > best_score => best_match = Some((idx, score)),
                 _ => {}
             }
         }
@@ -360,9 +353,7 @@ fn find_best_match_linear(
         if score >= min_score {
             match best_match {
                 None => best_match = Some((idx, score)),
-                Some((_, best_score)) if score > best_score => {
-                    best_match = Some((idx, score))
-                }
+                Some((_, best_score)) if score > best_score => best_match = Some((idx, score)),
                 _ => {}
             }
         }
@@ -390,12 +381,13 @@ fn pl_fuzzy_distance(inputs: &[Series]) -> PolarsResult<Series> {
         .downcast_iter()
         .zip(right.downcast_iter())
         .flat_map(|(left_chunk, right_chunk)| {
-            left_chunk.iter().zip(right_chunk.iter()).map(|(a, b)| {
-                match (a, b) {
+            left_chunk
+                .iter()
+                .zip(right_chunk.iter())
+                .map(|(a, b)| match (a, b) {
                     (Some(a), Some(b)) => Some(levenshtein(a, b) as u32),
                     _ => None,
-                }
-            })
+                })
         })
         .collect();
 
@@ -418,9 +410,7 @@ fn pl_fuzzy_soundex(inputs: &[Series]) -> PolarsResult<Series> {
     // Optimization: Process by chunks for better cache locality
     let out: StringChunked = values
         .downcast_iter()
-        .flat_map(|chunk| {
-            chunk.iter().map(|v| v.map(|s| soundex(s)))
-        })
+        .flat_map(|chunk| chunk.iter().map(|v| v.map(|s| soundex(s))))
         .collect();
 
     Ok(out.into_series())
@@ -442,9 +432,7 @@ fn pl_fuzzy_metaphone(inputs: &[Series]) -> PolarsResult<Series> {
     // Optimization: Process by chunks for better cache locality
     let out: StringChunked = values
         .downcast_iter()
-        .flat_map(|chunk| {
-            chunk.iter().map(|v| v.map(|s| metaphone(s, 4)))
-        })
+        .flat_map(|chunk| chunk.iter().map(|v| v.map(|s| metaphone(s, 4))))
         .collect();
 
     Ok(out.into_series())

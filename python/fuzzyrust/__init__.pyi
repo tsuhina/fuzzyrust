@@ -94,14 +94,17 @@ class AlgorithmComparison:
 
 class FuzzyRustError(Exception):
     """Base exception for all FuzzyRust errors."""
+
     ...
 
 class ValidationError(FuzzyRustError):
     """Raised when input validation fails (invalid parameters, out of range values)."""
+
     ...
 
 class AlgorithmError(FuzzyRustError):
     """Raised when an unknown or unsupported algorithm is specified."""
+
     ...
 
 class FuzzyIndexError(FuzzyRustError):
@@ -109,10 +112,12 @@ class FuzzyIndexError(FuzzyRustError):
 
     Note: Aliased from IndexError in Rust to avoid shadowing Python's built-in IndexError.
     """
+
     ...
 
 class SchemaError(FuzzyRustError):
     """Raised when schema validation or operations fail."""
+
     ...
 
 # =============================================================================

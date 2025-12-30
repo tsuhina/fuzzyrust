@@ -15,9 +15,9 @@
 //! let results = tree.search("query", 2); // Parallel search
 //! ```
 
+use ahash::AHasher;
 use rayon::prelude::*;
 use std::hash::{Hash, Hasher};
-use ahash::AHasher;
 
 use super::bktree::{BkTree, SearchResult as BkSearchResult};
 use super::ngram_index::{NgramIndex, SearchMatch};
@@ -146,7 +146,8 @@ impl ShardedBkTree {
     /// Find the k nearest neighbors across all shards.
     pub fn find_nearest(&self, query: &str, k: usize) -> Vec<BkSearchResult> {
         // Get candidates from all shards
-        let mut all_results: Vec<BkSearchResult> = self.shards
+        let mut all_results: Vec<BkSearchResult> = self
+            .shards
             .par_iter()
             .flat_map(|shard| shard.find_nearest(query, k))
             .collect();
@@ -335,11 +336,13 @@ impl ShardedNgramIndex {
         limit: Option<usize>,
     ) -> Vec<SearchMatch> {
         // Collect results from each shard in parallel
-        let shard_results: Vec<Vec<SearchMatch>> = self.shards
+        let shard_results: Vec<Vec<SearchMatch>> = self
+            .shards
             .par_iter()
             .enumerate()
             .map(|(shard_idx, shard)| {
-                shard.search_parallel(query, similarity, min_similarity, limit)
+                shard
+                    .search_parallel(query, similarity, min_similarity, limit)
                     .into_iter()
                     .map(|mut m| {
                         // Encode shard in the ID

@@ -375,6 +375,7 @@ def dedupe_snm(
         elif keep == "last":
             canonical_idx = max(members)
         else:  # most_complete
+
             def completeness(idx: int) -> int:
                 count = 0
                 row = df.row(idx, named=True)

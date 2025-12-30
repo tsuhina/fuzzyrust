@@ -64,7 +64,7 @@ impl Similarity for CosineSimilarity {
             cosine_similarity_chars(a, b)
         }
     }
-    
+
     fn name(&self) -> &'static str {
         "cosine"
     }
@@ -94,33 +94,33 @@ fn cosine_from_maps<T: std::hash::Hash + Eq>(
     if map_a.is_empty() && map_b.is_empty() {
         return 1.0;
     }
-    
+
     if map_a.is_empty() || map_b.is_empty() {
         return 0.0;
     }
-    
+
     let mut dot_product = 0.0f64;
     let mut magnitude_a = 0.0f64;
     let mut magnitude_b = 0.0f64;
-    
+
     // Calculate magnitude of A and dot product for common elements
     for (key, &count_a) in map_a {
         let count_a = count_a as f64;
         magnitude_a += count_a * count_a;
-        
+
         if let Some(&count_b) = map_b.get(key) {
             dot_product += count_a * count_b as f64;
         }
     }
-    
+
     // Calculate magnitude of B
     for &count_b in map_b.values() {
         let count_b = count_b as f64;
         magnitude_b += count_b * count_b;
     }
-    
+
     let magnitude = (magnitude_a * magnitude_b).sqrt();
-    
+
     if magnitude == 0.0 {
         0.0
     } else {
@@ -134,10 +134,10 @@ pub fn cosine_similarity_chars(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
-    
+
     let map_a = build_frequency_map(a.chars());
     let map_b = build_frequency_map(b.chars());
-    
+
     cosine_from_maps(&map_a, &map_b)
 }
 
@@ -147,14 +147,10 @@ pub fn cosine_similarity_words(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
-    
-    let map_a = build_frequency_map(
-        a.split_whitespace().map(|s| s.to_lowercase())
-    );
-    let map_b = build_frequency_map(
-        b.split_whitespace().map(|s| s.to_lowercase())
-    );
-    
+
+    let map_a = build_frequency_map(a.split_whitespace().map(|s| s.to_lowercase()));
+    let map_b = build_frequency_map(b.split_whitespace().map(|s| s.to_lowercase()));
+
     cosine_from_maps(&map_a, &map_b)
 }
 
@@ -165,7 +161,12 @@ const MAX_NGRAM_SIZE: usize = 32;
 ///
 /// # Arguments
 /// * `n` - N-gram size (1-32). Values of 0 return empty map, values >32 are clamped.
-fn build_ngram_frequency_map_direct(s: &str, n: usize, pad: bool, pad_char: char) -> AHashMap<String, usize> {
+fn build_ngram_frequency_map_direct(
+    s: &str,
+    n: usize,
+    pad: bool,
+    pad_char: char,
+) -> AHashMap<String, usize> {
     let mut map = AHashMap::new();
     if n == 0 {
         return map;
@@ -248,70 +249,65 @@ impl TfIdfCosine {
 
     /// Add a document to build the IDF scores.
     pub fn add_document(&mut self, doc: &str) {
-        let terms: std::collections::HashSet<String> = doc
-            .split_whitespace()
-            .map(|s| s.to_lowercase())
-            .collect();
-        
+        let terms: std::collections::HashSet<String> =
+            doc.split_whitespace().map(|s| s.to_lowercase()).collect();
+
         for term in terms {
             *self.df.entry(term).or_insert(0) += 1;
         }
         self.num_docs += 1;
     }
-    
+
     /// Calculate TF-IDF weighted cosine similarity.
     #[must_use]
     pub fn similarity(&self, a: &str, b: &str) -> f64 {
         if a == b {
             return 1.0;
         }
-        
+
         let tfidf_a = self.compute_tfidf(a);
         let tfidf_b = self.compute_tfidf(b);
-        
+
         if tfidf_a.is_empty() && tfidf_b.is_empty() {
             return 1.0;
         }
-        
+
         if tfidf_a.is_empty() || tfidf_b.is_empty() {
             return 0.0;
         }
-        
+
         let mut dot_product = 0.0f64;
         let mut magnitude_a = 0.0f64;
         let mut magnitude_b = 0.0f64;
-        
+
         for (term, &weight_a) in &tfidf_a {
             magnitude_a += weight_a * weight_a;
             if let Some(&weight_b) = tfidf_b.get(term) {
                 dot_product += weight_a * weight_b;
             }
         }
-        
+
         for &weight_b in tfidf_b.values() {
             magnitude_b += weight_b * weight_b;
         }
-        
+
         let magnitude = (magnitude_a * magnitude_b).sqrt();
-        
+
         if magnitude == 0.0 {
             0.0
         } else {
             dot_product / magnitude
         }
     }
-    
+
     fn compute_tfidf(&self, doc: &str) -> AHashMap<String, f64> {
-        let terms: Vec<String> = doc
-            .split_whitespace()
-            .map(|s| s.to_lowercase())
-            .collect();
-        
+        let terms: Vec<String> = doc.split_whitespace().map(|s| s.to_lowercase()).collect();
+
         let tf = build_frequency_map(terms.iter().cloned());
         let doc_len = terms.len() as f64;
-        
+
         let mut tfidf = AHashMap::new();
-        
+
         for (term, count) in tf {
             let tf_score = count as f64 / doc_len;
             let idf_score = if let Some(&df) = self.df.get(&term) {
@@ -321,7 +317,7 @@ impl TfIdfCosine {
             };
             tfidf.insert(term, tf_score * idf_score);
         }
-        
+
         tfidf
     }
 }
@@ -349,17 +345,17 @@ impl super::Similarity for TfIdfCosine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     fn approx_eq(a: f64, b: f64) -> bool {
         (a - b).abs() < 0.01
     }
-    
+
     #[test]
     fn test_cosine_chars() {
         assert!(approx_eq(cosine_similarity_chars("abc", "abc"), 1.0));
         assert!(approx_eq(cosine_similarity_chars("abc", "def"), 0.0));
     }
-    
+
     #[test]
     fn test_cosine_words() {
         let a = "the quick brown fox";
@@ -367,14 +363,14 @@ mod tests {
         let sim = cosine_similarity_words(a, b);
         assert!(sim > 0.5 && sim < 1.0);
     }
-    
+
     #[test]
     fn test_tfidf() {
         let mut tfidf = TfIdfCosine::new();
         tfidf.add_document("hello world");
         tfidf.add_document("hello there");
         tfidf.add_document("world news");
-        
+
         let sim = tfidf.similarity("hello world", "hello there");
         assert!(sim > 0.0 && sim < 1.0);
     }

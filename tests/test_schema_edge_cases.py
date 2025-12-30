@@ -114,7 +114,9 @@ class TestMissingFieldsInQuery:
 
         # Query with field not in schema should raise an error
         # (Implementation detail: SchemaIndex validates query fields)
-        with pytest.raises((KeyError, ValueError, fr.ValidationError, fr.SchemaError, fr.FuzzyIndexError)):
+        with pytest.raises(
+            (KeyError, ValueError, fr.ValidationError, fr.SchemaError, fr.FuzzyIndexError)
+        ):
             index.search({"name": "Test", "unknown_field": "value"})
 
     def test_query_missing_all_schema_fields(self):
@@ -128,7 +130,9 @@ class TestMissingFieldsInQuery:
         index.add({"name": "Test", "desc": "Description"})
 
         # Query with completely different field should raise error
-        with pytest.raises((KeyError, ValueError, fr.ValidationError, fr.SchemaError, fr.FuzzyIndexError)):
+        with pytest.raises(
+            (KeyError, ValueError, fr.ValidationError, fr.SchemaError, fr.FuzzyIndexError)
+        ):
             index.search({"other": "value"})
 
     def test_query_with_subset_of_fields(self):
@@ -202,7 +206,9 @@ class TestUnicodeFieldNames:
         """Field names with CJK characters."""
         builder = fr.SchemaBuilder()
         try:
-            builder.add_field(name="\u540d\u524d", field_type="short_text")  # Japanese: "namae" (name)
+            builder.add_field(
+                name="\u540d\u524d", field_type="short_text"
+            )  # Japanese: "namae" (name)
             schema = builder.build()
             index = fr.SchemaIndex(schema)
             index.add({"\u540d\u524d": "\u7530\u4e2d"})  # "Tanaka"
@@ -337,7 +343,7 @@ class TestSpecialCharactersInValues:
         index = fr.SchemaIndex(schema)
 
         # Mix of scripts: Latin, CJK, Arabic, Emoji
-        mixed_text = "Hello \u4e16\u754c \u0645\u0631\u062d\u0628\u0627 \U0001F44B"
+        mixed_text = "Hello \u4e16\u754c \u0645\u0631\u062d\u0628\u0627 \U0001f44b"
         index.add({"text": mixed_text})
 
         results = index.search({"text": "Hello"}, min_similarity=0.1)

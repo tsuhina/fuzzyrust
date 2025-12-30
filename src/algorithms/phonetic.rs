@@ -33,7 +33,7 @@ impl Similarity for Soundex {
     fn similarity(&self, a: &str, b: &str) -> f64 {
         soundex_similarity(a, b)
     }
-    
+
     fn name(&self) -> &'static str {
         "soundex"
     }
@@ -77,7 +77,7 @@ impl Similarity for Metaphone {
     fn similarity(&self, a: &str, b: &str) -> f64 {
         metaphone_similarity(a, b, self.max_length)
     }
-    
+
     fn name(&self) -> &'static str {
         "metaphone"
     }
@@ -104,19 +104,19 @@ impl Similarity for Metaphone {
 #[must_use]
 pub fn soundex(s: &str) -> String {
     let s = s.trim().to_uppercase();
-    
+
     if s.is_empty() {
         return String::new();
     }
-    
+
     let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
-    
+
     if chars.is_empty() {
         return String::new();
     }
-    
+
     let first = chars[0];
-    
+
     let encode_char = |c: char| -> char {
         match c {
             'B' | 'F' | 'P' | 'V' => '1',
@@ -128,11 +128,9 @@ pub fn soundex(s: &str) -> String {
             _ => '0', // A, E, I, O, U, H, W, Y
         }
     };
-    
+
     // Helper to check if a character is H or W (ignored entirely in Soundex)
-    let is_hw = |c: char| -> bool {
-        matches!(c, 'H' | 'W')
-    };
+    let is_hw = |c: char| -> bool { matches!(c, 'H' | 'W') };
 
     let mut result = String::with_capacity(4);
     result.push(first);
@@ -181,21 +179,22 @@ pub fn soundex_match(a: &str, b: &str) -> bool {
 pub fn soundex_similarity(a: &str, b: &str) -> f64 {
     let code_a = soundex(a);
     let code_b = soundex(b);
-    
+
     if code_a.is_empty() || code_b.is_empty() {
         return 0.0;
     }
-    
+
     if code_a == code_b {
         return 1.0;
     }
-    
+
     // Partial matching: count matching positions
-    let matches: usize = code_a.chars()
+    let matches: usize = code_a
+        .chars()
         .zip(code_b.chars())
         .filter(|(a, b)| a == b)
         .count();
-    
+
     matches as f64 / 4.0
 }
 
@@ -208,15 +207,15 @@ pub fn soundex_similarity(a: &str, b: &str) -> f64 {
 pub fn metaphone(s: &str, max_length: usize) -> String {
     let s = s.trim().to_uppercase();
     let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
-    
+
     if chars.is_empty() {
         return String::new();
     }
-    
+
     let mut result = String::with_capacity(max_length);
     let len = chars.len();
     let mut i = 0;
-    
+
     // Handle initial letter combinations
     if len >= 2 {
         match (chars[0], chars[1]) {
@@ -230,18 +229,22 @@ pub fn metaphone(s: &str, max_length: usize) -> String {
             _ => {}
         }
     }
-    
+
     if i == 0 && chars[0] == 'X' {
         result.push('S');
         i = 1;
     }
-    
+
     while i < len && result.len() < max_length {
         let c = chars[i];
         let next = chars.get(i + 1).copied();
-        let prev = if i > 0 { chars.get(i - 1).copied() } else { None };
+        let prev = if i > 0 {
+            chars.get(i - 1).copied()
+        } else {
+            None
+        };
         let next2 = chars.get(i + 2).copied();
-        
+
         match c {
             'A' | 'E' | 'I' | 'O' | 'U' => {
                 if i == 0 {
@@ -358,10 +361,10 @@ pub fn metaphone(s: &str, max_length: usize) -> String {
             'Z' => result.push('S'),
             _ => {}
         }
-        
+
         i += 1;
     }
-    
+
     result
 }
 
@@ -383,15 +386,15 @@ pub fn metaphone_match(a: &str, b: &str) -> bool {
 pub fn metaphone_similarity(a: &str, b: &str, max_length: usize) -> f64 {
     let code_a = metaphone(a, max_length);
     let code_b = metaphone(b, max_length);
-    
+
     if code_a.is_empty() || code_b.is_empty() {
         return 0.0;
     }
-    
+
     if code_a == code_b {
         return 1.0;
     }
-    
+
     // Use Jaro-Winkler on the codes for partial matching
     super::jaro::jaro_winkler_similarity(&code_a, &code_b)
 }
@@ -651,7 +654,9 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                     {
                         // Silent GH
                     } else {
-                        if i > 2 && prev == Some('U') && string_at(i - 3, &["C", "G", "L", "R", "T"])
+                        if i > 2
+                            && prev == Some('U')
+                            && string_at(i - 3, &["C", "G", "L", "R", "T"])
                         {
                             add("F", "F");
                         } else if i > 0 && prev != Some('I') {
@@ -673,7 +678,12 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                     i += 1;
                 } else if i == 0
                     && (next == Some('Y')
-                        || string_at(i + 1, &["ES", "EP", "EB", "EL", "EY", "IB", "IL", "IN", "IE", "EI", "ER"]))
+                        || string_at(
+                            i + 1,
+                            &[
+                                "ES", "EP", "EB", "EL", "EY", "IB", "IL", "IN", "IE", "EI", "ER",
+                            ],
+                        ))
                 {
                     add("K", "J");
                 } else if (string_at(i + 1, &["ER"]) || next == Some('Y'))
@@ -684,7 +694,10 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                     add("K", "J");
                 } else if string_at(i + 1, &["E", "I", "Y"]) || string_at(i - 1, &["AGGI", "OGGI"])
                 {
-                    if string_at(0, &["VAN ", "VON "]) || string_at(0, &["SCH"]) || string_at(i + 1, &["ET"]) {
+                    if string_at(0, &["VAN ", "VON "])
+                        || string_at(0, &["SCH"])
+                        || string_at(i + 1, &["ET"])
+                    {
                         add("K", "K");
                     } else if string_at(i + 1, &["IER"]) {
                         add("J", "J");
@@ -835,7 +848,10 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                             } else {
                                 add("SK", "SK");
                             }
-                        } else if i == 0 && !is_vowel_char(char_at(3).unwrap_or(' ')) && char_at(3) != Some('W') {
+                        } else if i == 0
+                            && !is_vowel_char(char_at(3).unwrap_or(' '))
+                            && char_at(3) != Some('W')
+                        {
                             add("X", "S");
                         } else {
                             add("X", "X");
@@ -865,7 +881,9 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                     add("X", "X");
                     i += 2;
                 } else if string_at(i, &["TH"]) || string_at(i, &["TTH"]) {
-                    if string_at(i + 2, &["OM", "AM"]) || string_at(0, &["VAN ", "VON "]) || string_at(0, &["SCH"])
+                    if string_at(i + 2, &["OM", "AM"])
+                        || string_at(0, &["VAN ", "VON "])
+                        || string_at(0, &["SCH"])
                     {
                         add("T", "T");
                     } else {
@@ -907,8 +925,7 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
             }
             'X' => {
                 if !(i == len - 1
-                    && (string_at(i - 3, &["IAU", "EAU"])
-                        || string_at(i - 2, &["AU", "OU"])))
+                    && (string_at(i - 3, &["IAU", "EAU"]) || string_at(i - 2, &["AU", "OU"])))
                 {
                     add("KS", "KS");
                 }
@@ -1028,20 +1045,20 @@ mod tests {
         assert_eq!(soundex("Ashcraft"), "A261");
         assert_eq!(soundex("Ashcroft"), "A261");
     }
-    
+
     #[test]
     fn test_soundex_match() {
         assert!(soundex_match("Robert", "Rupert"));
         assert!(soundex_match("Smith", "Smyth"));
         assert!(!soundex_match("Robert", "Rubin"));
     }
-    
+
     #[test]
     fn test_metaphone() {
         assert_eq!(metaphone("phone", 4), "FN");
         assert_eq!(metaphone("knight", 4), "NT");
     }
-    
+
     #[test]
     fn test_metaphone_match() {
         assert!(metaphone_match("Stephen", "Steven"));
