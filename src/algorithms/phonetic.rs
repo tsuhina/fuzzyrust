@@ -520,7 +520,7 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
         let c = chars[i];
         let next = char_at(i + 1);
         let prev = if i > 0 { char_at(i - 1) } else { None };
-        let next2 = char_at(i + 2);
+        let _next2 = char_at(i + 2);
 
         // Helper to add codes (respecting max_length)
         let mut add = |p: &str, a: &str| {
@@ -560,12 +560,10 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                     // Handle CH
                     if i > 0 && string_at(i, &["CHAE"]) {
                         add("K", "X");
-                    } else if i == 0
+                    } else if (i == 0
                         && (string_at(i + 1, &["HARAC", "HARIS"])
-                            || string_at(i + 1, &["HOR", "HYM", "HIA", "HEM"]))
-                    {
-                        add("K", "K");
-                    } else if string_at(0, &["VAN ", "VON "])
+                            || string_at(i + 1, &["HOR", "HYM", "HIA", "HEM"])))
+                        || string_at(0, &["VAN ", "VON "])
                         || string_at(0, &["SCH"])
                         || string_at(i - 2, &["ORCHES", "ARCHIT", "ORCHID"])
                         || string_at(i + 2, &["T", "S"])
@@ -653,15 +651,13 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                         || (i > 3 && string_at(i - 4, &["B", "H"]))
                     {
                         // Silent GH
-                    } else {
-                        if i > 2
-                            && prev == Some('U')
-                            && string_at(i - 3, &["C", "G", "L", "R", "T"])
-                        {
-                            add("F", "F");
-                        } else if i > 0 && prev != Some('I') {
-                            add("K", "K");
-                        }
+                    } else if i > 2
+                        && prev == Some('U')
+                        && string_at(i - 3, &["C", "G", "L", "R", "T"])
+                    {
+                        add("F", "F");
+                    } else if i > 0 && prev != Some('I') {
+                        add("K", "K");
                     }
                     i += 1;
                 } else if next == Some('N') {
@@ -676,20 +672,18 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                 } else if string_at(i + 1, &["LI"]) && !slavo_germanic {
                     add("KL", "L");
                     i += 1;
-                } else if i == 0
+                } else if (i == 0
                     && (next == Some('Y')
                         || string_at(
                             i + 1,
                             &[
                                 "ES", "EP", "EB", "EL", "EY", "IB", "IL", "IN", "IE", "EI", "ER",
                             ],
-                        ))
-                {
-                    add("K", "J");
-                } else if (string_at(i + 1, &["ER"]) || next == Some('Y'))
-                    && !string_at(0, &["DANGER", "RANGER", "MANGER"])
-                    && !string_at(i - 1, &["E", "I"])
-                    && !string_at(i - 1, &["RGY", "OGY"])
+                        )))
+                    || ((string_at(i + 1, &["ER"]) || next == Some('Y'))
+                        && !string_at(0, &["DANGER", "RANGER", "MANGER"])
+                        && !string_at(i - 1, &["E", "I"])
+                        && !string_at(i - 1, &["RGY", "OGY"]))
                 {
                     add("K", "J");
                 } else if string_at(i + 1, &["E", "I", "Y"]) || string_at(i - 1, &["AGGI", "OGGI"])
@@ -1068,7 +1062,7 @@ mod tests {
     #[test]
     fn test_double_metaphone() {
         // Test Germanic names with alternate encodings
-        let (primary, alternate) = double_metaphone("Schmidt", 4);
+        let (primary, _alternate) = double_metaphone("Schmidt", 4);
         assert!(!primary.is_empty());
         // Schmidt should have different primary and alternate
 

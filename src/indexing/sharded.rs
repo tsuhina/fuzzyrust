@@ -346,7 +346,7 @@ impl ShardedNgramIndex {
                     .into_iter()
                     .map(|mut m| {
                         // Encode shard in the ID
-                        m.id = (shard_idx << 48) | m.id;
+                        m.id |= shard_idx << 48;
                         m
                     })
                     .collect()

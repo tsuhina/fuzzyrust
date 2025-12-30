@@ -568,7 +568,7 @@ impl BkTree {
 
     /// Iterate over all active (non-deleted) items.
     pub fn iter_active(&self) -> impl Iterator<Item = (&str, Option<u64>)> {
-        BkTreeActiveIter::new(self.root.as_ref())
+        BkTreeActiveIter::new(self.root.as_deref())
     }
 }
 
@@ -852,10 +852,10 @@ struct BkTreeActiveIter<'a> {
 }
 
 impl<'a> BkTreeActiveIter<'a> {
-    fn new(root: Option<&'a Box<BkNode>>) -> Self {
+    fn new(root: Option<&'a BkNode>) -> Self {
         let mut stack = Vec::new();
         if let Some(node) = root {
-            stack.push(node.as_ref());
+            stack.push(node);
         }
         Self { stack }
     }

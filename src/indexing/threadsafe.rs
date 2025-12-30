@@ -479,6 +479,6 @@ mod tests {
         writer.join().unwrap();
         reader.join().unwrap();
 
-        assert!(tree.len() >= 1); // At least "initial"
+        assert!(!tree.is_empty()); // At least "initial"
     }
 }

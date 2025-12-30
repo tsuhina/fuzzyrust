@@ -148,9 +148,9 @@ pub fn extract_ngrams(s: &str, n: usize, pad: bool, pad_char: char) -> Vec<Strin
     let chars: Vec<char> = if pad {
         let char_count = s.chars().count();
         let mut result = Vec::with_capacity(char_count + 2 * (n - 1));
-        result.extend(std::iter::repeat(pad_char).take(n - 1));
+        result.extend(std::iter::repeat_n(pad_char, n - 1));
         result.extend(s.chars());
-        result.extend(std::iter::repeat(pad_char).take(n - 1));
+        result.extend(std::iter::repeat_n(pad_char, n - 1));
         result
     } else {
         s.chars().collect()

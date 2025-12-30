@@ -53,6 +53,7 @@
 pub mod field;
 pub mod field_indices;
 pub mod index;
+#[allow(clippy::module_inception)]
 pub mod schema;
 pub mod scoring;
 pub mod storage;

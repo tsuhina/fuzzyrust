@@ -208,10 +208,13 @@ fn get_similarity_metric_with_normalize(
     }
 }
 
+/// Type alias for boxed similarity functions.
+type SimilarityFn = Box<dyn Fn(&str, &str) -> f64 + Send + Sync>;
+
 /// Get a boxed similarity function for the given algorithm name.
 ///
 /// Used by find_best_matches where a closure is more appropriate than a trait object.
-fn get_similarity_fn(algorithm: &str) -> PyResult<Box<dyn Fn(&str, &str) -> f64 + Send + Sync>> {
+fn get_similarity_fn(algorithm: &str) -> PyResult<SimilarityFn> {
     match algorithm {
         "levenshtein" => Ok(Box::new(algorithms::levenshtein::levenshtein_similarity)),
         "damerau_levenshtein" | "damerau" => Ok(Box::new(algorithms::damerau::damerau_levenshtein_similarity)),
@@ -2383,8 +2386,7 @@ fn find_duplicate_pairs(
         let idx_i = indices[i];
         let end = (i + window_size).min(indices.len());
 
-        for j in (i + 1)..end {
-            let idx_j = indices[j];
+        for &idx_j in &indices[(i + 1)..end] {
             let score = metric.similarity(&processed_items[idx_i], &processed_items[idx_j]);
 
             if score >= min_similarity {
@@ -3677,7 +3679,7 @@ impl PyThreadSafeNgramIndex {
                 _ => Err(format!("Unknown algorithm: {}", algorithm)),
             });
 
-        let results = results.map_err(|e| AlgorithmError::new_err(e))?;
+        let results = results.map_err(AlgorithmError::new_err)?;
 
         Ok(results
             .into_iter()
@@ -3958,7 +3960,7 @@ impl PyShardedNgramIndex {
                 _ => Err(format!("Unknown algorithm: {}", algorithm)),
             });
 
-        let results = results.map_err(|e| AlgorithmError::new_err(e))?;
+        let results = results.map_err(AlgorithmError::new_err)?;
 
         Ok(results
             .into_iter()
