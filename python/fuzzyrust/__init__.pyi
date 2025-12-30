@@ -1,4 +1,4 @@
-"""Type stubs for fuzzyrust v0.1.1."""
+"""Type stubs for fuzzyrust."""
 
 from collections.abc import Sequence
 from enum import Enum

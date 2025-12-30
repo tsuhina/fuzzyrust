@@ -732,7 +732,6 @@ wheels = [
 
 [[package]]
 name = "fuzzyrust"
-version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "polars" },
@@ -806,7 +805,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.10" },
     { name = "thefuzz", marker = "extra == 'benchmarks'", specifier = ">=0.22.1" },
 ]
-provides-extras = ["dev", "benchmarks", "jupyter", "all"]
+provides-extras = ["all", "benchmarks", "dev", "jupyter"]
 
 [package.metadata.requires-dev]
 dev = [

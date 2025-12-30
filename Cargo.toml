@@ -1,6 +1,6 @@
 [package]
 name = "fuzzyrust"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Tomislav Suhina <tomislav.suhina@gmail.com>"]
 description = "High-performance string similarity library for Python, written in Rust"

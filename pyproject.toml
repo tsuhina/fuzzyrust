@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "fuzzyrust"
-version = "0.1.1"
+dynamic = ["version"]
 description = "High-performance string similarity library for Python, written in Rust"
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

@@ -203,7 +203,8 @@ import fuzzyrust.expr  # noqa: F401
 # Import polars subpackage for `from fuzzyrust import polars` style
 from fuzzyrust import polars  # noqa: F401
 
-__version__ = "0.1.1"
+from importlib.metadata import version as _get_version
+__version__ = _get_version("fuzzyrust")
 __all__ = [
     # Version
     "__version__",
