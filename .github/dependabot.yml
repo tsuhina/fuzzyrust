@@ -6,6 +6,11 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps(rust)"
+    groups:
+      rust-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
 
   - package-ecosystem: "pip"
     directory: "/"
@@ -13,6 +18,11 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps(python)"
+    groups:
+      python-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -20,3 +30,8 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps(actions)"
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 3
