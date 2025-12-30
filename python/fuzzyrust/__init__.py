@@ -24,35 +24,41 @@ Example usage:
     [('hello', 0.8), ('hallo', 0.6), ('hullo', 0.6)]
 """
 
+from importlib.metadata import version as _get_version
+
+# Register the .fuzzy expression namespace
+import fuzzyrust.expr  # noqa: F401
+
+# Import polars subpackage for `from fuzzyrust import polars` style
+from fuzzyrust import polars
 from fuzzyrust._core import (
     AlgorithmComparison,
+    AlgorithmError,
     # Evaluation metrics
     ConfusionMatrixResult,
     DeduplicationResult,
+    # Custom exceptions
+    FuzzyRustError,
     MatchResult,
     # Schema-based multi-field matching
     Schema,
     SchemaBuilder,
+    SchemaError,
     SchemaIndex,
     SchemaSearchResult,
     # Result types
     SearchResult,
-    # Custom exceptions
-    FuzzyRustError,
-    ValidationError,
-    AlgorithmError,
-    IndexError as FuzzyIndexError,  # Avoid shadowing built-in IndexError
-    SchemaError,
     # Similarity classes
     TfIdfCosine,
+    ValidationError,
     batch_jaro_winkler,
     # Batch processing
     batch_levenshtein,
     batch_similarity,
     batch_similarity_pairs,
-    cdist,
     bigram_similarity,
     bigram_similarity_ci,
+    cdist,
     # Multi-algorithm comparison
     compare_algorithms,
     confusion_matrix,
@@ -67,14 +73,17 @@ from fuzzyrust._core import (
     damerau_levenshtein_ci,
     damerau_levenshtein_similarity,
     damerau_levenshtein_similarity_ci,
+    double_metaphone,
+    double_metaphone_match,
+    double_metaphone_similarity,
     extract,
     extract_ngrams,
     extract_one,
     f_score,
     find_best_matches,
+    find_duplicate_pairs,
     # Deduplication
     find_duplicates,
-    find_duplicate_pairs,
     hamming,
     hamming_ci,
     hamming_distance_padded,
@@ -82,8 +91,10 @@ from fuzzyrust._core import (
     hamming_similarity_ci,
     jaro_similarity,
     jaro_similarity_ci,
+    jaro_similarity_grapheme,
     jaro_winkler_similarity,
     jaro_winkler_similarity_ci,
+    jaro_winkler_similarity_grapheme,
     lcs_length,
     lcs_length_ci,
     lcs_similarity,
@@ -96,8 +107,15 @@ from fuzzyrust._core import (
     levenshtein_bounded,
     # Case-insensitive variants
     levenshtein_ci,
+    # Grapheme cluster mode functions
+    levenshtein_grapheme,
+    # SIMD-accelerated functions
+    levenshtein_simd,
+    levenshtein_simd_bounded,
     levenshtein_similarity,
     levenshtein_similarity_ci,
+    levenshtein_similarity_grapheme,
+    levenshtein_similarity_simd,
     longest_common_substring,
     longest_common_substring_ci,
     longest_common_substring_length,
@@ -105,18 +123,6 @@ from fuzzyrust._core import (
     metaphone_match,
     metaphone_similarity,
     metaphone_similarity_ci,
-    double_metaphone,
-    double_metaphone_match,
-    double_metaphone_similarity,
-    # Grapheme cluster mode functions
-    levenshtein_grapheme,
-    levenshtein_similarity_grapheme,
-    jaro_similarity_grapheme,
-    jaro_winkler_similarity_grapheme,
-    # SIMD-accelerated functions
-    levenshtein_simd,
-    levenshtein_simd_bounded,
-    levenshtein_similarity_simd,
     ngram_jaccard,
     ngram_jaccard_ci,
     ngram_profile_similarity,
@@ -128,6 +134,8 @@ from fuzzyrust._core import (
     # RapidFuzz-compatible convenience functions
     partial_ratio,
     precision,
+    qratio,
+    qwratio,
     ratio,
     recall,
     soundex,
@@ -139,8 +147,9 @@ from fuzzyrust._core import (
     trigram_similarity,
     trigram_similarity_ci,
     wratio,
-    qratio,
-    qwratio,
+)
+from fuzzyrust._core import (
+    IndexError as FuzzyIndexError,  # Avoid shadowing built-in IndexError
 )
 from fuzzyrust._core import (
     # Index classes
@@ -153,20 +162,35 @@ from fuzzyrust._core import (
     PyNgramIndex as NgramIndex,
 )
 from fuzzyrust._core import (
-    # Thread-safe index classes
-    PyThreadSafeBkTree as ThreadSafeBkTree,
-)
-from fuzzyrust._core import (
-    PyThreadSafeNgramIndex as ThreadSafeNgramIndex,
-)
-from fuzzyrust._core import (
     # Sharded index classes
     PyShardedBkTree as ShardedBkTree,
 )
 from fuzzyrust._core import (
     PyShardedNgramIndex as ShardedNgramIndex,
 )
+from fuzzyrust._core import (
+    # Thread-safe index classes
+    PyThreadSafeBkTree as ThreadSafeBkTree,
+)
+from fuzzyrust._core import (
+    PyThreadSafeNgramIndex as ThreadSafeNgramIndex,
+)
 from fuzzyrust.enums import Algorithm, NormalizationMode
+from fuzzyrust.index import FuzzyIndex
+
+# -----------------------------------------------------------------------------
+# Polars Integration - Batch API (polars_api)
+# -----------------------------------------------------------------------------
+# High-performance batch operations for large datasets.
+# Uses vectorized processing and Sorted Neighborhood Method (SNM).
+# Best for large datasets (100K+ rows) where performance is critical.
+# See: fuzzyrust.polars_api module docstring for details.
+from fuzzyrust.polars_api import (
+    batch_best_match,
+    dedupe_snm,
+    find_similar_pairs,
+    match_records_batch,
+)
 
 # -----------------------------------------------------------------------------
 # Polars Integration - High-Level API (polars_ext)
@@ -182,28 +206,6 @@ from fuzzyrust.polars_ext import (
     match_series,
 )
 
-# -----------------------------------------------------------------------------
-# Polars Integration - Batch API (polars_api)
-# -----------------------------------------------------------------------------
-# High-performance batch operations for large datasets.
-# Uses vectorized processing and Sorted Neighborhood Method (SNM).
-# Best for large datasets (100K+ rows) where performance is critical.
-# See: fuzzyrust.polars_api module docstring for details.
-from fuzzyrust.polars_api import (
-    batch_best_match,
-    dedupe_snm,
-    find_similar_pairs,
-    match_records_batch,
-)
-from fuzzyrust.index import FuzzyIndex
-
-# Register the .fuzzy expression namespace
-import fuzzyrust.expr  # noqa: F401
-
-# Import polars subpackage for `from fuzzyrust import polars` style
-from fuzzyrust import polars  # noqa: F401
-
-from importlib.metadata import version as _get_version
 __version__ = _get_version("fuzzyrust")
 __all__ = [
     # Version

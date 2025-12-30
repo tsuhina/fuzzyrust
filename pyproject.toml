@@ -120,7 +120,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG", "PLR2004", "PLC0415", "E501", "E402", "B007", "PERF102", "RUF001", "ERA001", "F401", "F841"]
+"tests/*" = ["ARG", "PLR2004", "PLC0415", "E501", "E402", "B007", "PERF102", "PERF203", "PERF401", "RUF001", "RUF003", "RUF012", "ERA001", "F401", "F841", "B017", "PLC0206", "RUF015"]
 "examples/*" = ["E402", "B023", "E501", "ARG001", "SIM102", "F841", "ERA001", "B007"]
 "python/fuzzyrust/__init__.pyi" = ["UP006", "UP007", "UP035", "UP045", "E501"]  # type stubs use older syntax for py39 compat
 "python/fuzzyrust/polars_ext.py" = ["UP006", "UP035", "PERF401", "ARG001"]  # polars integration

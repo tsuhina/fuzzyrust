@@ -8,12 +8,20 @@ column-to-column similarity comparisons by avoiding Python/Rust boundary
 crossings for each row.
 """
 
+import importlib.util
 import os
 from pathlib import Path
 from typing import Optional
 
-_PLUGIN_PATH: Optional[Path] = None
-_PLUGIN_AVAILABLE: Optional[bool] = None
+
+class _PluginState:
+    """Encapsulates plugin state to avoid global variables."""
+
+    path: Optional[Path] = None
+    available: Optional[bool] = None
+
+
+_state = _PluginState()
 
 
 def _find_plugin_lib() -> Optional[Path]:
@@ -25,17 +33,17 @@ def _find_plugin_lib() -> Optional[Path]:
     Returns:
         Path to the shared library, or None if not found.
     """
-    global _PLUGIN_PATH
-    if _PLUGIN_PATH is not None:
-        return _PLUGIN_PATH
+    if _state.path is not None:
+        return _state.path
 
     try:
         import fuzzyrust._core
+
         # The plugin is in the same library as _core
         core_path = Path(fuzzyrust._core.__file__)
         if core_path.exists():
-            _PLUGIN_PATH = core_path
-            return _PLUGIN_PATH
+            _state.path = core_path
+            return _state.path
     except (ImportError, AttributeError):
         pass
 
@@ -57,30 +65,27 @@ def is_plugin_available() -> bool:
         >>> if is_plugin_available():
         ...     print("Native Polars plugin is available!")
     """
-    global _PLUGIN_AVAILABLE
-
     # Check if disabled by environment variable
     if os.environ.get("FUZZYRUST_DISABLE_PLUGIN", "").lower() in ("1", "true", "yes"):
-        _PLUGIN_AVAILABLE = False
+        _state.available = False
         return False
 
-    if _PLUGIN_AVAILABLE is not None:
-        return _PLUGIN_AVAILABLE
+    if _state.available is not None:
+        return _state.available
 
     # Check if plugin library exists
     lib_path = _find_plugin_lib()
     if lib_path is None:
-        _PLUGIN_AVAILABLE = False
+        _state.available = False
         return False
 
     # Check if polars has plugin support
-    try:
-        from polars.plugins import register_plugin_function
-        _PLUGIN_AVAILABLE = True
-    except ImportError:
-        _PLUGIN_AVAILABLE = False
+    if importlib.util.find_spec("polars.plugins") is not None:
+        _state.available = True
+    else:
+        _state.available = False
 
-    return _PLUGIN_AVAILABLE
+    return _state.available
 
 
 def use_native_plugin(enabled: bool = True) -> None:
@@ -97,17 +102,17 @@ def use_native_plugin(enabled: bool = True) -> None:
         >>> fuzzyrust.use_native_plugin(False)  # Disable plugin
         >>> # Now all operations use the fallback implementation
     """
-    global _PLUGIN_AVAILABLE
     if enabled:
         # Re-detect availability
-        _PLUGIN_AVAILABLE = None
+        _state.available = None
         is_plugin_available()
     else:
-        _PLUGIN_AVAILABLE = False
+        _state.available = False
 
 
 # Plugin function wrappers
 # These are only called when is_plugin_available() returns True
+
 
 def fuzzy_similarity(left, right, algorithm: str = "jaro_winkler"):
     """Compute fuzzy similarity using native plugin.
@@ -154,7 +159,9 @@ def fuzzy_is_match(left, right, algorithm: str = "jaro_winkler", threshold: floa
     )
 
 
-def fuzzy_best_match(query, targets: list, algorithm: str = "jaro_winkler", min_score: float = 0.0):
+def fuzzy_best_match(
+    query, targets: list, algorithm: str = "jaro_winkler", min_score: float = 0.0
+):
     """Find best match from targets using native plugin.
 
     Args:

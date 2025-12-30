@@ -27,25 +27,25 @@ Example:
     ... )
 """
 
-from typing import List, Literal, Union
+from typing import Literal, Union
 
 import polars as pl
 
 import fuzzyrust as fr
 from fuzzyrust._utils import normalize_algorithm
-from fuzzyrust.enums import Algorithm
 
 # Try to import native plugin support
 try:
     from fuzzyrust._plugin import (
-        is_plugin_available,
-        fuzzy_similarity as _plugin_similarity,
         fuzzy_is_match as _plugin_is_match,
-        fuzzy_best_match as _plugin_best_match,
-        fuzzy_distance as _plugin_distance,
-        fuzzy_soundex as _plugin_soundex,
-        fuzzy_metaphone as _plugin_metaphone,
     )
+    from fuzzyrust._plugin import (
+        fuzzy_similarity as _plugin_similarity,
+    )
+    from fuzzyrust._plugin import (
+        is_plugin_available,
+    )
+
     _PLUGIN_AVAILABLE = is_plugin_available()
 except ImportError:
     _PLUGIN_AVAILABLE = False
@@ -167,7 +167,7 @@ class FuzzyExprNamespace:
 
     def best_match(
         self,
-        choices: List[str],
+        choices: list[str],
         algorithm: Union[
             str,
             Literal[
@@ -207,7 +207,7 @@ class FuzzyExprNamespace:
 
     def best_match_score(
         self,
-        choices: List[str],
+        choices: list[str],
         algorithm: Union[
             str,
             Literal[

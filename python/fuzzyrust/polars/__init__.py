@@ -40,15 +40,6 @@ Examples:
 # (importing fuzzyrust.expr handles this)
 import fuzzyrust.expr as _expr  # noqa: F401
 
-# DataFrame functions for joins and deduplication
-from fuzzyrust.polars_ext import (
-    dedupe_series,
-    fuzzy_dedupe_rows,
-    fuzzy_join,
-    match_dataframe,
-    match_series,
-)
-
 # High-performance batch API for large datasets
 from fuzzyrust.polars_api import (
     batch_best_match,
@@ -56,6 +47,15 @@ from fuzzyrust.polars_api import (
     dedupe_snm,
     find_similar_pairs,
     match_records_batch,
+)
+
+# DataFrame functions for joins and deduplication
+from fuzzyrust.polars_ext import (
+    dedupe_series,
+    fuzzy_dedupe_rows,
+    fuzzy_join,
+    match_dataframe,
+    match_series,
 )
 
 __all__ = [

@@ -77,15 +77,22 @@ See Also
 - ``fuzzyrust.HybridIndex``: Index structure for repeated searches
 """
 
-from typing import Dict, List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 import polars as pl
 
 from fuzzyrust._utils import normalize_algorithm
 from fuzzyrust.enums import Algorithm
 
+
 # Backend detection (import-time, not per-call)
-_BACKEND: Optional[str] = None
+class _BackendState:
+    """Encapsulates backend state to avoid global variables."""
+
+    value: Optional[str] = None
+
+
+_backend_state = _BackendState()
 
 
 def _detect_backend() -> str:
@@ -94,14 +101,13 @@ def _detect_backend() -> str:
     Returns "batch" for now. Plugin backend will be added when
     pyo3-polars version compatibility is resolved.
     """
-    global _BACKEND
-    if _BACKEND is not None:
-        return _BACKEND
+    if _backend_state.value is not None:
+        return _backend_state.value
 
     # For now, only batch backend is available
     # Plugin backend requires pyo3-polars which has version conflicts
-    _BACKEND = "batch"
-    return _BACKEND
+    _backend_state.value = "batch"
+    return _backend_state.value
 
 
 class UnionFind:
@@ -198,7 +204,7 @@ def batch_similarity(
 
 def batch_best_match(
     queries: "pl.Series",
-    targets: List[str],
+    targets: list[str],
     algorithm: Union[str, Algorithm] = "jaro_winkler",
     min_similarity: float = 0.0,
     limit: int = 1,
@@ -267,7 +273,7 @@ def batch_best_match(
 
 def dedupe_snm(
     df: "pl.DataFrame",
-    columns: List[str],
+    columns: list[str],
     algorithm: Union[str, Algorithm] = "jaro_winkler",
     min_similarity: float = 0.85,
     window_size: int = 10,
@@ -345,7 +351,7 @@ def dedupe_snm(
         uf.union(i, j)
 
     # Group rows by cluster root
-    clusters: Dict[int, List[int]] = {}
+    clusters: dict[int, list[int]] = {}
     for i in range(n):
         root = uf.find(i)
         if root not in clusters:
@@ -353,11 +359,11 @@ def dedupe_snm(
         clusters[root].append(i)
 
     # Assign group IDs and determine canonical rows
-    group_ids: List[Optional[int]] = [None] * n
-    is_canonical: List[bool] = [True] * n
+    group_ids: list[Optional[int]] = [None] * n
+    is_canonical: list[bool] = [True] * n
 
     group_counter = 0
-    for root, members in clusters.items():
+    for members in clusters.values():
         if len(members) == 1:
             continue
 
@@ -395,11 +401,11 @@ def dedupe_snm(
 def match_records_batch(
     queries_df: "pl.DataFrame",
     targets_df: "pl.DataFrame",
-    columns: List[str],
+    columns: list[str],
     algorithm: Union[str, Algorithm] = "jaro_winkler",
     min_similarity: float = 0.0,
-    weights: Optional[Dict[str, float]] = None,
-    algorithms: Optional[Dict[str, Union[str, Algorithm]]] = None,
+    weights: Optional[dict[str, float]] = None,
+    algorithms: Optional[dict[str, Union[str, Algorithm]]] = None,
     limit: int = 1,
 ) -> "pl.DataFrame":
     """
@@ -516,11 +522,11 @@ def match_records_batch(
 
 def find_similar_pairs(
     df: "pl.DataFrame",
-    columns: List[str],
+    columns: list[str],
     algorithm: Union[str, Algorithm] = "jaro_winkler",
     min_similarity: float = 0.8,
-    weights: Optional[Dict[str, float]] = None,
-    algorithms: Optional[Dict[str, Union[str, Algorithm]]] = None,
+    weights: Optional[dict[str, float]] = None,
+    algorithms: Optional[dict[str, Union[str, Algorithm]]] = None,
     method: Literal["snm", "full"] = "snm",
     window_size: int = 10,
 ) -> "pl.DataFrame":

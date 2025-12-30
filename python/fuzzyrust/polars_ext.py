@@ -432,7 +432,7 @@ def fuzzy_join(
 
     # Build schema for multi-column matching
     builder = fr.SchemaBuilder()
-    for left_col, right_col, col_algo, col_weight in column_configs:
+    for left_col, _right_col, col_algo, col_weight in column_configs:
         # Use left column name as field name
         builder.add_field(
             name=left_col,
@@ -632,7 +632,7 @@ def fuzzy_dedupe_rows(
     is_canonical: List[bool] = [True] * n
 
     group_counter = 0
-    for root, members in clusters.items():
+    for members in clusters.values():
         if len(members) == 1:
             # Unique row - no group ID, is canonical
             continue

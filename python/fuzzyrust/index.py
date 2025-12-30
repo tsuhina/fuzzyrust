@@ -11,7 +11,7 @@ Warning:
 
 import pickle
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Literal, Union
 
 import polars as pl
 
@@ -51,7 +51,7 @@ class FuzzyIndex:
 
     def __init__(
         self,
-        items: List[str],
+        items: list[str],
         algorithm: Literal["ngram", "bktree", "hybrid"] = "ngram",
         ngram_size: int = 3,
     ):
@@ -139,7 +139,7 @@ class FuzzyIndex:
         query: str,
         min_similarity: float = 0.0,
         limit: int = 10,
-    ) -> List[fr.SearchResult]:
+    ) -> list[fr.SearchResult]:
         """
         Search the index for strings similar to the query.
 
@@ -153,8 +153,8 @@ class FuzzyIndex:
         """
         if self._algorithm == "bktree":
             # BkTree uses max_distance (edit distance) instead of min_similarity.
-            # The relationship is: similarity = 1 - (distance / max(len(query), len(target)))
-            # Rearranging: distance = (1 - similarity) * max_len
+            # Relationship: similarity equals 1 minus (distance divided by max length)
+            # Therefore: distance equals (1 minus similarity) times max_len
             #
             # The challenge: we don't know target lengths until we search.
             # Solution: Use a conservative max_distance that won't miss matches,
@@ -176,8 +176,7 @@ class FuzzyIndex:
             else:
                 estimated_max_len = query_len * 3
 
-            # Calculate max_distance from similarity threshold
-            # distance = (1 - min_similarity) * max_len
+            # Calculate max_distance from similarity threshold using formula above
             max_dist = max(1, int((1 - min_similarity) * estimated_max_len))
 
             # Cap max_distance to avoid expensive full-tree scans
@@ -251,7 +250,12 @@ class FuzzyIndex:
                 rows.append(row)
 
         if not rows:
-            schema = {"query_idx": pl.Int64, "match": pl.Utf8, "match_idx": pl.Int64, "score": pl.Float64}
+            schema = {
+                "query_idx": pl.Int64,
+                "match": pl.Utf8,
+                "match_idx": pl.Int64,
+                "score": pl.Float64,
+            }
             if include_query:
                 schema["query"] = pl.Utf8
             return pl.DataFrame(schema=schema)
@@ -264,10 +268,10 @@ class FuzzyIndex:
 
     def batch_search(
         self,
-        queries: List[str],
+        queries: list[str],
         min_similarity: float = 0.0,
         limit: int = 1,
-    ) -> List[List[fr.SearchResult]]:
+    ) -> list[list[fr.SearchResult]]:
         """
         Search for multiple queries, returning results for each.
 
@@ -282,7 +286,7 @@ class FuzzyIndex:
         """
         return [self.search(q, min_similarity=min_similarity, limit=limit) for q in queries]
 
-    def get_items(self) -> List[str]:
+    def get_items(self) -> list[str]:
         """Return the list of indexed items."""
         return self._items.copy()
 
@@ -305,7 +309,7 @@ class FuzzyIndex:
             "algorithm": self._algorithm,
             "ngram_size": self._ngram_size,
         }
-        with open(path, "wb") as f:
+        with Path(path).open("wb") as f:
             pickle.dump(data, f)
 
     @classmethod
@@ -322,7 +326,7 @@ class FuzzyIndex:
         Example:
             >>> index = FuzzyIndex.load("my_index.pkl")
         """
-        with open(path, "rb") as f:
+        with Path(path).open("rb") as f:
             data = pickle.load(f)
 
         return cls(

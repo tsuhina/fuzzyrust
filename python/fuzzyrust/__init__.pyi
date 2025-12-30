@@ -2108,7 +2108,7 @@ class BkTree:
         ...
 
     @staticmethod
-    def from_bytes(data: bytes) -> "BkTree":
+    def from_bytes(data: bytes) -> BkTree:
         """
         Deserialize a tree from bytes.
 
@@ -2117,7 +2117,7 @@ class BkTree:
         ...
 
     @staticmethod
-    def from_bytes_damerau(data: bytes) -> "BkTree":
+    def from_bytes_damerau(data: bytes) -> BkTree:
         """Deserialize a tree from bytes using Damerau-Levenshtein distance."""
         ...
 
@@ -2266,7 +2266,7 @@ class NgramIndex:
         ...
 
     @staticmethod
-    def from_bytes(data: bytes) -> "NgramIndex":
+    def from_bytes(data: bytes) -> NgramIndex:
         """Deserialize an index from bytes."""
         ...
 
@@ -2469,7 +2469,7 @@ class HybridIndex:
         ...
 
     @staticmethod
-    def from_bytes(data: bytes) -> "HybridIndex":
+    def from_bytes(data: bytes) -> HybridIndex:
         """Deserialize an index from bytes."""
         ...
 
