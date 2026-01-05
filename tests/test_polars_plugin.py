@@ -136,7 +136,16 @@ class TestPluginSimilarity:
             }
         )
 
-        algorithms = ["levenshtein", "jaro", "jaro_winkler", "ngram", "cosine"]
+        # Test all supported algorithms including new ones
+        algorithms = [
+            "levenshtein",
+            "damerau_levenshtein",
+            "jaro",
+            "jaro_winkler",
+            "ngram",
+            "cosine",
+            "lcs",
+        ]
 
         for algo in algorithms:
             result = df.with_columns(
@@ -146,6 +155,44 @@ class TestPluginSimilarity:
             # All scores should be in [0, 1]
             for score in result["score"]:
                 assert 0.0 <= score <= 1.0, f"Invalid score for {algo}: {score}"
+
+    def test_similarity_hamming_algorithm(self):
+        """Test Hamming similarity (requires equal-length strings)."""
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "world", "test"],
+                "right": ["hallo", "words", "best"],
+            }
+        )
+
+        result = df.with_columns(
+            score=pl.col("left").fuzzy.similarity(pl.col("right"), algorithm="hamming")
+        )
+
+        # All scores should be in [0, 1]
+        for score in result["score"]:
+            assert 0.0 <= score <= 1.0, f"Invalid Hamming score: {score}"
+
+        # hello vs hallo: 1 difference out of 5 = 0.8 similarity
+        assert result["score"][0] == 0.8
+
+    def test_similarity_hamming_different_lengths(self):
+        """Test Hamming returns 0 for different-length strings."""
+        df = pl.DataFrame(
+            {
+                "left": ["hello", "hi"],
+                "right": ["hallo", "hello"],  # Different lengths
+            }
+        )
+
+        result = df.with_columns(
+            score=pl.col("left").fuzzy.similarity(pl.col("right"), algorithm="hamming")
+        )
+
+        # Same length: valid score
+        assert result["score"][0] == 0.8
+        # Different lengths: should return 0.0
+        assert result["score"][1] == 0.0
 
     def test_similarity_with_nulls(self):
         """Test similarity handles null values correctly."""
@@ -455,19 +502,74 @@ class TestFallbackBehavior:
         # Re-enable for other tests
         use_native_plugin(True)
 
-    def test_literal_comparison_always_uses_fallback(self):
-        """Test that literal string comparisons use fallback (not plugin)."""
+    def test_literal_comparison_uses_plugin(self):
+        """Test that literal string comparisons use native plugin when available."""
         df = pl.DataFrame(
             {
                 "name": ["John", "Jon", "Jane"],
             }
         )
 
-        # Literal comparison should work regardless of plugin state
+        # Literal comparison should work with native plugin (10-50x speedup)
         result = df.with_columns(score=pl.col("name").fuzzy.similarity("John"))
 
         assert "score" in result.columns
         # John vs John should be 1.0
         assert result["score"][0] == 1.0
-        # Jon vs John should be high
-        assert result["score"][1] > 0.8
+        # Jon vs John should be high (Jaro-Winkler gives ~0.933)
+        assert result["score"][1] > 0.9
+
+        # Also test is_similar with literal (use higher threshold)
+        result2 = df.with_columns(
+            is_match=pl.col("name").fuzzy.is_similar("John", min_similarity=0.95)
+        )
+
+        assert "is_match" in result2.columns
+        assert result2["is_match"][0] is True  # John == John (1.0)
+        assert result2["is_match"][1] is False  # Jon vs John (~0.933, below 0.95)
+        assert result2["is_match"][2] is False  # Jane vs John (below 0.95)
+
+    def test_literal_comparison_all_algorithms(self):
+        """Test literal comparisons with all supported algorithms."""
+        df = pl.DataFrame(
+            {
+                "name": ["kitten", "sitting", "saturday"],
+            }
+        )
+
+        # Test all algorithms with literal comparison
+        algorithms = [
+            "levenshtein",
+            "damerau_levenshtein",
+            "jaro",
+            "jaro_winkler",
+            "ngram",
+            "cosine",
+            "lcs",
+        ]
+
+        for algo in algorithms:
+            result = df.with_columns(
+                score=pl.col("name").fuzzy.similarity("kitten", algorithm=algo)
+            )
+
+            # All scores should be in [0, 1]
+            for score in result["score"]:
+                assert 0.0 <= score <= 1.0, f"Invalid score for {algo}: {score}"
+
+            # First row should be 1.0 (kitten == kitten)
+            assert result["score"][0] == 1.0, f"Expected 1.0 for {algo}, got {result['score'][0]}"
+
+    def test_literal_comparison_with_nulls(self):
+        """Test literal comparisons handle nulls correctly."""
+        df = pl.DataFrame(
+            {
+                "name": ["John", None, "Jane"],
+            }
+        )
+
+        result = df.with_columns(score=pl.col("name").fuzzy.similarity("John"))
+
+        assert result["score"][0] == 1.0  # John vs John
+        assert result["score"][1] is None  # null
+        assert result["score"][2] < 1.0  # Jane vs John

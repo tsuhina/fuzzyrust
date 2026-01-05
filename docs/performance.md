@@ -158,3 +158,52 @@ Enable debug output for performance analysis:
 import logging
 logging.getLogger("fuzzyrust").setLevel(logging.DEBUG)
 ```
+
+## Scale Limits and Complexity
+
+### Function Complexity Reference
+
+| Function | Complexity | Max Recommended Records |
+|----------|------------|------------------------|
+| `df_dedupe()` | O(N^2) | 50K |
+| `df_match_pairs()` | O(N^2) | 50K |
+| `df_dedupe_snm()` | O(N * W * log N) | 10M |
+| `df_find_pairs(method="snm")` | O(N * W * log N) | 10M |
+| `df_join()` | O(N * M) | N=100K, M=1M |
+| `df_match_records()` | O(N * log M) | N=1M, M=10M |
+| `SchemaIndex.search()` | O(log N) | 10M |
+| `SchemaIndex.batch_search()` | O(Q * log N) | Q=100K, N=10M |
+
+Where:
+- N, M = number of records
+- W = window_size for SNM
+- Q = number of queries
+
+### Memory Limits
+
+| Structure | Memory per 1M records |
+|-----------|----------------------|
+| SchemaIndex (4 fields) | ~2 GB |
+| NgramIndex | ~500 MB |
+| BkTree | ~400 MB |
+
+### Warning: Avoid These Patterns
+
+```python
+# BAD: O(N^2) for large datasets - will take hours!
+result = frp.df_dedupe(df_1m_rows, columns=["name"])
+
+# GOOD: O(N * W * log N) - completes in minutes
+result = frp.df_dedupe_snm(df_1m_rows, columns=["name"], window_size=50)
+```
+
+```python
+# BAD: Loop with individual calls
+for query in queries:
+    results.append(index.search(query))
+
+# GOOD: Single batch call (parallelized)
+results = index.batch_search(queries)
+```
+
+See [Large-Scale Fuzzy Matching Guide](guide/large-scale.md) for detailed optimization strategies

@@ -261,7 +261,7 @@ class TestDedupParallelEfficiency:
         """Deduplication should work correctly for small datasets."""
         items = ["hello", "helo", "world", "wrold", "test"]
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.85)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.85)
 
         # Should find some duplicates
         assert len(result.groups) > 0 or len(result.unique) > 0
@@ -270,7 +270,7 @@ class TestDedupParallelEfficiency:
         """Deduplication should identify all unique items correctly."""
         items = ["apple", "banana", "cherry", "date", "elderberry"]
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.95)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.95)
 
         # All items are unique
         assert result.total_duplicates == 0
@@ -280,7 +280,7 @@ class TestDedupParallelEfficiency:
         """Deduplication should group identical items."""
         items = ["test", "test", "test", "test"]
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.99)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.99)
 
         # All items should be grouped (check total_duplicates which is correctly tracked)
         # Note: groups may contain repeated strings due to how groups are reported
@@ -299,7 +299,7 @@ class TestDedupParallelEfficiency:
             "banana",  # Truly unique items (very different)
         ]
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.85)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.85)
 
         # Should find at least 2 groups of duplicates (hello/helo and world/wrold)
         assert len(result.groups) >= 2
@@ -312,7 +312,7 @@ class TestDedupParallelEfficiency:
         """Deduplication should handle empty input."""
         items = []
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.85)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.85)
 
         assert len(result.groups) == 0
         assert len(result.unique) == 0
@@ -322,7 +322,7 @@ class TestDedupParallelEfficiency:
         """Deduplication should handle single item."""
         items = ["hello"]
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.85)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.85)
 
         assert len(result.groups) == 0
         assert len(result.unique) == 1
@@ -369,7 +369,7 @@ class TestDedupParallelEfficiency:
         # Add some duplicates
         items.extend(["item_0100", "item_0200", "item_0300"])
 
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.99)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.99)
 
         # Should find the duplicate groups
         assert len(result.groups) == 3
@@ -417,7 +417,7 @@ class TestIntegration:
         ]
 
         # Dedupe
-        result = fr.find_duplicates(items, algorithm="jaro_winkler", min_similarity=0.95)
+        result = fr.batch.deduplicate(items, algorithm="jaro_winkler", min_similarity=0.95)
 
         # Get unique items (one from each group + truly unique)
         unique_items = result.unique.copy()

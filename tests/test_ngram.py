@@ -69,14 +69,14 @@ class TestNgramEdgeCases:
         with pytest.raises(fr.ValidationError, match="ngram_size must be at least 1"):
             fr.ngram_profile_similarity("hello", "hello", ngram_size=0)
 
-    def test_ngram_ci_variants_n_zero_raises_error(self):
-        """Test case-insensitive ngram functions with ngram_size=0 raise ValidationError."""
+    def test_ngram_with_normalize_n_zero_raises_error(self):
+        """Test ngram functions with normalize='lowercase' and ngram_size=0 raise ValidationError."""
         with pytest.raises(fr.ValidationError, match="ngram_size must be at least 1"):
-            fr.ngram_similarity_ci("hello", "HELLO", ngram_size=0)
+            fr.ngram_similarity("hello", "HELLO", ngram_size=0, normalize="lowercase")
         with pytest.raises(fr.ValidationError, match="ngram_size must be at least 1"):
-            fr.ngram_jaccard_ci("hello", "HELLO", ngram_size=0)
+            fr.ngram_jaccard("hello", "HELLO", ngram_size=0, normalize="lowercase")
         with pytest.raises(fr.ValidationError, match="ngram_size must be at least 1"):
-            fr.cosine_similarity_ngrams_ci("hello", "HELLO", ngram_size=0)
+            fr.cosine_similarity_ngrams("hello", "HELLO", ngram_size=0, normalize="lowercase")
 
 
 class TestNgramConvenience:
@@ -110,55 +110,55 @@ class TestNgramConvenience:
         assert 0.0 < sim < 1.0
 
 
-class TestBigramSimilarityCi:
-    """Tests for bigram_similarity_ci function."""
+class TestBigramSimilarityWithNormalize:
+    """Tests for ngram_similarity with ngram_size=2 and normalize='lowercase'."""
 
     def test_case_insensitive(self):
         """Upper vs lower case should have similarity 1.0."""
-        assert fr.bigram_similarity_ci("HELLO", "hello") == 1.0
+        assert fr.ngram_similarity("HELLO", "hello", ngram_size=2, normalize="lowercase") == 1.0
 
     def test_mixed_case(self):
         """Mixed case strings should be treated as equal."""
-        assert fr.bigram_similarity_ci("HeLLo", "hElLO") == 1.0
+        assert fr.ngram_similarity("HeLLo", "hElLO", ngram_size=2, normalize="lowercase") == 1.0
 
     def test_empty_strings(self):
         """Empty strings should have similarity 1.0."""
-        assert fr.bigram_similarity_ci("", "") == 1.0
+        assert fr.ngram_similarity("", "", ngram_size=2, normalize="lowercase") == 1.0
 
     def test_one_empty(self):
         """Non-empty vs empty string should have similarity 0.0."""
-        assert fr.bigram_similarity_ci("hello", "") == 0.0
-        assert fr.bigram_similarity_ci("", "hello") == 0.0
+        assert fr.ngram_similarity("hello", "", ngram_size=2, normalize="lowercase") == 0.0
+        assert fr.ngram_similarity("", "hello", ngram_size=2, normalize="lowercase") == 0.0
 
     def test_similar_strings(self):
         """Similar strings should have reasonable similarity."""
-        sim = fr.bigram_similarity_ci("HELLO", "hallo")
+        sim = fr.ngram_similarity("HELLO", "hallo", ngram_size=2, normalize="lowercase")
         assert 0.0 < sim < 1.0
 
 
-class TestTrigramSimilarityCi:
-    """Tests for trigram_similarity_ci function."""
+class TestTrigramSimilarityWithNormalize:
+    """Tests for ngram_similarity with ngram_size=3 and normalize='lowercase'."""
 
     def test_case_insensitive(self):
         """Upper vs lower case should have similarity 1.0."""
-        assert fr.trigram_similarity_ci("HELLO", "hello") == 1.0
+        assert fr.ngram_similarity("HELLO", "hello", ngram_size=3, normalize="lowercase") == 1.0
 
     def test_mixed_case(self):
         """Mixed case strings should be treated as equal."""
-        assert fr.trigram_similarity_ci("HeLLo", "hElLO") == 1.0
+        assert fr.ngram_similarity("HeLLo", "hElLO", ngram_size=3, normalize="lowercase") == 1.0
 
     def test_empty_strings(self):
         """Empty strings should have similarity 1.0."""
-        assert fr.trigram_similarity_ci("", "") == 1.0
+        assert fr.ngram_similarity("", "", ngram_size=3, normalize="lowercase") == 1.0
 
     def test_one_empty(self):
         """Non-empty vs empty string should have similarity 0.0."""
-        assert fr.trigram_similarity_ci("hello", "") == 0.0
-        assert fr.trigram_similarity_ci("", "hello") == 0.0
+        assert fr.ngram_similarity("hello", "", ngram_size=3, normalize="lowercase") == 0.0
+        assert fr.ngram_similarity("", "hello", ngram_size=3, normalize="lowercase") == 0.0
 
     def test_similar_strings(self):
         """Similar strings should have reasonable similarity."""
-        sim = fr.trigram_similarity_ci("HELLO", "hallo")
+        sim = fr.ngram_similarity("HELLO", "hallo", ngram_size=3, normalize="lowercase")
         assert 0.0 < sim < 1.0
 
 
@@ -224,29 +224,36 @@ class TestTfIdfCosine:
         assert sim_rare > sim_common
 
 
-class TestCaseInsensitiveFunctions:
-    """Tests for case-insensitive (_ci) function variants related to n-grams."""
+class TestCaseInsensitiveWithNormalize:
+    """Tests for case-insensitive operations using normalize='lowercase'."""
 
-    def test_ngram_jaccard_ci(self):
-        """ngram_jaccard_ci should be case-insensitive."""
+    def test_ngram_jaccard_with_normalize(self):
+        """ngram_jaccard with normalize='lowercase' should be case-insensitive."""
         # Case-sensitive would give different results
-        assert fr.ngram_jaccard_ci("Hello", "hello") == fr.ngram_jaccard("hello", "hello")
-        assert fr.ngram_jaccard_ci("WORLD", "world") == 1.0
+        assert fr.ngram_jaccard("Hello", "hello", normalize="lowercase") == fr.ngram_jaccard(
+            "hello", "hello"
+        )
+        assert fr.ngram_jaccard("WORLD", "world", normalize="lowercase") == 1.0
 
-    def test_cosine_similarity_chars_ci(self):
-        """cosine_similarity_chars_ci should be case-insensitive."""
-        assert fr.cosine_similarity_chars_ci("ABC", "abc") == 1.0
-        assert fr.cosine_similarity_chars_ci("Hello", "HELLO") == 1.0
+    def test_cosine_similarity_chars_with_normalize(self):
+        """cosine_similarity_chars with normalize='lowercase' should be case-insensitive."""
+        assert fr.cosine_similarity_chars("ABC", "abc", normalize="lowercase") == 1.0
+        assert fr.cosine_similarity_chars("Hello", "HELLO", normalize="lowercase") == 1.0
 
-    def test_cosine_similarity_words_ci(self):
-        """cosine_similarity_words_ci should be case-insensitive."""
-        assert fr.cosine_similarity_words_ci("The Quick Fox", "the quick fox") == 1.0
-        assert fr.cosine_similarity_words_ci("HELLO WORLD", "hello world") == 1.0
+    def test_cosine_similarity_words_with_normalize(self):
+        """cosine_similarity_words with normalize='lowercase' should be case-insensitive."""
+        assert (
+            fr.cosine_similarity_words("The Quick Fox", "the quick fox", normalize="lowercase")
+            == 1.0
+        )
+        assert (
+            fr.cosine_similarity_words("HELLO WORLD", "hello world", normalize="lowercase") == 1.0
+        )
 
-    def test_cosine_similarity_ngrams_ci(self):
-        """cosine_similarity_ngrams_ci should be case-insensitive."""
-        assert fr.cosine_similarity_ngrams_ci("Hello", "HELLO") == 1.0
-        assert fr.cosine_similarity_ngrams_ci("WORLD", "world") == 1.0
+    def test_cosine_similarity_ngrams_with_normalize(self):
+        """cosine_similarity_ngrams with normalize='lowercase' should be case-insensitive."""
+        assert fr.cosine_similarity_ngrams("Hello", "HELLO", normalize="lowercase") == 1.0
+        assert fr.cosine_similarity_ngrams("WORLD", "world", normalize="lowercase") == 1.0
 
 
 class TestNgramLongStrings:

@@ -1,10 +1,10 @@
-"""Tests for the optimized Polars API (polars_api.py)."""
+"""Tests for the optimized Polars API (fuzzyrust.polars module)."""
 
 import polars as pl
 import pytest
 
 import fuzzyrust as fr
-from fuzzyrust.polars_api import batch_similarity as batch_similarity_polars
+from fuzzyrust.polars import series_similarity as batch_similarity_polars
 
 
 class TestBatchSimilarity:
@@ -97,7 +97,7 @@ class TestBatchBestMatch:
         queries = pl.Series(["appel", "banan", "cheery"])
         targets = ["apple", "banana", "cherry", "grape"]
 
-        result = fr.batch_best_match(queries, targets, min_similarity=0.7)
+        result = fr.polars.series_best_match(queries, targets, min_similarity=0.7)
 
         assert result[0] == "apple"
         assert result[1] == "banana"
@@ -108,7 +108,7 @@ class TestBatchBestMatch:
         queries = pl.Series(["xyz", "apple"])
         targets = ["apple", "banana"]
 
-        result = fr.batch_best_match(queries, targets, min_similarity=0.8)
+        result = fr.polars.series_best_match(queries, targets, min_similarity=0.8)
 
         assert result[0] is None  # xyz has no good match
         assert result[1] == "apple"  # exact match
@@ -118,7 +118,7 @@ class TestBatchBestMatch:
         queries = pl.Series(["apple", None])
         targets = ["apple", "banana"]
 
-        result = fr.batch_best_match(queries, targets)
+        result = fr.polars.series_best_match(queries, targets)
 
         # "apple" should match itself exactly
         assert result[0] == "apple", f"Expected 'apple' as best match, got {result[0]}"
@@ -137,7 +137,7 @@ class TestDedupeSNM:
             }
         )
 
-        result = fr.dedupe_snm(
+        result = fr.polars.df_dedupe_snm(
             df,
             columns=["name"],
             min_similarity=0.8,
@@ -167,7 +167,7 @@ class TestDedupeSNM:
             }
         )
 
-        result = fr.dedupe_snm(df, columns=["name"], keep="first")
+        result = fr.polars.df_dedupe_snm(df, columns=["name"], keep="first")
         canonical = result.filter(pl.col("_is_canonical"))
 
         # First row should be canonical
@@ -181,7 +181,7 @@ class TestDedupeSNM:
             }
         )
 
-        result = fr.dedupe_snm(df, columns=["name"], keep="last")
+        result = fr.polars.df_dedupe_snm(df, columns=["name"], keep="last")
         canonical_rows = result.filter(pl.col("_is_canonical") & pl.col("_group_id").is_not_null())
 
         if len(canonical_rows) > 0:
@@ -198,8 +198,8 @@ class TestDedupeSNM:
         )
 
         # Small window might miss distant duplicates
-        small_window = fr.dedupe_snm(df, columns=["name"], window_size=2)
-        large_window = fr.dedupe_snm(df, columns=["name"], window_size=10)
+        small_window = fr.polars.df_dedupe_snm(df, columns=["name"], window_size=2)
+        large_window = fr.polars.df_dedupe_snm(df, columns=["name"], window_size=10)
 
         # Both should return valid DataFrames with required columns
         assert "_group_id" in small_window.columns, "small_window missing _group_id column"
@@ -220,7 +220,7 @@ class TestDedupeSNM:
     def test_empty_dataframe(self):
         """Test handling of empty DataFrame."""
         df = pl.DataFrame({"name": []})
-        result = fr.dedupe_snm(df, columns=["name"])
+        result = fr.polars.df_dedupe_snm(df, columns=["name"])
 
         assert len(result) == 0
         assert "_group_id" in result.columns
@@ -245,7 +245,7 @@ class TestMatchRecordsBatch:
             }
         )
 
-        result = fr.match_records_batch(
+        result = fr.polars.df_match_records(
             queries,
             targets,
             columns=["name", "city"],
@@ -267,7 +267,7 @@ class TestMatchRecordsBatch:
         )
 
         # Heavy weight on email should prefer exact email match
-        result = fr.match_records_batch(
+        result = fr.polars.df_match_records(
             queries,
             targets,
             columns=["name", "email"],
@@ -287,7 +287,7 @@ class TestMatchRecordsBatch:
         queries = pl.DataFrame({"name": ["Jon"], "code": ["ABC123"]})
         targets = pl.DataFrame({"name": ["John"], "code": ["ABC124"]})
 
-        result = fr.match_records_batch(
+        result = fr.polars.df_match_records(
             queries,
             targets,
             columns=["name", "code"],
@@ -313,7 +313,7 @@ class TestFindSimilarPairs:
             }
         )
 
-        result = fr.find_similar_pairs(
+        result = fr.polars.df_find_pairs(
             df,
             columns=["name"],
             method="snm",
@@ -335,7 +335,7 @@ class TestFindSimilarPairs:
             }
         )
 
-        result = fr.find_similar_pairs(
+        result = fr.polars.df_find_pairs(
             df,
             columns=["name"],
             method="full",
@@ -353,7 +353,7 @@ class TestFindSimilarPairs:
             }
         )
 
-        result = fr.find_similar_pairs(
+        result = fr.polars.df_find_pairs(
             df,
             columns=["name"],
             method="full",
@@ -390,7 +390,7 @@ class TestIntegration:
         )
 
         # Step 1: Find duplicates using SNM
-        deduped = fr.dedupe_snm(
+        deduped = fr.polars.df_dedupe_snm(
             df,
             columns=["name", "email"],
             min_similarity=0.7,
@@ -428,7 +428,7 @@ class TestPerformance:
             }
         )
 
-        result = fr.dedupe_snm(
+        result = fr.polars.df_dedupe_snm(
             df,
             columns=["name"],
             min_similarity=0.9,
@@ -442,6 +442,6 @@ class TestPerformance:
         queries = pl.Series([f"query {i}" for i in range(100)])
         targets = [f"target {i}" for i in range(100)]
 
-        result = fr.batch_best_match(queries, targets, min_similarity=0.0)
+        result = fr.polars.series_best_match(queries, targets, min_similarity=0.0)
 
         assert len(result) == 100

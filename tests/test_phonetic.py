@@ -95,58 +95,68 @@ class TestPhoneticSimilarity:
         assert sim > 0.8
 
 
-class TestSoundexSimilarityCi:
-    """Tests for soundex_similarity_ci function."""
+class TestSoundexSimilarityWithLowercase:
+    """Tests for soundex_similarity with manual lowercasing."""
 
     def test_case_insensitive(self):
         """Upper vs lower case should have similarity 1.0."""
-        assert fr.soundex_similarity_ci("ROBERT", "robert") == 1.0
+        a, b = "ROBERT", "robert"
+        assert fr.soundex_similarity(a.lower(), b.lower()) == 1.0
 
     def test_mixed_case(self):
         """Mixed case strings should be treated as equal."""
-        assert fr.soundex_similarity_ci("RoBeRt", "rObErT") == 1.0
+        a, b = "RoBeRt", "rObErT"
+        assert fr.soundex_similarity(a.lower(), b.lower()) == 1.0
 
     def test_empty_strings(self):
-        """Empty strings return 0.0 for phonetic algorithms (no phonetic content)."""
-        # Phonetic algorithms return 0.0 for empty strings (no phonetic content to compare)
-        assert fr.soundex_similarity_ci("", "") == 0.0
+        """Two empty strings are identical, so similarity is 1.0."""
+        # Two identical empty strings should return 1.0 (both have no phonetic content,
+        # which means they are equivalent in that sense)
+        a, b = "", ""
+        assert fr.soundex_similarity(a.lower(), b.lower()) == 1.0
 
     def test_one_empty(self):
         """Non-empty vs empty string should have similarity 0.0."""
-        assert fr.soundex_similarity_ci("hello", "") == 0.0
-        assert fr.soundex_similarity_ci("", "hello") == 0.0
+        assert fr.soundex_similarity("hello".lower(), "".lower()) == 0.0
+        assert fr.soundex_similarity("".lower(), "hello".lower()) == 0.0
 
     def test_same_soundex_different_case(self):
         """Words with same Soundex code should have high similarity."""
         # Robert and Rupert have same Soundex code R163
-        assert fr.soundex_similarity_ci("ROBERT", "rupert") == 1.0
+        a, b = "ROBERT", "rupert"
+        assert fr.soundex_similarity(a.lower(), b.lower()) == 1.0
 
 
-class TestMetaphoneSimilarityCi:
-    """Tests for metaphone_similarity_ci function."""
+class TestMetaphoneSimilarityWithLowercase:
+    """Tests for metaphone_similarity with manual lowercasing."""
 
     def test_case_insensitive(self):
         """Upper vs lower case should have similarity 1.0."""
-        assert fr.metaphone_similarity_ci("PHONE", "phone") == 1.0
+        a, b = "PHONE", "phone"
+        assert fr.metaphone_similarity(a.lower(), b.lower()) == 1.0
 
     def test_mixed_case(self):
         """Mixed case strings should be treated as equal."""
-        assert fr.metaphone_similarity_ci("PhOnE", "pHoNe") == 1.0
+        a, b = "PhOnE", "pHoNe"
+        assert fr.metaphone_similarity(a.lower(), b.lower()) == 1.0
 
     def test_empty_strings(self):
-        """Empty strings return 0.0 for phonetic algorithms (no phonetic content)."""
-        # Phonetic algorithms return 0.0 for empty strings (no phonetic content to compare)
-        assert fr.metaphone_similarity_ci("", "") == 0.0
+        """Two empty strings are identical, so similarity is 1.0."""
+        # Two identical empty strings should return 1.0 (both have no phonetic content,
+        # which means they are equivalent in that sense)
+        a, b = "", ""
+        assert fr.metaphone_similarity(a.lower(), b.lower()) == 1.0
 
     def test_one_empty(self):
         """Non-empty vs empty string should have similarity 0.0."""
-        assert fr.metaphone_similarity_ci("hello", "") == 0.0
-        assert fr.metaphone_similarity_ci("", "hello") == 0.0
+        assert fr.metaphone_similarity("hello".lower(), "".lower()) == 0.0
+        assert fr.metaphone_similarity("".lower(), "hello".lower()) == 0.0
 
     def test_same_metaphone_different_case(self):
         """Words with same Metaphone code should have similarity 1.0."""
         # Stephen and Steven have same Metaphone code
-        assert fr.metaphone_similarity_ci("STEPHEN", "steven") == 1.0
+        a, b = "STEPHEN", "steven"
+        assert fr.metaphone_similarity(a.lower(), b.lower()) == 1.0
 
 
 if __name__ == "__main__":

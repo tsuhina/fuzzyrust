@@ -8,7 +8,7 @@ Get started with FuzzyRust in 5 minutes.
 import fuzzyrust as fr
 
 # Jaro-Winkler similarity (0.0 to 1.0)
-fr.jaro_winkler("hello", "hallo")  # 0.88
+fr.jaro_winkler_similarity("hello", "hallo")  # 0.88
 
 # Levenshtein distance (edit distance)
 fr.levenshtein("kitten", "sitting")  # 3
@@ -16,22 +16,40 @@ fr.levenshtein("kitten", "sitting")  # 3
 # Levenshtein similarity (normalized)
 fr.levenshtein_similarity("kitten", "sitting")  # 0.57
 
-# Case-insensitive variants
-fr.jaro_winkler_ci("Hello", "HELLO")  # 1.0
+# Case-insensitive comparison (use normalize parameter)
+fr.jaro_winkler_similarity("Hello", "HELLO", normalize="lowercase")  # 1.0
 ```
 
-## Finding Best Matches
+## Batch Operations
+
+Process lists of strings efficiently:
 
 ```python
+from fuzzyrust import batch
+
 # Find best matches from a list
 choices = ["apple", "application", "apply", "banana", "orange"]
-results = fr.find_best_matches("app", choices, limit=3)
+results = batch.best_matches(choices, "app", limit=3)
 
 for match in results:
     print(f"{match.text}: {match.score:.2f}")
 # apple: 0.73
 # apply: 0.73
 # application: 0.64
+
+# Compute similarity scores for multiple strings
+results = batch.similarity(["John", "Jon", "Jane"], "John", algorithm="jaro_winkler")
+# Returns list of MatchResult: [MatchResult(text='John', score=1.0, id=0), ...]
+
+# Deduplicate a list
+result = batch.deduplicate(["John Smith", "Jon Smyth", "Jane Doe"], min_similarity=0.8)
+# result.groups contains duplicate groups, result.unique contains unique strings
+
+# Pairwise similarity between two lists
+scores = batch.pairwise(["John", "Jane"], ["Jon", "Janet"])
+
+# Full similarity matrix
+matrix = batch.similarity_matrix(["John", "Jane"], ["Jon", "Janet", "Bob"])
 ```
 
 ## Using Index Structures
@@ -53,7 +71,7 @@ results = index.search("Jon Smith", algorithm="jaro_winkler", min_similarity=0.8
 
 ```python
 import polars as pl
-from fuzzyrust import fuzzy_join
+from fuzzyrust import polars as frp
 
 customers = pl.DataFrame({
     "id": [1, 2, 3],
@@ -66,37 +84,60 @@ orders = pl.DataFrame({
 })
 
 # Fuzzy join on similar names
-result = fuzzy_join(
+result = frp.df_join(
     customers, orders,
     left_on="name",
     right_on="customer_name",
-    threshold=0.8
+    min_similarity=0.8
 )
 ```
 
 ### Deduplication
 
 ```python
-from fuzzyrust import fuzzy_dedupe_rows
+from fuzzyrust import polars as frp
 
 df = pl.DataFrame({
     "company": ["Acme Inc", "ACME Inc.", "Acme Incorporated", "Beta Corp"]
 })
 
 # Group similar rows
-deduped = fuzzy_dedupe_rows(df, on="company", threshold=0.85)
+deduped = frp.df_dedupe(df, columns=["company"], min_similarity=0.85)
+```
+
+### Series Operations
+
+```python
+from fuzzyrust import polars as frp
+
+queries = pl.Series(["Jon Smith", "Janet Doe"])
+targets = pl.Series(["John Smith", "Jane Doe", "Bob Wilson"])
+
+# Match queries against targets
+matches = frp.series_match(queries, targets, min_similarity=0.8)
+
+# Find best match for each query
+best = frp.series_best_match(queries, targets, algorithm="jaro_winkler")
+
+# Deduplicate a series
+deduped = frp.series_dedupe(targets, min_similarity=0.85)
 ```
 
 ### Expression Namespace
 
 ```python
+import polars as pl
+import fuzzyrust  # Registers the namespace
+
+df = pl.DataFrame({"name": ["John", "Jon", "Jane", "Bob"]})
+
 # Use fuzzy matching in Polars expressions
 df.with_columns(
     score=pl.col("name").fuzzy.similarity("John Smith")
 )
 
 df.filter(
-    pl.col("name").fuzzy.is_similar("John", threshold=0.8)
+    pl.col("name").fuzzy.is_similar("John", min_similarity=0.8)
 )
 ```
 

@@ -591,8 +591,9 @@ pub fn batch_search(
 }
 
 /// Minimum tree size to use parallel search.
-/// Below this threshold, sequential search is faster due to parallelism overhead.
-const PARALLEL_SEARCH_THRESHOLD: usize = 10_000;
+/// Below this threshold, sequential search is used. Benchmarks show parallel
+/// search has minimal overhead even at 2K items on modern CPUs.
+const PARALLEL_SEARCH_THRESHOLD: usize = 2_000;
 
 /// Maximum depth for collecting subtree roots for parallel search.
 /// Collecting at depth 2-3 provides good parallelism without excessive overhead.

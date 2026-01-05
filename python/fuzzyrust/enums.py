@@ -35,7 +35,7 @@ class Algorithm(str, Enum):
     """Jaro-Winkler similarity with prefix weighting, excellent for names"""
 
     NGRAM = "ngram"
-    """N-gram similarity (Sørensen-Dice coefficient), default n=2"""
+    """N-gram similarity (Sørensen-Dice coefficient), default n=3 (trigram)"""
 
     BIGRAM = "bigram"
     """Bigram similarity (n=2)"""
@@ -43,11 +43,17 @@ class Algorithm(str, Enum):
     TRIGRAM = "trigram"
     """Trigram similarity (n=3)"""
 
+    JACCARD = "jaccard"
+    """Jaccard similarity (n-gram based)"""
+
     LCS = "lcs"
     """Longest Common Subsequence similarity"""
 
     COSINE = "cosine"
     """Cosine similarity (character-level)"""
+
+    HAMMING = "hamming"
+    """Hamming distance (for equal-length strings)"""
 
 
 class NormalizationMode(str, Enum):

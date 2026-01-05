@@ -79,31 +79,31 @@ class TestDamerauLevenshtein:
         assert sim == 0.8, f"Expected 0.8 for single transposition, got {sim}"
 
 
-class TestDamerauLevenshteinSimilarityCi:
-    """Tests for damerau_levenshtein_similarity_ci function."""
+class TestDamerauLevenshteinSimilarityWithNormalize:
+    """Tests for damerau_levenshtein_similarity with normalize='lowercase'."""
 
     def test_case_insensitive(self):
         """Upper vs lower case should have similarity 1.0."""
-        assert fr.damerau_levenshtein_similarity_ci("HELLO", "hello") == 1.0
+        assert fr.damerau_levenshtein_similarity("HELLO", "hello", normalize="lowercase") == 1.0
 
     def test_mixed_case(self):
         """Mixed case strings should be treated as equal."""
-        assert fr.damerau_levenshtein_similarity_ci("HeLLo", "hElLO") == 1.0
+        assert fr.damerau_levenshtein_similarity("HeLLo", "hElLO", normalize="lowercase") == 1.0
 
     def test_empty_strings(self):
         """Empty strings should have similarity 1.0."""
-        assert fr.damerau_levenshtein_similarity_ci("", "") == 1.0
+        assert fr.damerau_levenshtein_similarity("", "", normalize="lowercase") == 1.0
 
     def test_one_empty(self):
         """Non-empty vs empty string should have similarity 0.0."""
-        assert fr.damerau_levenshtein_similarity_ci("hello", "") == 0.0
-        assert fr.damerau_levenshtein_similarity_ci("", "hello") == 0.0
+        assert fr.damerau_levenshtein_similarity("hello", "", normalize="lowercase") == 0.0
+        assert fr.damerau_levenshtein_similarity("", "hello", normalize="lowercase") == 0.0
 
     def test_transposition(self):
         """Transposition should be counted correctly."""
         # "ab" and "BA" after case normalization are "ab" and "ba"
         # Transposition is 1 edit, similarity = 1 - 1/2 = 0.5
-        sim = fr.damerau_levenshtein_similarity_ci("ab", "BA")
+        sim = fr.damerau_levenshtein_similarity("ab", "BA", normalize="lowercase")
         assert sim == 0.5, f"Expected 0.5 for transposition, got {sim}"
 
 

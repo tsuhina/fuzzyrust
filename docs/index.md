@@ -18,20 +18,20 @@ High-performance string similarity library for Python, written in Rust.
 
 ```python
 import fuzzyrust as fr
+from fuzzyrust import batch, polars as frp
 
 # Simple similarity
-fr.jaro_winkler("hello", "hallo")  # 0.88
+fr.jaro_winkler_similarity("hello", "hallo")  # 0.88
 
-# Find best matches
-fr.find_best_matches("apple", ["apply", "maple", "orange"], limit=2)
+# Find best matches from a list
+batch.best_matches(["apply", "maple", "orange"], "apple", limit=2)
 
 # Fuzzy join with Polars
 import polars as pl
-from fuzzyrust import fuzzy_join
 
 df1 = pl.DataFrame({"name": ["John Smith", "Jane Doe"]})
 df2 = pl.DataFrame({"customer": ["Jon Smith", "Janet Doe"]})
-result = fuzzy_join(df1, df2, left_on="name", right_on="customer", threshold=0.8)
+result = frp.df_join(df1, df2, left_on="name", right_on="customer", min_similarity=0.8)
 ```
 
 ## Installation

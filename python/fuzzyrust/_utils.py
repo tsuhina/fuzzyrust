@@ -17,6 +17,7 @@ VALID_ALGORITHMS = frozenset(
         "lcs",
         "cosine",
         "jaccard",  # Also valid for some functions
+        "hamming",
     }
 )
 
@@ -45,6 +46,9 @@ def normalize_algorithm(algorithm: Union[str, Algorithm]) -> str:
 
     if isinstance(algorithm, str):
         algo_lower = algorithm.lower()
+        # Normalize aliases
+        if algo_lower == "damerau":
+            algo_lower = "damerau_levenshtein"
         # Check against known algorithms
         if algo_lower in VALID_ALGORITHMS:
             return algo_lower
@@ -60,4 +64,45 @@ def normalize_algorithm(algorithm: Union[str, Algorithm]) -> str:
     raise TypeError(f"algorithm must be str or Algorithm enum, got {type(algorithm).__name__}")
 
 
-__all__ = ["normalize_algorithm", "VALID_ALGORITHMS"]
+class UnionFind:
+    """Union-Find data structure for efficient clustering.
+
+    This data structure supports efficient union and find operations
+    with path compression and union by rank optimizations.
+
+    Args:
+        n: Number of elements in the disjoint set.
+
+    Example:
+        >>> uf = UnionFind(5)
+        >>> uf.union(0, 1)
+        >>> uf.union(2, 3)
+        >>> uf.find(0) == uf.find(1)
+        True
+        >>> uf.find(0) == uf.find(2)
+        False
+    """
+
+    def __init__(self, n: int):
+        self.parent = list(range(n))
+        self.rank = [0] * n
+
+    def find(self, x: int) -> int:
+        """Find the root of element x with path compression."""
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+        return self.parent[x]
+
+    def union(self, x: int, y: int) -> None:
+        """Union the sets containing x and y using union by rank."""
+        px, py = self.find(x), self.find(y)
+        if px == py:
+            return
+        if self.rank[px] < self.rank[py]:
+            px, py = py, px
+        self.parent[py] = px
+        if self.rank[px] == self.rank[py]:
+            self.rank[px] += 1
+
+
+__all__ = ["normalize_algorithm", "VALID_ALGORITHMS", "UnionFind"]

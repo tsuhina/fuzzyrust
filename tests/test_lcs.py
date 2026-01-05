@@ -64,29 +64,33 @@ class TestLcsAlternative:
         assert fr.lcs_similarity_max("abc", "xyz") == 0.0
 
 
-class TestLcsSimilarityCi:
-    """Tests for lcs_similarity_ci function."""
+class TestLcsSimilarityWithLowercase:
+    """Tests for lcs_similarity with manual lowercasing."""
 
     def test_case_insensitive(self):
-        """Upper vs lower case should have similarity 1.0."""
-        assert fr.lcs_similarity_ci("HELLO", "hello") == 1.0
+        """Upper vs lower case should have similarity 1.0 after lowercasing."""
+        a, b = "HELLO", "hello"
+        assert fr.lcs_similarity(a.lower(), b.lower()) == 1.0
 
     def test_mixed_case(self):
-        """Mixed case strings should be treated as equal."""
-        assert fr.lcs_similarity_ci("HeLLo", "hElLO") == 1.0
+        """Mixed case strings should be treated as equal after lowercasing."""
+        a, b = "HeLLo", "hElLO"
+        assert fr.lcs_similarity(a.lower(), b.lower()) == 1.0
 
     def test_empty_strings(self):
         """Empty strings should have similarity 1.0."""
-        assert fr.lcs_similarity_ci("", "") == 1.0
+        a, b = "", ""
+        assert fr.lcs_similarity(a.lower(), b.lower()) == 1.0
 
     def test_one_empty(self):
         """Non-empty vs empty string should have similarity 0.0."""
-        assert fr.lcs_similarity_ci("hello", "") == 0.0
-        assert fr.lcs_similarity_ci("", "hello") == 0.0
+        assert fr.lcs_similarity("hello".lower(), "".lower()) == 0.0
+        assert fr.lcs_similarity("".lower(), "hello".lower()) == 0.0
 
     def test_partial_match(self):
         """Partial matches should have appropriate similarity."""
-        sim = fr.lcs_similarity_ci("ABCD", "axbxcxd")
+        a, b = "ABCD", "axbxcxd"
+        sim = fr.lcs_similarity(a.lower(), b.lower())
         assert 0.0 < sim < 1.0
 
 

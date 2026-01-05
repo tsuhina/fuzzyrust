@@ -63,6 +63,34 @@ pub use indexing::{bktree, ngram_index};
 /// is relatively low per item.
 const PARALLEL_THRESHOLD: usize = 100;
 
+/// Valid algorithm names for similarity functions.
+const VALID_ALGORITHMS: &str =
+    "levenshtein, damerau_levenshtein, jaro, jaro_winkler, ngram, bigram, trigram, lcs, cosine";
+
+/// Valid algorithm names for N-gram/Hybrid index search (subset of algorithms).
+const VALID_INDEX_ALGORITHMS: &str = "jaro_winkler, levenshtein, damerau_levenshtein, ngram";
+
+/// Valid normalization modes.
+const VALID_NORMALIZATIONS: &str =
+    "lowercase, unicode_nfkd, remove_punctuation, remove_whitespace, strict";
+
+/// Valid normalization modes including "none" (for optional normalization).
+const VALID_NORMALIZATIONS_WITH_NONE: &str =
+    "none, lowercase, unicode_nfkd, remove_punctuation, remove_whitespace, strict";
+
+/// Valid deduplication methods.
+const VALID_DEDUP_METHODS: &str = "auto, brute_force, snm";
+
+/// Valid field types for schema.
+const VALID_FIELD_TYPES: &str = "short_text, long_text, token_set";
+
+/// Valid scoring strategies for schema.
+const VALID_SCORING_STRATEGIES: &str = "weighted_average, minmax_scaling";
+
+/// Valid algorithms for schema fields.
+const VALID_SCHEMA_ALGORITHMS: &str =
+    "levenshtein, damerau_levenshtein, jaro_winkler, ngram, jaccard, cosine, exact_match";
+
 // ============================================================================
 // Validation Helpers
 // ============================================================================
@@ -152,8 +180,8 @@ fn parse_normalization_mode(norm: &str) -> PyResult<NormalizationMode> {
         "remove_whitespace" => Ok(NormalizationMode::RemoveWhitespace),
         "strict" => Ok(NormalizationMode::Strict),
         _ => Err(ValidationError::new_err(format!(
-            "Unknown normalization mode: '{}'. Valid: lowercase, unicode_nfkd, remove_punctuation, remove_whitespace, strict",
-            norm
+            "Unknown normalization mode: '{}'. Valid: {}",
+            norm, VALID_NORMALIZATIONS
         ))),
     }
 }
@@ -193,17 +221,41 @@ fn get_similarity_metric_with_normalize(
     }
 
     match algorithm {
-        "levenshtein" => Ok(wrap_metric!(algorithms::levenshtein::Levenshtein::new(), use_case_insensitive)),
-        "damerau_levenshtein" | "damerau" => Ok(wrap_metric!(algorithms::damerau::DamerauLevenshtein::new(), use_case_insensitive)),
-        "jaro" => Ok(wrap_metric!(algorithms::jaro::Jaro::new(), use_case_insensitive)),
-        "jaro_winkler" => Ok(wrap_metric!(algorithms::jaro::JaroWinkler::new(), use_case_insensitive)),
-        "ngram" | "bigram" => Ok(wrap_metric!(algorithms::ngram::Ngram::bigram(), use_case_insensitive)),
-        "trigram" => Ok(wrap_metric!(algorithms::ngram::Ngram::trigram(), use_case_insensitive)),
-        "lcs" => Ok(wrap_metric!(algorithms::lcs::Lcs::new(), use_case_insensitive)),
-        "cosine" | "cosine_chars" => Ok(wrap_metric!(algorithms::cosine::CosineSimilarity::character_based(), use_case_insensitive)),
+        "levenshtein" => Ok(wrap_metric!(
+            algorithms::levenshtein::Levenshtein::new(),
+            use_case_insensitive
+        )),
+        "damerau_levenshtein" | "damerau" => Ok(wrap_metric!(
+            algorithms::damerau::DamerauLevenshtein::new(),
+            use_case_insensitive
+        )),
+        "jaro" => Ok(wrap_metric!(
+            algorithms::jaro::Jaro::new(),
+            use_case_insensitive
+        )),
+        "jaro_winkler" => Ok(wrap_metric!(
+            algorithms::jaro::JaroWinkler::new(),
+            use_case_insensitive
+        )),
+        "bigram" => Ok(wrap_metric!(
+            algorithms::ngram::Ngram::bigram(),
+            use_case_insensitive
+        )),
+        "ngram" | "trigram" => Ok(wrap_metric!(
+            algorithms::ngram::Ngram::trigram(),
+            use_case_insensitive
+        )),
+        "lcs" => Ok(wrap_metric!(
+            algorithms::lcs::Lcs::new(),
+            use_case_insensitive
+        )),
+        "cosine" | "cosine_chars" => Ok(wrap_metric!(
+            algorithms::cosine::CosineSimilarity::character_based(),
+            use_case_insensitive
+        )),
         _ => Err(AlgorithmError::new_err(format!(
-            "Unknown algorithm: '{}'. Valid: levenshtein, damerau_levenshtein, jaro, jaro_winkler, ngram, trigram, lcs, cosine",
-            algorithm
+            "Unknown algorithm: '{}'. Valid: {}",
+            algorithm, VALID_ALGORITHMS
         ))),
     }
 }
@@ -217,16 +269,18 @@ type SimilarityFn = Box<dyn Fn(&str, &str) -> f64 + Send + Sync>;
 fn get_similarity_fn(algorithm: &str) -> PyResult<SimilarityFn> {
     match algorithm {
         "levenshtein" => Ok(Box::new(algorithms::levenshtein::levenshtein_similarity)),
-        "damerau_levenshtein" | "damerau" => Ok(Box::new(algorithms::damerau::damerau_levenshtein_similarity)),
+        "damerau_levenshtein" | "damerau" => Ok(Box::new(
+            algorithms::damerau::damerau_levenshtein_similarity,
+        )),
         "jaro" => Ok(Box::new(algorithms::jaro::jaro_similarity)),
         "jaro_winkler" => Ok(Box::new(algorithms::jaro::jaro_winkler_similarity)),
-        "ngram" | "bigram" => Ok(Box::new(algorithms::ngram::bigram_similarity)),
-        "trigram" => Ok(Box::new(algorithms::ngram::trigram_similarity)),
+        "bigram" => Ok(Box::new(algorithms::ngram::bigram_similarity)),
+        "ngram" | "trigram" => Ok(Box::new(algorithms::ngram::trigram_similarity)),
         "lcs" => Ok(Box::new(algorithms::lcs::lcs_similarity)),
         "cosine" | "cosine_chars" => Ok(Box::new(algorithms::cosine::cosine_similarity_chars)),
         _ => Err(AlgorithmError::new_err(format!(
-            "Unknown algorithm: '{}'. Valid: levenshtein, damerau_levenshtein, jaro, jaro_winkler, ngram, trigram, lcs, cosine",
-            algorithm
+            "Unknown algorithm: '{}'. Valid: {}",
+            algorithm, VALID_ALGORITHMS
         ))),
     }
 }
@@ -759,9 +813,69 @@ fn levenshtein_similarity_simd(a: &str, b: &str) -> f64 {
 ///
 /// Returns `max_distance + 1` if distance exceeds threshold (for RapidFuzz compatibility).
 /// Use `damerau_levenshtein_bounded()` if you prefer `None` semantics.
+///
+/// Note: This uses the "true" Damerau-Levenshtein algorithm which allows multiple edits
+/// on the same substring. For the restricted (OSA) variant, use `optimal_string_alignment()`.
 #[pyfunction]
 #[pyo3(signature = (a, b, max_distance=None, normalize=None))]
 fn damerau_levenshtein(
+    a: &str,
+    b: &str,
+    max_distance: Option<usize>,
+    normalize: Option<&str>,
+) -> PyResult<usize> {
+    let (a, b) = apply_normalization(a, b, normalize)?;
+    let dist = algorithms::damerau::true_damerau_levenshtein(&a, &b);
+    match max_distance {
+        Some(max_d) => {
+            if dist > max_d {
+                Ok(max_d.saturating_add(1))
+            } else {
+                Ok(dist)
+            }
+        }
+        None => Ok(dist),
+    }
+}
+
+/// Compute Damerau-Levenshtein distance with explicit `None` return when threshold exceeded.
+///
+/// # Arguments
+/// * `max_distance` - Threshold. Returns `None` if distance exceeds this value.
+/// * `normalize` - Optional normalization mode
+///
+/// Returns `Some(distance)` if within threshold, `None` if exceeded.
+///
+/// Note: Uses the "true" Damerau-Levenshtein algorithm.
+#[pyfunction]
+#[pyo3(signature = (a, b, max_distance, normalize=None))]
+fn damerau_levenshtein_bounded(
+    a: &str,
+    b: &str,
+    max_distance: usize,
+    normalize: Option<&str>,
+) -> PyResult<Option<usize>> {
+    let (a, b) = apply_normalization(a, b, normalize)?;
+    let dist = algorithms::damerau::true_damerau_levenshtein(&a, &b);
+    if dist > max_distance {
+        Ok(None)
+    } else {
+        Ok(Some(dist))
+    }
+}
+
+/// Compute Optimal String Alignment (OSA) distance - restricted Damerau-Levenshtein.
+///
+/// This is the restricted variant that doesn't allow multiple edits on the
+/// same substring. It's slightly faster than the true algorithm but may
+/// produce different results for certain edge cases.
+///
+/// # Arguments
+/// * `max_distance` - Optional threshold. If distance exceeds this, returns `max_distance + 1`
+/// * `normalize` - Optional normalization mode
+#[pyfunction]
+#[pyo3(signature = (a, b, max_distance=None, normalize=None))]
+fn optimal_string_alignment(
     a: &str,
     b: &str,
     max_distance: Option<usize>,
@@ -782,26 +896,13 @@ fn damerau_levenshtein(
     }
 }
 
-/// Compute Damerau-Levenshtein distance with explicit `None` return when threshold exceeded.
-///
-/// # Arguments
-/// * `max_distance` - Threshold. Returns `None` if distance exceeds this value.
-/// * `normalize` - Optional normalization mode
-///
-/// Returns `Some(distance)` if within threshold, `None` if exceeded.
+/// Compute normalized Optimal String Alignment similarity (0.0 to 1.0).
 #[pyfunction]
-#[pyo3(signature = (a, b, max_distance, normalize=None))]
-fn damerau_levenshtein_bounded(
-    a: &str,
-    b: &str,
-    max_distance: usize,
-    normalize: Option<&str>,
-) -> PyResult<Option<usize>> {
+#[pyo3(signature = (a, b, normalize=None))]
+fn optimal_string_alignment_similarity(a: &str, b: &str, normalize: Option<&str>) -> PyResult<f64> {
     let (a, b) = apply_normalization(a, b, normalize)?;
-    Ok(algorithms::damerau::damerau_levenshtein_distance_bounded(
-        &a,
-        &b,
-        Some(max_distance),
+    Ok(algorithms::damerau::optimal_string_alignment_similarity(
+        &a, &b,
     ))
 }
 
@@ -1512,6 +1613,9 @@ where
 /// * `strings` - List of strings to compare
 /// * `query` - Query string to compare against
 /// * `normalize` - Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+///
+/// # Deprecated
+/// Use `batch_similarity(strings, query, algorithm="levenshtein")` instead.
 #[pyfunction]
 #[pyo3(signature = (strings, query, normalize=None))]
 fn batch_levenshtein(
@@ -1519,9 +1623,20 @@ fn batch_levenshtein(
     strings: Vec<String>,
     query: &str,
     normalize: Option<&str>,
-) -> Vec<MatchResult> {
+) -> PyResult<Vec<MatchResult>> {
+    // Issue deprecation warning
+    let warnings = py.import("warnings")?;
+    warnings.call_method1(
+        "warn",
+        (
+            "batch_levenshtein() is deprecated. Use batch_similarity(strings, query, algorithm='levenshtein') instead.",
+            py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+            2i32, // stacklevel
+        ),
+    )?;
+
     let query = query.to_string();
-    py.allow_threads(|| {
+    Ok(py.allow_threads(|| {
         if matches!(normalize, Some("lowercase")) {
             let query_lower = query.to_lowercase();
             batch_similarity_internal(&strings, &query_lower, |s, q| {
@@ -1534,7 +1649,7 @@ fn batch_levenshtein(
                 algorithms::levenshtein::levenshtein_similarity,
             )
         }
-    })
+    }))
 }
 
 /// Compute Jaro-Winkler similarities in batch.
@@ -1547,6 +1662,9 @@ fn batch_levenshtein(
 /// * `strings` - List of strings to compare
 /// * `query` - Query string to compare against
 /// * `normalize` - Optional normalization mode. Use "lowercase" for case-insensitive comparison.
+///
+/// # Deprecated
+/// Use `batch_similarity(strings, query, algorithm="jaro_winkler")` instead.
 #[pyfunction]
 #[pyo3(signature = (strings, query, normalize=None))]
 fn batch_jaro_winkler(
@@ -1554,9 +1672,20 @@ fn batch_jaro_winkler(
     strings: Vec<String>,
     query: &str,
     normalize: Option<&str>,
-) -> Vec<MatchResult> {
+) -> PyResult<Vec<MatchResult>> {
+    // Issue deprecation warning
+    let warnings = py.import("warnings")?;
+    warnings.call_method1(
+        "warn",
+        (
+            "batch_jaro_winkler() is deprecated. Use batch_similarity(strings, query, algorithm='jaro_winkler') instead.",
+            py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+            2i32, // stacklevel
+        ),
+    )?;
+
     let query = query.to_string();
-    py.allow_threads(|| {
+    Ok(py.allow_threads(|| {
         if matches!(normalize, Some("lowercase")) {
             let query_lower = query.to_lowercase();
             batch_similarity_internal(&strings, &query_lower, |s, q| {
@@ -1565,7 +1694,7 @@ fn batch_jaro_winkler(
         } else {
             batch_similarity_internal(&strings, &query, algorithms::jaro::jaro_winkler_similarity)
         }
-    })
+    }))
 }
 
 /// Find best matches from a list using specified algorithm.
@@ -1926,220 +2055,6 @@ fn batch_similarity(
 }
 
 // ============================================================================
-// Case-Insensitive Variants (Aliases for base functions with normalize="lowercase")
-// ============================================================================
-
-/// Case-insensitive Levenshtein distance.
-/// Equivalent to `levenshtein(a, b, normalize="lowercase")`.
-#[pyfunction]
-#[pyo3(signature = (a, b, max_distance=None))]
-fn levenshtein_ci(a: &str, b: &str, max_distance: Option<usize>) -> PyResult<usize> {
-    levenshtein(a, b, max_distance, Some("lowercase"))
-}
-
-/// Case-insensitive Levenshtein similarity.
-/// Equivalent to `levenshtein_similarity(a, b, normalize="lowercase")`.
-#[pyfunction]
-fn levenshtein_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
-    levenshtein_similarity(a, b, Some("lowercase"))
-}
-
-/// Case-insensitive Damerau-Levenshtein distance.
-/// Equivalent to `damerau_levenshtein(a, b, normalize="lowercase")`.
-#[pyfunction]
-#[pyo3(signature = (a, b, max_distance=None))]
-fn damerau_levenshtein_ci(a: &str, b: &str, max_distance: Option<usize>) -> PyResult<usize> {
-    damerau_levenshtein(a, b, max_distance, Some("lowercase"))
-}
-
-/// Case-insensitive Damerau-Levenshtein similarity.
-/// Equivalent to `damerau_levenshtein_similarity(a, b, normalize="lowercase")`.
-#[pyfunction]
-fn damerau_levenshtein_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
-    damerau_levenshtein_similarity(a, b, Some("lowercase"))
-}
-
-/// Case-insensitive Jaro similarity.
-/// Equivalent to `jaro_similarity(a, b, normalize="lowercase")`.
-#[pyfunction]
-fn jaro_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
-    jaro_similarity(a, b, Some("lowercase"))
-}
-
-/// Case-insensitive Jaro-Winkler similarity.
-/// Equivalent to `jaro_winkler_similarity(a, b, normalize="lowercase")`.
-#[pyfunction]
-#[pyo3(signature = (a, b, prefix_weight=0.1, max_prefix_length=4))]
-fn jaro_winkler_similarity_ci(
-    a: &str,
-    b: &str,
-    prefix_weight: f64,
-    max_prefix_length: usize,
-) -> PyResult<f64> {
-    jaro_winkler_similarity(a, b, prefix_weight, max_prefix_length, Some("lowercase"))
-}
-
-/// Case-insensitive n-gram similarity.
-/// Equivalent to `ngram_similarity(a, b, normalize="lowercase")`.
-#[pyfunction]
-#[pyo3(signature = (a, b, ngram_size=3, pad=true))]
-fn ngram_similarity_ci(a: &str, b: &str, ngram_size: usize, pad: bool) -> PyResult<f64> {
-    ngram_similarity(a, b, ngram_size, pad, Some("lowercase"))
-}
-
-/// Case-insensitive n-gram Jaccard similarity.
-/// Equivalent to `ngram_jaccard(a, b, normalize="lowercase")`.
-#[pyfunction]
-#[pyo3(signature = (a, b, ngram_size=3, pad=true))]
-fn ngram_jaccard_ci(a: &str, b: &str, ngram_size: usize, pad: bool) -> PyResult<f64> {
-    ngram_jaccard(a, b, ngram_size, pad, Some("lowercase"))
-}
-
-/// Case-insensitive character-level cosine similarity.
-/// Equivalent to `cosine_similarity_chars(a, b, normalize="lowercase")`.
-#[pyfunction]
-fn cosine_similarity_chars_ci(a: &str, b: &str) -> PyResult<f64> {
-    cosine_similarity_chars(a, b, Some("lowercase"))
-}
-
-/// Case-insensitive word-level cosine similarity.
-/// Equivalent to `cosine_similarity_words(a, b, normalize="lowercase")`.
-#[pyfunction]
-fn cosine_similarity_words_ci(a: &str, b: &str) -> PyResult<f64> {
-    cosine_similarity_words(a, b, Some("lowercase"))
-}
-
-/// Case-insensitive n-gram cosine similarity.
-/// Equivalent to `cosine_similarity_ngrams(a, b, normalize="lowercase")`.
-#[pyfunction]
-#[pyo3(signature = (a, b, ngram_size=3))]
-fn cosine_similarity_ngrams_ci(a: &str, b: &str, ngram_size: usize) -> PyResult<f64> {
-    cosine_similarity_ngrams(a, b, ngram_size, Some("lowercase"))
-}
-
-/// Case-insensitive bigram similarity.
-/// Equivalent to `ngram_similarity(a, b, ngram_size=2, normalize="lowercase")`.
-#[pyfunction]
-fn bigram_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
-    ngram_similarity(a, b, 2, true, Some("lowercase"))
-}
-
-/// Case-insensitive trigram similarity.
-/// Equivalent to `ngram_similarity(a, b, ngram_size=3, normalize="lowercase")`.
-#[pyfunction]
-fn trigram_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
-    ngram_similarity(a, b, 3, true, Some("lowercase"))
-}
-
-/// Case-insensitive LCS similarity.
-/// Equivalent to `lcs_similarity(a.lower(), b.lower())`.
-#[pyfunction]
-fn lcs_similarity_ci(a: &str, b: &str) -> f64 {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    algorithms::lcs::lcs_similarity(&a_lower, &b_lower)
-}
-
-/// Case-insensitive Soundex similarity.
-/// Equivalent to `soundex_similarity(a.lower(), b.lower())`.
-#[pyfunction]
-fn soundex_similarity_ci(a: &str, b: &str) -> f64 {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    algorithms::phonetic::soundex_similarity(&a_lower, &b_lower)
-}
-
-/// Case-insensitive Metaphone similarity.
-/// Equivalent to `metaphone_similarity(a.lower(), b.lower())`.
-#[pyfunction]
-#[pyo3(signature = (a, b, max_length=4))]
-fn metaphone_similarity_ci(a: &str, b: &str, max_length: usize) -> f64 {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    algorithms::phonetic::metaphone_similarity(&a_lower, &b_lower, max_length)
-}
-
-/// Case-insensitive Hamming distance.
-///
-/// Converts both strings to lowercase before computing Hamming distance.
-/// Strings must have equal length.
-#[pyfunction]
-fn hamming_ci(a: &str, b: &str) -> PyResult<usize> {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    algorithms::hamming::hamming_distance(&a_lower, &b_lower).ok_or_else(|| {
-        ValidationError::new_err("Strings must have equal length for Hamming distance")
-    })
-}
-
-/// Case-insensitive Hamming similarity (0.0 to 1.0).
-///
-/// Converts both strings to lowercase before computing Hamming similarity.
-/// Strings must have equal length.
-#[pyfunction]
-fn hamming_similarity_ci(a: &str, b: &str) -> PyResult<f64> {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    algorithms::hamming::hamming_similarity(&a_lower, &b_lower).ok_or_else(|| {
-        ValidationError::new_err("Strings must have equal length for Hamming similarity")
-    })
-}
-
-/// Case-insensitive LCS length.
-/// Equivalent to `lcs_length(a.lower(), b.lower())`.
-#[pyfunction]
-fn lcs_length_ci(a: &str, b: &str) -> usize {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    algorithms::lcs::lcs_length(&a_lower, &b_lower)
-}
-
-/// Case-insensitive LCS string.
-///
-/// Returns the actual Longest Common Subsequence string after converting
-/// both inputs to lowercase.
-///
-/// Note: For strings longer than 10,000 characters, this raises a ValidationError
-/// to prevent excessive memory allocation (O(m*n) space required).
-#[pyfunction]
-fn lcs_string_ci(a: &str, b: &str) -> PyResult<String> {
-    const MAX_LEN: usize = 10_000;
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    if a_lower.chars().count() > MAX_LEN || b_lower.chars().count() > MAX_LEN {
-        return Err(ValidationError::new_err(format!(
-            "Input strings exceed maximum length of {} characters for lcs_string_ci. \
-             Use lcs_length_ci for a space-efficient alternative.",
-            MAX_LEN
-        )));
-    }
-    Ok(algorithms::lcs::lcs_string(&a_lower, &b_lower))
-}
-
-/// Case-insensitive longest common substring.
-///
-/// Returns the longest common contiguous substring after converting
-/// both inputs to lowercase.
-///
-/// Note: For strings longer than 10,000 characters, this raises a ValidationError
-/// to prevent excessive memory allocation (O(m*n) space required).
-#[pyfunction]
-fn longest_common_substring_ci(a: &str, b: &str) -> PyResult<String> {
-    const MAX_LEN: usize = 10_000;
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    if a_lower.chars().count() > MAX_LEN || b_lower.chars().count() > MAX_LEN {
-        return Err(ValidationError::new_err(format!(
-            "Input strings exceed maximum length of {} characters for longest_common_substring_ci. \
-             Use longest_common_substring_length for a space-efficient alternative.",
-            MAX_LEN
-        )));
-    }
-    Ok(algorithms::lcs::longest_common_substring(
-        &a_lower, &b_lower,
-    ))
-}
-
 // ============================================================================
 // String Normalization
 // ============================================================================
@@ -2208,8 +2123,8 @@ fn find_duplicates(
         }
         _ => {
             return Err(ValidationError::new_err(format!(
-                "Unknown deduplication method: '{}'. Valid: auto, brute_force, snm",
-                method
+                "Unknown deduplication method: '{}'. Valid: {}",
+                method, VALID_DEDUP_METHODS
             )))
         }
     };
@@ -2222,10 +2137,12 @@ fn find_duplicates(
         "remove_punctuation" => Some(NormalizationMode::RemovePunctuation),
         "remove_whitespace" => Some(NormalizationMode::RemoveWhitespace),
         "strict" => Some(NormalizationMode::Strict),
-        _ => return Err(ValidationError::new_err(format!(
-            "Unknown normalization mode: '{}'. Valid: none, lowercase, unicode_nfkd, remove_punctuation, remove_whitespace, strict",
-            normalize
-        ))),
+        _ => {
+            return Err(ValidationError::new_err(format!(
+                "Unknown normalization mode: '{}'. Valid: {}",
+                normalize, VALID_NORMALIZATIONS_WITH_NONE
+            )))
+        }
     };
 
     // Normalize items if requested
@@ -2358,10 +2275,12 @@ fn find_duplicate_pairs(
         "remove_punctuation" => Some(NormalizationMode::RemovePunctuation),
         "remove_whitespace" => Some(NormalizationMode::RemoveWhitespace),
         "strict" => Some(NormalizationMode::Strict),
-        _ => return Err(ValidationError::new_err(format!(
-            "Unknown normalization mode: '{}'. Valid: none, lowercase, unicode_nfkd, remove_punctuation, remove_whitespace, strict",
-            normalize
-        ))),
+        _ => {
+            return Err(ValidationError::new_err(format!(
+                "Unknown normalization mode: '{}'. Valid: {}",
+                normalize, VALID_NORMALIZATIONS_WITH_NONE
+            )))
+        }
     };
 
     // Normalize items if requested
@@ -3268,8 +3187,13 @@ impl PyNgramIndex {
     ///
     /// This restores the uncompressed index from the compressed format.
     /// Call this before adding new items to a compressed index.
-    fn decompress(&mut self) {
-        self.inner.decompress();
+    ///
+    /// Raises:
+    ///     IndexError: If the compressed data is corrupted and cannot be decoded.
+    fn decompress(&mut self) -> PyResult<()> {
+        self.inner
+            .decompress()
+            .map_err(|e| IndexError::new_err(e.to_string()))
     }
 
     /// Check if the index is currently compressed.
@@ -3676,7 +3600,10 @@ impl PyThreadSafeNgramIndex {
                         .inner
                         .search_parallel(&query, &sim, min_similarity, limit))
                 }
-                _ => Err(format!("Unknown algorithm: {}", algorithm)),
+                _ => Err(format!(
+                    "Unknown algorithm: '{}'. Valid: {}",
+                    algorithm, VALID_INDEX_ALGORITHMS
+                )),
             });
 
         let results = results.map_err(AlgorithmError::new_err)?;
@@ -3957,7 +3884,10 @@ impl PyShardedNgramIndex {
                     let sim = algorithms::Ngram::new(3);
                     Ok(self.inner.search(&query, &sim, min_similarity, limit))
                 }
-                _ => Err(format!("Unknown algorithm: {}", algorithm)),
+                _ => Err(format!(
+                    "Unknown algorithm: '{}'. Valid: {}",
+                    algorithm, VALID_INDEX_ALGORITHMS
+                )),
             });
 
         let results = results.map_err(AlgorithmError::new_err)?;
@@ -4150,8 +4080,8 @@ impl SchemaBuilder {
             "token_set" => "jaccard",
             _ => {
                 return Err(SchemaError::new_err(format!(
-                    "Unknown field type: '{}'. Valid: short_text, long_text, token_set",
-                    field_type
+                    "Unknown field type: '{}'. Valid: {}",
+                    field_type, VALID_FIELD_TYPES
                 )))
             }
         };
@@ -4183,8 +4113,8 @@ impl SchemaBuilder {
             }
             _ => {
                 return Err(SchemaError::new_err(format!(
-                    "Unknown field type: '{}'. Valid: short_text, long_text, token_set",
-                    field_type
+                    "Unknown field type: '{}'. Valid: {}",
+                    field_type, VALID_FIELD_TYPES
                 )))
             }
         };
@@ -4216,8 +4146,8 @@ impl SchemaBuilder {
             "minmax_scaling" | "minmax" => schema::ScoringStrategy::MinMaxScaling,
             _ => {
                 return Err(SchemaError::new_err(format!(
-                    "Unknown scoring strategy: '{}'. Valid: weighted_average, minmax_scaling",
-                    strategy
+                    "Unknown scoring strategy: '{}'. Valid: {}",
+                    strategy, VALID_SCORING_STRATEGIES
                 )))
             }
         };
@@ -4439,8 +4369,8 @@ fn parse_algorithm(algo: &str) -> PyResult<schema::types::Algorithm> {
         "cosine" => Ok(schema::types::Algorithm::Cosine),
         "exact" | "exact_match" => Ok(schema::types::Algorithm::ExactMatch),
         _ => Err(AlgorithmError::new_err(format!(
-            "Unknown algorithm: '{}'. Valid algorithms: levenshtein, damerau_levenshtein, jaro_winkler, ngram, jaccard, cosine, exact_match",
-            algo
+            "Unknown algorithm: '{}'. Valid: {}",
+            algo, VALID_SCHEMA_ALGORITHMS
         ))),
     }
 }
@@ -4471,6 +4401,8 @@ fn _core(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(damerau_levenshtein, m)?)?;
     m.add_function(wrap_pyfunction!(damerau_levenshtein_bounded, m)?)?;
     m.add_function(wrap_pyfunction!(damerau_levenshtein_similarity, m)?)?;
+    m.add_function(wrap_pyfunction!(optimal_string_alignment, m)?)?;
+    m.add_function(wrap_pyfunction!(optimal_string_alignment_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(jaro_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(jaro_winkler_similarity, m)?)?;
 
@@ -4531,29 +4463,6 @@ fn _core(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(batch_similarity_pairs, m)?)?;
     m.add_function(wrap_pyfunction!(cdist, m)?)?;
     m.add_function(wrap_pyfunction!(batch_similarity, m)?)?;
-
-    // Case-insensitive variants
-    m.add_function(wrap_pyfunction!(levenshtein_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(levenshtein_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(damerau_levenshtein_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(damerau_levenshtein_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(jaro_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(jaro_winkler_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(ngram_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(ngram_jaccard_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(cosine_similarity_chars_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(cosine_similarity_words_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(cosine_similarity_ngrams_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(bigram_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(trigram_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(lcs_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(lcs_length_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(lcs_string_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(longest_common_substring_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(hamming_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(hamming_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(soundex_similarity_ci, m)?)?;
-    m.add_function(wrap_pyfunction!(metaphone_similarity_ci, m)?)?;
 
     // Normalization
     m.add_function(wrap_pyfunction!(normalize_string, m)?)?;

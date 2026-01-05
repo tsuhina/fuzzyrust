@@ -355,7 +355,11 @@ impl ShardedNgramIndex {
 
         // Flatten and sort by similarity
         let mut all_results: Vec<SearchMatch> = shard_results.into_iter().flatten().collect();
-        all_results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        all_results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         if let Some(limit) = limit {
             all_results.truncate(limit);
         }

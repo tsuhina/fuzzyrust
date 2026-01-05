@@ -3,47 +3,47 @@
 import pytest
 
 
-class TestCaseInsensitiveVariants:
-    """Tests for case-insensitive function variants."""
+class TestCaseInsensitiveWithNormalize:
+    """Tests for case-insensitive matching using normalize='lowercase' parameter."""
 
-    def test_levenshtein_ci(self):
+    def test_levenshtein_normalize_lowercase(self):
         import fuzzyrust as fr
 
-        assert fr.levenshtein_ci("Hello", "HELLO") == 0
+        assert fr.levenshtein("Hello", "HELLO", normalize="lowercase") == 0
         # "hello" vs "world" (lowercased): 4 substitutions = distance 4
-        assert fr.levenshtein_ci("Hello", "World") == 4
+        assert fr.levenshtein("Hello", "World", normalize="lowercase") == 4
 
-    def test_levenshtein_similarity_ci(self):
+    def test_levenshtein_similarity_normalize_lowercase(self):
         import fuzzyrust as fr
 
-        assert fr.levenshtein_similarity_ci("Hello", "HELLO") == 1.0
-        assert fr.levenshtein_similarity_ci("Test", "TEST") == 1.0
+        assert fr.levenshtein_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
+        assert fr.levenshtein_similarity("Test", "TEST", normalize="lowercase") == 1.0
         # "Hello" vs "Hallo" after lowercasing: 1 edit out of 5 = 0.8 similarity
-        assert fr.levenshtein_similarity_ci("Hello", "Hallo") == 0.8
+        assert fr.levenshtein_similarity("Hello", "Hallo", normalize="lowercase") == 0.8
 
-    def test_damerau_levenshtein_ci(self):
+    def test_damerau_levenshtein_normalize_lowercase(self):
         import fuzzyrust as fr
 
-        assert fr.damerau_levenshtein_ci("ab", "BA") == 1  # Transposition
-        assert fr.damerau_levenshtein_ci("TEST", "test") == 0
+        assert fr.damerau_levenshtein("ab", "BA", normalize="lowercase") == 1  # Transposition
+        assert fr.damerau_levenshtein("TEST", "test", normalize="lowercase") == 0
 
-    def test_jaro_similarity_ci(self):
+    def test_jaro_similarity_normalize_lowercase(self):
         import fuzzyrust as fr
 
-        assert fr.jaro_similarity_ci("Hello", "HELLO") == 1.0
-        assert fr.jaro_similarity_ci("Test", "test") == 1.0
+        assert fr.jaro_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
+        assert fr.jaro_similarity("Test", "test", normalize="lowercase") == 1.0
 
-    def test_jaro_winkler_similarity_ci(self):
+    def test_jaro_winkler_similarity_normalize_lowercase(self):
         import fuzzyrust as fr
 
-        assert fr.jaro_winkler_similarity_ci("Hello", "HELLO") == 1.0
-        assert fr.jaro_winkler_similarity_ci("Prefix", "PREFIX") == 1.0
+        assert fr.jaro_winkler_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
+        assert fr.jaro_winkler_similarity("Prefix", "PREFIX", normalize="lowercase") == 1.0
 
-    def test_ngram_similarity_ci(self):
+    def test_ngram_similarity_normalize_lowercase(self):
         import fuzzyrust as fr
 
-        assert fr.ngram_similarity_ci("Test", "TEST") == 1.0
-        assert fr.ngram_similarity_ci("Hello", "HELLO", ngram_size=3) == 1.0
+        assert fr.ngram_similarity("Test", "TEST", normalize="lowercase") == 1.0
+        assert fr.ngram_similarity("Hello", "HELLO", ngram_size=3, normalize="lowercase") == 1.0
 
 
 class TestNormalizationMode:
@@ -167,7 +167,7 @@ class TestDeduplication:
         import fuzzyrust as fr
 
         items = ["hello", "Hello", "HELLO", "world"]
-        result = fr.find_duplicates(items, min_similarity=0.9, normalize="lowercase")
+        result = fr.batch.deduplicate(items, min_similarity=0.9, normalize="lowercase")
 
         assert isinstance(result.groups, list), "Expected groups to be a list"
         assert len(result.groups) == 1, (
@@ -195,7 +195,7 @@ class TestDeduplication:
         import fuzzyrust as fr
 
         items = ["hello", "Hello", "HELLO"]
-        result = fr.find_duplicates(items, min_similarity=0.9, normalize="none")
+        result = fr.batch.deduplicate(items, min_similarity=0.9, normalize="none")
 
         # Without normalization and high min_similarity (0.9), case differences prevent grouping
         # "hello" vs "Hello" has ~0.8 similarity (1 char diff / 5 chars), below 0.9 threshold
@@ -212,7 +212,7 @@ class TestDeduplication:
         items = ["test", "Test", "tset"]
 
         for algo in ["levenshtein", "jaro_winkler", "ngram"]:
-            result = fr.find_duplicates(
+            result = fr.batch.deduplicate(
                 items, algorithm=algo, min_similarity=0.7, normalize="lowercase"
             )
             # Verify result structure is correct
@@ -254,7 +254,7 @@ class TestDeduplication:
     def test_find_duplicates_empty(self):
         import fuzzyrust as fr
 
-        result = fr.find_duplicates([], min_similarity=0.8)
+        result = fr.batch.deduplicate([], min_similarity=0.8)
         assert result.groups == []
         assert result.unique == []
         assert result.total_duplicates == 0
@@ -262,7 +262,7 @@ class TestDeduplication:
     def test_find_duplicates_single(self):
         import fuzzyrust as fr
 
-        result = fr.find_duplicates(["hello"], min_similarity=0.8)
+        result = fr.batch.deduplicate(["hello"], min_similarity=0.8)
         assert result.groups == []
         assert result.unique == ["hello"]
         assert result.total_duplicates == 0
@@ -271,7 +271,7 @@ class TestDeduplication:
         import fuzzyrust as fr
 
         items = ["apple", "banana", "cherry"]
-        result = fr.find_duplicates(items, min_similarity=0.9)
+        result = fr.batch.deduplicate(items, min_similarity=0.9)
         assert result.groups == []
         assert len(result.unique) == 3
         assert result.total_duplicates == 0
@@ -280,7 +280,7 @@ class TestDeduplication:
         import fuzzyrust as fr
 
         items = ["hello", "Hello"]
-        result = fr.find_duplicates(items, min_similarity=0.9, normalize="lowercase")
+        result = fr.batch.deduplicate(items, min_similarity=0.9, normalize="lowercase")
 
         # Test that all attributes are accessible
         assert hasattr(result, "groups")
@@ -296,9 +296,7 @@ class TestDeduplication:
         items = ["hello", "Hello", "HELLO", "world", "worl"]
 
         # SNM with window_size=5 should easily catch these
-        result = fr.find_duplicates(
-            items, min_similarity=0.8, normalize="lowercase", method="snm", window_size=5
-        )
+        result = fr.batch.deduplicate(items, min_similarity=0.8, normalize="lowercase")
 
         assert len(result.groups) >= 1
         # hello, Hello, HELLO should be grouped
@@ -311,7 +309,7 @@ class TestDeduplication:
 
         items = ["test"] * 100
         # Should default to brute force for small N
-        result = fr.find_duplicates(items, method="auto")
+        result = fr.batch.deduplicate(items)
         assert result.total_duplicates == 99
 
     def test_find_duplicates_snm_large(self):
@@ -335,7 +333,7 @@ class TestDeduplication:
         import time
 
         start = time.time()
-        result = fr.find_duplicates(items, method="snm", window_size=50, min_similarity=0.8)
+        result = fr.batch.deduplicate(items, min_similarity=0.8)
         end = time.time()
 
         assert end - start < 2.0  # Should be fast
@@ -577,7 +575,7 @@ class TestNewResultTypes:
         import fuzzyrust as fr
 
         strings = ["apple", "apply"]
-        results = fr.find_best_matches(strings, "apple", limit=2)
+        results = fr.batch.best_matches(strings, "apple", limit=2)
 
         assert len(results) > 0
         result = results[0]
@@ -639,7 +637,7 @@ class TestParameterRenames:
         strings = ["hello", "hallo", "world"]
 
         # find_best_matches should use min_similarity
-        results = fr.find_best_matches(strings, "hello", min_similarity=0.8)
+        results = fr.batch.best_matches(strings, "hello", min_similarity=0.8)
         # Verify we get results and they all meet the min_similarity threshold
         assert len(results) >= 1, (
             f"Expected at least 1 result for 'hello' query, got {len(results)}"
@@ -683,7 +681,7 @@ class TestEdgeCases:
         import fuzzyrust as fr
 
         items = ["hello", "hallo", "hullo"]
-        result = fr.find_duplicates(items, min_similarity=0.99)
+        result = fr.batch.deduplicate(items, min_similarity=0.99)
         # With min_similarity=0.99, only near-identical strings should group
         # "hello", "hallo", "hullo" each differ by 1 char (80% similar), below 0.99 threshold
         assert isinstance(result.groups, list), "Expected groups to be a list"

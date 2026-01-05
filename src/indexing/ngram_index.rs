@@ -69,7 +69,32 @@ impl CompressedPostingList {
     }
 
     /// Decode all IDs from the compressed format.
-    pub fn decode(&self) -> Vec<usize> {
+    ///
+    /// Returns `Ok(ids)` on success, or `Err` if the compressed data is corrupted.
+    /// For recovery scenarios where partial decoding is acceptable, use `decode_partial()`.
+    pub fn decode(&self) -> Result<Vec<usize>, VarintDecodeError> {
+        if self.len == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut result = Vec::with_capacity(self.len);
+        let mut pos = 0;
+        let mut prev = 0usize;
+
+        while pos < self.data.len() {
+            let (delta, bytes_read) = decode_varint(&self.data[pos..])?;
+            pos += bytes_read;
+            prev += delta;
+            result.push(prev);
+        }
+
+        Ok(result)
+    }
+
+    /// Decode IDs, stopping on first error and returning what was successfully decoded.
+    ///
+    /// This is useful for recovery scenarios where partial data is better than no data.
+    pub fn decode_partial(&self) -> Vec<usize> {
         if self.len == 0 {
             return Vec::new();
         }
@@ -79,10 +104,14 @@ impl CompressedPostingList {
         let mut prev = 0usize;
 
         while pos < self.data.len() {
-            let (delta, bytes_read) = decode_varint(&self.data[pos..]);
-            pos += bytes_read;
-            prev += delta;
-            result.push(prev);
+            match decode_varint(&self.data[pos..]) {
+                Ok((delta, bytes_read)) => {
+                    pos += bytes_read;
+                    prev += delta;
+                    result.push(prev);
+                }
+                Err(_) => break, // Stop on first decode error
+            }
         }
 
         result
@@ -131,25 +160,62 @@ fn encode_varint(mut value: usize, out: &mut Vec<u8>) {
     out.push(value as u8);
 }
 
-/// Decode a varint from bytes. Returns (value, bytes_consumed).
+/// Error type for varint decoding failures
+#[derive(Debug, Clone, PartialEq)]
+pub enum VarintDecodeError {
+    /// Reached end of data without finding terminating byte
+    UnexpectedEndOfData,
+    /// Varint encoding exceeds maximum allowed shift (overflow protection)
+    Overflow,
+}
+
+impl std::fmt::Display for VarintDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VarintDecodeError::UnexpectedEndOfData => {
+                write!(f, "Unexpected end of data while decoding varint")
+            }
+            VarintDecodeError::Overflow => {
+                write!(f, "Varint encoding exceeds maximum size (overflow)")
+            }
+        }
+    }
+}
+
+impl std::error::Error for VarintDecodeError {}
+
+/// Decode a varint from bytes. Returns (value, bytes_consumed) or error on invalid data.
+///
+/// # Safety
+/// This function validates bounds and prevents overflow:
+/// - Returns `UnexpectedEndOfData` if data ends without a terminating byte (< 0x80)
+/// - Returns `Overflow` if shift exceeds 63 bits (would overflow usize)
 #[inline]
-fn decode_varint(data: &[u8]) -> (usize, usize) {
+fn decode_varint(data: &[u8]) -> Result<(usize, usize), VarintDecodeError> {
     let mut result = 0usize;
     let mut shift = 0;
     let mut pos = 0;
 
     loop {
+        // Bounds check: ensure we have data to read
+        if pos >= data.len() {
+            return Err(VarintDecodeError::UnexpectedEndOfData);
+        }
+
         let byte = data[pos];
         result |= ((byte & 0x7F) as usize) << shift;
         pos += 1;
 
         if byte < 0x80 {
-            break;
+            return Ok((result, pos));
         }
-        shift += 7;
-    }
 
-    (result, pos)
+        shift += 7;
+        // Overflow protection: usize is at most 64 bits
+        if shift > 63 {
+            return Err(VarintDecodeError::Overflow);
+        }
+    }
 }
 
 /// Entry in the n-gram index
@@ -460,7 +526,8 @@ impl NgramIndex {
             for ngram in &query_ngrams {
                 let hash = Self::hash_string(ngram);
                 if let Some(posting_list) = compressed.get(&hash) {
-                    candidate_ids.extend(posting_list.decode());
+                    // Use decode_partial to gracefully handle any corrupted posting lists
+                    candidate_ids.extend(posting_list.decode_partial());
                 }
             }
         } else {
@@ -500,7 +567,8 @@ impl NgramIndex {
             for ngram in &query_ngrams {
                 let hash = Self::hash_string(ngram);
                 if let Some(posting_list) = compressed.get(&hash) {
-                    for id in posting_list.decode() {
+                    // Use decode_partial to gracefully handle any corrupted posting lists
+                    for id in posting_list.decode_partial() {
                         *candidate_counts.entry(id).or_insert(0) += 1;
                     }
                 }
@@ -748,10 +816,29 @@ impl NgramIndex {
     ///
     /// This restores the uncompressed index from the compressed format.
     /// Call this before adding new items to a compressed index.
-    pub fn decompress(&mut self) {
+    ///
+    /// # Errors
+    /// Returns `Err(VarintDecodeError)` if any compressed posting list is corrupted.
+    /// On error, the index state is undefined - some posting lists may have been
+    /// restored while others remain compressed.
+    pub fn decompress(&mut self) -> Result<(), VarintDecodeError> {
         if let Some(compressed) = self.compressed_index.take() {
             for (hash, posting_list) in compressed {
-                self.index.insert(hash, posting_list.decode());
+                self.index.insert(hash, posting_list.decode()?);
+            }
+        }
+        Ok(())
+    }
+
+    /// Decompress the posting lists, ignoring corrupted entries.
+    ///
+    /// This is a recovery method that will restore as much data as possible
+    /// even if some posting lists are corrupted. Use `decompress()` for
+    /// normal operation where data integrity is expected.
+    pub fn decompress_partial(&mut self) {
+        if let Some(compressed) = self.compressed_index.take() {
+            for (hash, posting_list) in compressed {
+                self.index.insert(hash, posting_list.decode_partial());
             }
         }
     }
@@ -960,7 +1047,7 @@ mod tests {
         let compressed = CompressedPostingList::from_sorted_ids(&ids);
 
         assert_eq!(compressed.len(), 6);
-        assert_eq!(compressed.decode(), ids);
+        assert_eq!(compressed.decode().unwrap(), ids);
 
         // Verify compression actually saves space
         assert!(compressed.compressed_size() < compressed.uncompressed_size());
@@ -971,7 +1058,42 @@ mod tests {
     fn test_compressed_posting_list_empty() {
         let compressed = CompressedPostingList::from_sorted_ids(&[]);
         assert!(compressed.is_empty());
-        assert_eq!(compressed.decode(), Vec::<usize>::new());
+        assert_eq!(compressed.decode().unwrap(), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_varint_decode_bounds_check() {
+        // Test that decode_varint correctly handles invalid data
+        let invalid_data = vec![0x80, 0x80, 0x80]; // No terminating byte
+        assert!(matches!(
+            decode_varint(&invalid_data),
+            Err(VarintDecodeError::UnexpectedEndOfData)
+        ));
+
+        // Test empty data
+        assert!(matches!(
+            decode_varint(&[]),
+            Err(VarintDecodeError::UnexpectedEndOfData)
+        ));
+
+        // Test valid single-byte varint
+        let valid = decode_varint(&[0x05]).unwrap();
+        assert_eq!(valid, (5, 1));
+
+        // Test valid multi-byte varint
+        let valid = decode_varint(&[0x80, 0x01]).unwrap();
+        assert_eq!(valid, (128, 2));
+    }
+
+    #[test]
+    fn test_decode_partial_on_corruption() {
+        // Create a compressed posting list with some valid data
+        let ids = vec![10, 20, 30];
+        let compressed = CompressedPostingList::from_sorted_ids(&ids);
+
+        // decode_partial should return what it can decode
+        let decoded = compressed.decode_partial();
+        assert_eq!(decoded, ids);
     }
 
     #[test]
@@ -1018,7 +1140,7 @@ mod tests {
         index.compress();
         assert!(index.is_compressed());
 
-        index.decompress();
+        index.decompress().unwrap();
         assert!(!index.is_compressed());
 
         // Should still work after decompress

@@ -4,23 +4,23 @@ import polars as pl
 import pytest
 
 from fuzzyrust import FuzzyIndex
-from fuzzyrust.polars_ext import (
-    dedupe_series,
-    fuzzy_dedupe_rows,
-    fuzzy_join,
-    match_dataframe,
-    match_series,
+from fuzzyrust.polars import (
+    df_dedupe,
+    df_join,
+    df_match_pairs,
+    series_dedupe,
+    series_match,
 )
 
 
 class TestMatchSeries:
-    """Tests for match_series function."""
+    """Tests for series_match function."""
 
     def test_basic_match(self):
         """Basic matching between two series."""
         queries = pl.Series(["apple", "banana"])
         targets = pl.Series(["appel", "banan", "cherry"])
-        result = match_series(queries, targets, min_similarity=0.7)
+        result = series_match(queries, targets, min_similarity=0.7)
 
         assert isinstance(result, pl.DataFrame)
         assert "query" in result.columns
@@ -32,7 +32,7 @@ class TestMatchSeries:
         """Empty series should return empty DataFrame."""
         queries = pl.Series([], dtype=pl.Utf8)
         targets = pl.Series(["apple", "banana"])
-        result = match_series(queries, targets)
+        result = series_match(queries, targets)
 
         assert len(result) == 0
 
@@ -40,18 +40,18 @@ class TestMatchSeries:
         """No matches above threshold."""
         queries = pl.Series(["xyz"])
         targets = pl.Series(["apple", "banana"])
-        result = match_series(queries, targets, min_similarity=0.9)
+        result = series_match(queries, targets, min_similarity=0.9)
 
         assert len(result) == 0
 
 
 class TestDedupeSeries:
-    """Tests for dedupe_series function."""
+    """Tests for series_dedupe function."""
 
     def test_basic_dedup(self):
         """Basic deduplication."""
         series = pl.Series(["hello", "helo", "world", "HELLO"])
-        result = dedupe_series(series, min_similarity=0.8)
+        result = series_dedupe(series, min_similarity=0.8)
 
         assert isinstance(result, pl.DataFrame)
         assert "value" in result.columns
@@ -69,7 +69,7 @@ class TestDedupeSeries:
     def test_no_duplicates(self):
         """No duplicates should have all unique."""
         series = pl.Series(["apple", "banana", "cherry"])
-        result = dedupe_series(series, min_similarity=0.95)
+        result = series_dedupe(series, min_similarity=0.95)
 
         # All should be canonical (unique)
         canonical = result.filter(pl.col("is_canonical"))
@@ -78,7 +78,7 @@ class TestDedupeSeries:
     def test_all_duplicates(self):
         """All same value should be one group."""
         series = pl.Series(["hello", "hello", "hello"])
-        result = dedupe_series(series, min_similarity=0.9)
+        result = series_dedupe(series, min_similarity=0.9)
 
         # Should have one group with 3 items
         groups = result["group_id"].unique().drop_nulls()
@@ -86,14 +86,14 @@ class TestDedupeSeries:
 
 
 class TestMatchDataframe:
-    """Tests for match_dataframe function."""
+    """Tests for df_match_pairs function."""
 
     def test_basic_match(self):
         """Basic multi-column matching."""
         df = pl.DataFrame(
             {"name": ["John Smith", "Jon Smith", "Jane Doe"], "city": ["NYC", "New York", "Boston"]}
         )
-        result = match_dataframe(df, ["name"], min_similarity=0.7)
+        result = df_match_pairs(df, ["name"], min_similarity=0.7)
 
         assert isinstance(result, pl.DataFrame)
         assert "idx_a" in result.columns
@@ -107,7 +107,7 @@ class TestMatchDataframe:
                 "name": ["Apple", "Banana", "Cherry"],
             }
         )
-        result = match_dataframe(df, ["name"], min_similarity=0.95)
+        result = df_match_pairs(df, ["name"], min_similarity=0.95)
 
         # May or may not have matches depending on algorithm
         assert isinstance(result, pl.DataFrame)
@@ -115,7 +115,7 @@ class TestMatchDataframe:
     def test_with_weights(self):
         """Matching with column weights."""
         df = pl.DataFrame({"name": ["John", "Jon"], "email": ["john@test.com", "jon@test.com"]})
-        result = match_dataframe(
+        result = df_match_pairs(
             df, ["name", "email"], weights={"name": 2.0, "email": 1.0}, min_similarity=0.5
         )
 
@@ -123,13 +123,13 @@ class TestMatchDataframe:
 
 
 class TestFuzzyJoin:
-    """Tests for fuzzy_join function."""
+    """Tests for df_join function."""
 
     def test_basic_join(self):
         """Basic fuzzy join."""
         left = pl.DataFrame({"name": ["Apple Inc", "Microsoft"]})
         right = pl.DataFrame({"company": ["Apple", "Microsft", "Google"]})
-        result = fuzzy_join(left, right, "name", "company", min_similarity=0.5)
+        result = df_join(left, right, left_on="name", right_on="company", min_similarity=0.5)
 
         assert isinstance(result, pl.DataFrame)
         assert "fuzzy_score" in result.columns
@@ -138,7 +138,7 @@ class TestFuzzyJoin:
         """No matches above threshold."""
         left = pl.DataFrame({"name": ["XYZ Corp"]})
         right = pl.DataFrame({"company": ["Apple", "Microsoft"]})
-        result = fuzzy_join(left, right, "name", "company", min_similarity=0.95)
+        result = df_join(left, right, left_on="name", right_on="company", min_similarity=0.95)
 
         # Should return empty DataFrame with correct schema
         assert len(result) == 0
@@ -147,7 +147,9 @@ class TestFuzzyJoin:
         """Left join should include unmatched rows."""
         left = pl.DataFrame({"name": ["Apple", "XYZ"]})
         right = pl.DataFrame({"company": ["Apple Inc"]})
-        result = fuzzy_join(left, right, "name", "company", min_similarity=0.5, how="left")
+        result = df_join(
+            left, right, left_on="name", right_on="company", min_similarity=0.5, how="left"
+        )
 
         # Left join should include all left rows
         assert len(result) >= 1
@@ -160,7 +162,7 @@ class TestPolarsIntegration:
         """Common workflow: dedupe then match."""
         # Dedupe a messy list
         series = pl.Series(["Apple Inc", "apple inc", "Microsoft", "MICROSOFT"])
-        deduped = dedupe_series(series, min_similarity=0.85)
+        deduped = series_dedupe(series, min_similarity=0.85)
 
         # Get canonical values
         canonical = deduped.filter(pl.col("is_canonical"))["value"].to_list()
@@ -168,7 +170,7 @@ class TestPolarsIntegration:
         # Match against a query
         queries = pl.Series(["apple"])
         targets = pl.Series(canonical)
-        matches = match_series(queries, targets, min_similarity=0.5)
+        matches = series_match(queries, targets, min_similarity=0.5)
 
         assert len(matches) > 0
 
@@ -183,7 +185,7 @@ class TestPolarsIntegration:
         )
 
         # Find similar rows
-        result = match_dataframe(df, ["name"], min_similarity=0.7)
+        result = df_match_pairs(df, ["name"], min_similarity=0.7)
 
         # Should find John/Jon/Smyth as similar
         assert len(result) > 0
@@ -196,7 +198,9 @@ class TestPolarsIntegration:
 
         orders = pl.DataFrame({"company": ["Apple Inc", "Microsft"], "order_value": [100, 200]})
 
-        merged = fuzzy_join(customers, orders, "customer_name", "company", min_similarity=0.5)
+        merged = df_join(
+            customers, orders, left_on="customer_name", right_on="company", min_similarity=0.5
+        )
 
         assert len(merged) > 0
         assert "revenue" in merged.columns
@@ -204,7 +208,7 @@ class TestPolarsIntegration:
 
 
 class TestFuzzyDedupeRows:
-    """Tests for fuzzy_dedupe_rows function."""
+    """Tests for df_dedupe function."""
 
     def test_basic_dedupe(self):
         """Basic DataFrame deduplication."""
@@ -214,7 +218,7 @@ class TestFuzzyDedupeRows:
                 "email": ["john@test.com", "jon@test.com", "jane@test.com", "john@test.com"],
             }
         )
-        result = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.8)
+        result = df_dedupe(df, columns=["name"], min_similarity=0.8)
 
         assert isinstance(result, pl.DataFrame)
         assert "_group_id" in result.columns
@@ -233,7 +237,7 @@ class TestFuzzyDedupeRows:
                 "email": ["john@test.com", "jon@test.com", "jane@test.com"],
             }
         )
-        result = fuzzy_dedupe_rows(
+        result = df_dedupe(
             df,
             columns=["name", "email"],
             algorithms={"name": "jaro_winkler", "email": "levenshtein"},
@@ -253,17 +257,15 @@ class TestFuzzyDedupeRows:
         )
 
         # Keep first
-        result_first = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.7, keep="first")
+        result_first = df_dedupe(df, columns=["name"], min_similarity=0.7, keep="first")
         canonical_first = result_first.filter(pl.col("_is_canonical"))
 
         # Keep last
-        result_last = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.7, keep="last")
+        result_last = df_dedupe(df, columns=["name"], min_similarity=0.7, keep="last")
         canonical_last = result_last.filter(pl.col("_is_canonical"))
 
         # Keep most complete
-        result_complete = fuzzy_dedupe_rows(
-            df, columns=["name"], min_similarity=0.7, keep="most_complete"
-        )
+        result_complete = df_dedupe(df, columns=["name"], min_similarity=0.7, keep="most_complete")
         canonical_complete = result_complete.filter(pl.col("_is_canonical"))
 
         assert len(canonical_first) > 0
@@ -273,7 +275,7 @@ class TestFuzzyDedupeRows:
     def test_empty_dataframe(self):
         """Empty DataFrame returns correct schema."""
         df = pl.DataFrame({"name": []}, schema={"name": pl.Utf8})
-        result = fuzzy_dedupe_rows(df, columns=["name"])
+        result = df_dedupe(df, columns=["name"])
 
         assert "_group_id" in result.columns
         assert "_is_canonical" in result.columns
@@ -282,14 +284,14 @@ class TestFuzzyDedupeRows:
     def test_no_duplicates(self):
         """No duplicates means all rows are canonical."""
         df = pl.DataFrame({"name": ["apple", "banana", "cherry"]})
-        result = fuzzy_dedupe_rows(df, columns=["name"], min_similarity=0.95)
+        result = df_dedupe(df, columns=["name"], min_similarity=0.95)
 
         canonical = result.filter(pl.col("_is_canonical"))
         assert len(canonical) == 3
 
 
 class TestMultiColumnFuzzyJoin:
-    """Tests for multi-column fuzzy_join."""
+    """Tests for multi-column df_join."""
 
     def test_multi_column_join(self):
         """Join on multiple columns."""
@@ -305,7 +307,7 @@ class TestMultiColumnFuzzyJoin:
                 "location": ["NYC", "LA"],
             }
         )
-        result = fuzzy_join(
+        result = df_join(
             left,
             right,
             on=[
@@ -332,7 +334,7 @@ class TestMultiColumnFuzzyJoin:
                 "region": ["United States"],
             }
         )
-        result = fuzzy_join(
+        result = df_join(
             left, right, on=[("name", "company"), ("country", "region")], min_similarity=0.5
         )
 
@@ -342,7 +344,7 @@ class TestMultiColumnFuzzyJoin:
         """Single column syntax still works."""
         left = pl.DataFrame({"name": ["Apple Inc"]})
         right = pl.DataFrame({"company": ["Apple"]})
-        result = fuzzy_join(left, right, left_on="name", right_on="company", min_similarity=0.5)
+        result = df_join(left, right, left_on="name", right_on="company", min_similarity=0.5)
 
         assert len(result) > 0
 

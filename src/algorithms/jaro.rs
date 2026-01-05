@@ -442,8 +442,13 @@ fn jaro_standard_generic<T: PartialEq>(a: &[T], b: &[T]) -> f64 {
         if !a_matched[i] {
             continue;
         }
-        while !b_matched[k] {
+        // Find next matched position in b (with bounds check for safety)
+        while k < b_len && !b_matched[k] {
             k += 1;
+        }
+        // Safety guard (should never happen mathematically, but be defensive)
+        if k >= b_len {
+            break;
         }
         if a[i] != b[k] {
             transpositions += 1;

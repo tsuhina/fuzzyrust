@@ -221,11 +221,11 @@ class TestErrorHandling:
     """Tests for error handling and invalid inputs."""
 
     def test_invalid_algorithm_find_best_matches(self):
-        """Test that invalid algorithm raises AlgorithmError."""
+        """Test that invalid algorithm raises ValueError."""
         import fuzzyrust as fr
 
-        with pytest.raises(fr.AlgorithmError, match="Unknown algorithm"):
-            fr.find_best_matches(["hello"], "hello", algorithm="invalid_algo")
+        with pytest.raises(ValueError, match="Unknown algorithm"):
+            fr.batch.best_matches(["hello"], "hello", algorithm="invalid_algo")
 
     def test_invalid_algorithm_ngram_index_search(self):
         """Test that invalid algorithm in NgramIndex.search raises AlgorithmError."""
@@ -255,95 +255,95 @@ class TestErrorHandling:
             fr.hamming("a", "abc")
 
 
-class TestCaseInsensitiveVariants:
-    """Test cases for new case-insensitive function variants."""
+class TestCaseInsensitiveWithLowercase:
+    """Test cases for case-insensitive operations using manual lowercasing."""
 
-    def test_hamming_ci_basic(self):
-        """Test case-insensitive Hamming distance."""
+    def test_hamming_with_lowercase(self):
+        """Test Hamming distance with manual lowercasing."""
         import fuzzyrust as fr
 
-        # Same strings with different case should have distance 0
-        assert fr.hamming_ci("ABC", "abc") == 0
-        assert fr.hamming_ci("Hello", "hello") == 0
-        assert fr.hamming_ci("HELLO", "HeLLo") == 0
+        # Same strings with different case should have distance 0 after lowercasing
+        assert fr.hamming("ABC".lower(), "abc".lower()) == 0
+        assert fr.hamming("Hello".lower(), "hello".lower()) == 0
+        assert fr.hamming("HELLO".lower(), "HeLLo".lower()) == 0
 
         # Actual differences should be detected
-        assert fr.hamming_ci("ABC", "AXC") == 1
-        assert fr.hamming_ci("abc", "AXC") == 1
+        assert fr.hamming("ABC".lower(), "AXC".lower()) == 1
+        assert fr.hamming("abc".lower(), "AXC".lower()) == 1
 
-    def test_hamming_ci_unequal_length(self):
-        """Test that hamming_ci raises ValidationError for unequal length strings."""
+    def test_hamming_unequal_length(self):
+        """Test that hamming raises ValidationError for unequal length strings."""
         import fuzzyrust as fr
 
         with pytest.raises(fr.ValidationError):
-            fr.hamming_ci("abc", "ab")
+            fr.hamming("abc".lower(), "ab".lower())
         with pytest.raises(fr.ValidationError):
-            fr.hamming_ci("A", "abc")
+            fr.hamming("A".lower(), "abc".lower())
 
-    def test_hamming_similarity_ci_basic(self):
-        """Test case-insensitive Hamming similarity."""
+    def test_hamming_similarity_with_lowercase(self):
+        """Test Hamming similarity with manual lowercasing."""
         import fuzzyrust as fr
 
-        # Same strings with different case should have similarity 1.0
-        assert fr.hamming_similarity_ci("ABC", "abc") == 1.0
-        assert fr.hamming_similarity_ci("Hello", "hello") == 1.0
+        # Same strings with different case should have similarity 1.0 after lowercasing
+        assert fr.hamming_similarity("ABC".lower(), "abc".lower()) == 1.0
+        assert fr.hamming_similarity("Hello".lower(), "hello".lower()) == 1.0
 
         # Actual differences should reduce similarity
-        sim = fr.hamming_similarity_ci("ABC", "AXC")
+        sim = fr.hamming_similarity("ABC".lower(), "AXC".lower())
         assert 0.6 < sim < 0.7  # 2/3 match
 
-    def test_hamming_similarity_ci_unequal_length(self):
-        """Test that hamming_similarity_ci raises ValidationError for unequal length strings."""
+    def test_hamming_similarity_unequal_length(self):
+        """Test that hamming_similarity raises ValidationError for unequal length strings."""
         import fuzzyrust as fr
 
         with pytest.raises(fr.ValidationError):
-            fr.hamming_similarity_ci("abc", "ab")
+            fr.hamming_similarity("abc".lower(), "ab".lower())
 
-    def test_lcs_length_ci_basic(self):
-        """Test case-insensitive LCS length."""
+    def test_lcs_length_with_lowercase(self):
+        """Test LCS length with manual lowercasing."""
         import fuzzyrust as fr
 
-        # Case-insensitive should find LCS regardless of case
-        assert fr.lcs_length_ci("ABCDGH", "aedfhr") == 3  # ADH
-        assert fr.lcs_length_ci("ABC", "abc") == 3
-        assert fr.lcs_length_ci("Hello", "HELLO") == 5
+        # Case-insensitive should find LCS regardless of case after lowercasing
+        assert fr.lcs_length("ABCDGH".lower(), "aedfhr".lower()) == 3  # ADH
+        assert fr.lcs_length("ABC".lower(), "abc".lower()) == 3
+        assert fr.lcs_length("Hello".lower(), "HELLO".lower()) == 5
 
         # Empty strings
-        assert fr.lcs_length_ci("", "") == 0
-        assert fr.lcs_length_ci("abc", "") == 0
+        assert fr.lcs_length("".lower(), "".lower()) == 0
+        assert fr.lcs_length("abc".lower(), "".lower()) == 0
 
-    def test_lcs_string_ci_basic(self):
-        """Test case-insensitive LCS string."""
+    def test_lcs_string_with_lowercase(self):
+        """Test LCS string with manual lowercasing."""
         import fuzzyrust as fr
 
         # Results should be lowercase (from lowercase conversion)
-        result = fr.lcs_string_ci("ABCDGH", "aedfhr")
+        result = fr.lcs_string("ABCDGH".lower(), "aedfhr".lower())
         assert result == "adh"
 
-        result = fr.lcs_string_ci("Hello", "HELLO")
+        result = fr.lcs_string("Hello".lower(), "HELLO".lower())
         assert result == "hello"
 
         # Empty strings
-        assert fr.lcs_string_ci("", "") == ""
-        assert fr.lcs_string_ci("abc", "") == ""
+        assert fr.lcs_string("".lower(), "".lower()) == ""
+        assert fr.lcs_string("abc".lower(), "".lower()) == ""
 
-    def test_longest_common_substring_ci_basic(self):
-        """Test case-insensitive longest common substring."""
+    def test_longest_common_substring_with_lowercase(self):
+        """Test longest common substring with manual lowercasing."""
         import fuzzyrust as fr
 
-        # Should find common substring regardless of case
-        result = fr.longest_common_substring_ci("ABCDEF", "zbcdf")
+        # Should find common substring regardless of case after lowercasing
+        result = fr.longest_common_substring("ABCDEF".lower(), "zbcdf".lower())
         assert result == "bcd"
 
-        result = fr.longest_common_substring_ci("Hello World", "ELLO")
+        result = fr.longest_common_substring("Hello World".lower(), "ELLO".lower())
         assert result == "ello"
 
         # Empty strings
-        assert fr.longest_common_substring_ci("", "") == ""
-        assert fr.longest_common_substring_ci("abc", "") == ""
+        assert fr.longest_common_substring("".lower(), "".lower()) == ""
+        assert fr.longest_common_substring("abc".lower(), "".lower()) == ""
 
-    def test_ci_functions_consistency_with_lowercase(self):
-        """CI functions should give same result as calling regular function on lowercase strings."""
+    def test_lowercase_functions_consistency(self):
+        """Functions with lowercased input should give consistent results."""
         import fuzzyrust as fr
 
         a = "Hello"
@@ -353,16 +353,16 @@ class TestCaseInsensitiveVariants:
         a_eq = "HELLO"
         b_eq = "world"
 
-        # hamming_ci should equal hamming on lowercase
-        assert fr.hamming_ci(a_eq, b_eq) == fr.hamming(a_eq.lower(), b_eq.lower())
-        assert fr.hamming_similarity_ci(a_eq, b_eq) == fr.hamming_similarity(
+        # Hamming on lowercased strings should work
+        assert fr.hamming(a_eq.lower(), b_eq.lower()) == fr.hamming(a_eq.lower(), b_eq.lower())
+        assert fr.hamming_similarity(a_eq.lower(), b_eq.lower()) == fr.hamming_similarity(
             a_eq.lower(), b_eq.lower()
         )
 
         # LCS functions should be consistent
-        assert fr.lcs_length_ci(a, b) == fr.lcs_length(a.lower(), b.lower())
-        assert fr.lcs_string_ci(a, b) == fr.lcs_string(a.lower(), b.lower())
-        assert fr.longest_common_substring_ci(a, b) == fr.longest_common_substring(
+        assert fr.lcs_length(a.lower(), b.lower()) == fr.lcs_length(a.lower(), b.lower())
+        assert fr.lcs_string(a.lower(), b.lower()) == fr.lcs_string(a.lower(), b.lower())
+        assert fr.longest_common_substring(a.lower(), b.lower()) == fr.longest_common_substring(
             a.lower(), b.lower()
         )
 
@@ -637,28 +637,42 @@ class TestPropertyBased:
         )
 
     @given(st.text(min_size=0, max_size=40))
-    def test_ci_variants_consistency(self, s):
-        """Case-insensitive variants should return same result for same-case input."""
+    def test_normalize_lowercase_consistency(self, s):
+        """Functions with normalize='lowercase' should return same result for same-case input."""
         import fuzzyrust as fr
 
         lower = s.lower()
-        # CI variant on lowercase should equal regular on lowercase
-        assert fr.levenshtein_ci(lower, lower) == fr.levenshtein(lower, lower)
-        assert abs(fr.jaro_similarity_ci(lower, lower) - fr.jaro_similarity(lower, lower)) < 1e-10
+        # With normalize='lowercase' on lowercase string should equal regular on lowercase
+        assert fr.levenshtein(lower, lower, normalize="lowercase") == fr.levenshtein(lower, lower)
+        assert (
+            abs(
+                fr.jaro_similarity(lower, lower, normalize="lowercase")
+                - fr.jaro_similarity(lower, lower)
+            )
+            < 1e-10
+        )
 
     @given(
         st.text(alphabet=string.ascii_lowercase, min_size=1, max_size=30),
         st.text(alphabet=string.ascii_lowercase, min_size=1, max_size=30),
     )
     @settings(max_examples=50)
-    def test_ci_case_insensitivity(self, a, b):
-        """Case-insensitive functions treat different cases as equivalent."""
+    def test_normalize_lowercase_case_insensitivity(self, a, b):
+        """Functions with normalize='lowercase' treat different cases as equivalent."""
         import fuzzyrust as fr
 
         upper_a, upper_b = a.upper(), b.upper()
-        # CI versions should give same result regardless of case
-        assert fr.levenshtein_ci(a, b) == fr.levenshtein_ci(upper_a, upper_b)
-        assert abs(fr.jaro_similarity_ci(a, b) - fr.jaro_similarity_ci(upper_a, upper_b)) < 1e-10
+        # With normalize='lowercase' should give same result regardless of case
+        assert fr.levenshtein(a, b, normalize="lowercase") == fr.levenshtein(
+            upper_a, upper_b, normalize="lowercase"
+        )
+        assert (
+            abs(
+                fr.jaro_similarity(a, b, normalize="lowercase")
+                - fr.jaro_similarity(upper_a, upper_b, normalize="lowercase")
+            )
+            < 1e-10
+        )
 
 
 # =============================================================================
@@ -724,7 +738,7 @@ class TestBenchmarks:
         """Benchmark find_best_matches function."""
         import fuzzyrust as fr
 
-        result = benchmark(fr.find_best_matches, sample_strings, "hello", limit=10)
+        result = benchmark(fr.batch.best_matches, sample_strings, "hello", limit=10)
         assert len(result) <= 10
 
     def test_benchmark_bktree_build(self, benchmark, sample_strings):
@@ -932,7 +946,7 @@ class TestBenchmarks:
         import fuzzyrust as fr
 
         strings = [f"item_{i % 20}" for i in range(100)]
-        result = benchmark(fr.find_duplicates, strings, min_similarity=0.9)
+        result = benchmark(fr.batch.deduplicate, strings, min_similarity=0.9)
         assert result.total_duplicates >= 0
 
     def test_benchmark_find_duplicates_medium(self, benchmark):
@@ -940,7 +954,7 @@ class TestBenchmarks:
         import fuzzyrust as fr
 
         strings = [f"product_{i % 50}" for i in range(500)]
-        result = benchmark(fr.find_duplicates, strings, min_similarity=0.9)
+        result = benchmark(fr.batch.deduplicate, strings, min_similarity=0.9)
         assert result.total_duplicates >= 0
 
     # --- Multi-algorithm comparison ---
@@ -1046,7 +1060,7 @@ class TestThreadSafety:
         strings = [f"product_{i:04d}" for i in range(500)]
 
         def search(query):
-            return fr.find_best_matches(strings, query, limit=5)
+            return fr.batch.best_matches(strings, query, limit=5)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             queries = [f"product_{i:04d}" for i in range(0, 100, 10)]
@@ -1195,7 +1209,7 @@ class TestThreadSafety:
         def dedupe_task(seed):
             # Each task has slightly different data
             strings = [f"duplicate_{seed}_{i % 10}" for i in range(100)]
-            result = fr.find_duplicates(strings, min_similarity=0.9)
+            result = fr.batch.deduplicate(strings, min_similarity=0.9)
             # DeduplicationResult has groups, unique, and total_duplicates attributes
             return result.total_duplicates
 

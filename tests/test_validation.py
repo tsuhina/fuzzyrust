@@ -20,27 +20,27 @@ class TestParameterValidation:
     def test_min_similarity_above_one(self):
         """min_similarity > 1.0 should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=1.5)
+            fr.batch.best_matches(["a"], "b", min_similarity=1.5)
 
     def test_min_similarity_negative(self):
         """Negative min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=-0.1)
+            fr.batch.best_matches(["a"], "b", min_similarity=-0.1)
 
     def test_min_similarity_nan(self):
         """NaN min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=float("nan"))
+            fr.batch.best_matches(["a"], "b", min_similarity=float("nan"))
 
     def test_min_similarity_infinity(self):
         """Infinity min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=float("inf"))
+            fr.batch.best_matches(["a"], "b", min_similarity=float("inf"))
 
     def test_min_similarity_negative_infinity(self):
         """Negative infinity min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_best_matches(["a"], "b", min_similarity=float("-inf"))
+            fr.batch.best_matches(["a"], "b", min_similarity=float("-inf"))
 
     def test_ngram_size_zero(self):
         """Zero ngram_size should raise ValidationError."""
@@ -83,12 +83,12 @@ class TestParameterValidation:
     def test_find_duplicates_min_similarity_above_one(self):
         """find_duplicates with min_similarity > 1.0 should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_duplicates(["hello", "hallo"], min_similarity=1.5)
+            fr.batch.deduplicate(["hello", "hallo"], min_similarity=1.5)
 
     def test_find_duplicates_min_similarity_negative(self):
         """find_duplicates with negative min_similarity should raise ValidationError."""
         with pytest.raises(fr.ValidationError):
-            fr.find_duplicates(["hello", "hallo"], min_similarity=-0.1)
+            fr.batch.deduplicate(["hello", "hallo"], min_similarity=-0.1)
 
     def test_extract_min_similarity_above_one(self):
         """extract with min_similarity > 1.0 should return empty results.
@@ -168,12 +168,12 @@ class TestTypeErrors:
     def test_find_best_matches_non_list_strings(self):
         """Non-list strings argument should raise TypeError."""
         with pytest.raises(TypeError):
-            fr.find_best_matches("not a list", "query")  # type: ignore[arg-type]
+            fr.batch.best_matches("not a list", "query")  # type: ignore[arg-type]
 
     def test_find_best_matches_integer_query(self):
         """Integer query should raise TypeError."""
         with pytest.raises(TypeError):
-            fr.find_best_matches(["hello", "world"], 123)  # type: ignore[arg-type]
+            fr.batch.best_matches(["hello", "world"], 123)  # type: ignore[arg-type]
 
     def test_soundex_integer_input(self):
         """Integer input should raise TypeError."""

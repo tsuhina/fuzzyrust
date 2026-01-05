@@ -238,7 +238,7 @@ class TestBatchOperationsMemory:
         tracemalloc.start()
 
         for _ in range(100):
-            results = fr.find_best_matches(strings, "query_string", limit=10)
+            results = fr.batch.best_matches(strings, "query_string", limit=10)
             del results
             gc.collect()
 

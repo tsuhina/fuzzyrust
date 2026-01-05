@@ -141,7 +141,7 @@ class TestParallelBatchOperations:
         queries = ["appel", "banan", "chery"]
 
         def worker():
-            return [fr.find_best_matches(choices, q) for q in queries]
+            return [fr.batch.best_matches(choices, q) for q in queries]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(worker) for _ in range(4)]

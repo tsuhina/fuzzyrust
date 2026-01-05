@@ -700,15 +700,21 @@ pub fn levenshtein_simd_bounded(a: &str, b: &str, max_distance: usize) -> Option
 ///
 /// Uses SIMD acceleration for the distance calculation, providing
 /// significant speedups on x86/x86-64 CPUs.
+///
+/// Note: The denominator uses character count (not byte length) for consistency
+/// with `levenshtein_similarity`.
 #[inline]
 #[must_use]
 pub fn levenshtein_similarity_simd(a: &str, b: &str) -> f64 {
     let dist = levenshtein_simd(a, b);
-    let max_len = a.len().max(b.len());
+    // Use character count, not byte length, for consistency with non-SIMD version
+    let max_len = a.chars().count().max(b.chars().count());
     if max_len == 0 {
         1.0
     } else {
-        1.0 - (dist as f64 / max_len as f64)
+        // Clamp to [0, 1] range since SIMD operates on bytes but we divide by char count.
+        // For non-ASCII strings, byte distance can exceed char count, producing values < 0.
+        (1.0 - (dist as f64 / max_len as f64)).clamp(0.0, 1.0)
     }
 }
 

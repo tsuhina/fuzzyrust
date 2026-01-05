@@ -71,7 +71,7 @@ movies = [
 query = "pulp ficton"  # User's typo
 
 # Find the best match
-matches = fr.find_best_matches(movies, query, algorithm="jaro_winkler", limit=3)
+matches = fr.batch.best_matches(movies, query, algorithm="jaro_winkler", limit=3)
 
 print(f"User searched: '{query}'")
 print("Top matches:")
@@ -96,7 +96,7 @@ customers = [
     "Rob Johnson",
 ]
 
-result = fr.find_duplicates(
+result = fr.batch.deduplicate(
     customers,
     algorithm="jaro_winkler",
     min_similarity=0.80,  # Lower threshold to catch name variations like Jonathan/John
@@ -150,7 +150,8 @@ for typo in typos:
 # %%
 import polars as pl
 
-from fuzzyrust import FuzzyIndex, fuzzy_dedupe_rows, fuzzy_join, match_dataframe
+from fuzzyrust import FuzzyIndex
+from fuzzyrust import polars as frp
 
 # %% [markdown]
 # ### 2A: Fuzzy Join DataFrames
@@ -186,7 +187,7 @@ print(orders)
 print()
 
 # One line to match them
-matched = fuzzy_join(
+matched = frp.df_join(
     orders,
     customers,
     left_on="company",
@@ -232,7 +233,7 @@ print(to_match)
 print()
 
 # Multi-column join with per-field algorithms
-result = fuzzy_join(
+result = frp.df_join(
     to_match,
     reference,
     on=[
@@ -249,8 +250,8 @@ print(result)
 # ### 2B: DataFrame Deduplication
 #
 # Two approaches for finding duplicates in a single DataFrame:
-# - `match_dataframe()` - Explore: find similar pairs for review
-# - `fuzzy_dedupe_rows()` - Act: group duplicates and pick canonical records
+# - `frp.df_match_pairs()` - Explore: find similar pairs for review
+# - `frp.df_dedupe()` - Act: group duplicates and pick canonical records
 
 # %%
 print("\nEntity Deduplication:")
@@ -269,22 +270,22 @@ print("  Original data:")
 print(customers)
 
 # %% [markdown]
-# **Step 1: Explore with `match_dataframe()`**
+# **Step 1: Explore with `frp.df_match_pairs()`**
 #
 # Find all similar pairs for review. Great for understanding your data
 # or when you need human review before merging.
 
 # %%
-print("\n  Step 1: Find similar pairs (match_dataframe)")
+print("\n  Step 1: Find similar pairs (df_match_pairs)")
 print()
 
-pairs = match_dataframe(
+pairs = frp.df_match_pairs(
     customers,
     columns=["name", "email", "phone"],
     algorithms={
         "name": "jaro_winkler",
         "email": "levenshtein",
-        "phone": "exact_match",
+        "phone": "levenshtein",  # Using levenshtein for phone matching
     },
     weights={"name": 2.0, "email": 1.5, "phone": 1.0},
     min_similarity=0.5,
@@ -297,22 +298,22 @@ print("  Use case: Review these pairs manually, export for data steward review,"
 print("  or feed into a workflow that needs human approval before merging.")
 
 # %% [markdown]
-# **Step 2: Act with `fuzzy_dedupe_rows()`**
+# **Step 2: Act with `frp.df_dedupe()`**
 #
 # Automatically group duplicates and mark one as "canonical" (the keeper).
-# Uses Union-Find clustering to handle transitive duplicates (A~B, B~C → A,B,C grouped).
+# Uses Union-Find clustering to handle transitive duplicates (A~B, B~C -> A,B,C grouped).
 
 # %%
-print("\n  Step 2: Group and pick winners (fuzzy_dedupe_rows)")
+print("\n  Step 2: Group and pick winners (df_dedupe)")
 print()
 
-result = fuzzy_dedupe_rows(
+result = frp.df_dedupe(
     customers,
     columns=["name", "email", "phone"],
     algorithms={
         "name": "jaro_winkler",
         "email": "levenshtein",
-        "phone": "exact_match",
+        "phone": "levenshtein",  # Using levenshtein for phone matching
     },
     weights={"name": 2.0, "email": 1.5, "phone": 1.0},
     min_similarity=0.5,
@@ -348,8 +349,8 @@ print(result)
 print()
 
 # Filter by similarity
-similar = df.filter(pl.col("name").fuzzy.is_similar("John", threshold=0.8))
-print("  Names similar to 'John' (threshold=0.8):")
+similar = df.filter(pl.col("name").fuzzy.is_similar("John", min_similarity=0.8))
+print("  Names similar to 'John' (min_similarity=0.8):")
 print(similar)
 
 # %% [markdown]
@@ -369,7 +370,7 @@ print(f"  Built index: {index}")
 
 # Batch search
 queries = pl.Series(["Apple", "Microsft"])
-results = index.search_series(queries, min_score=0.5)
+results = index.search_series(queries, min_similarity=0.5)
 print("\n  Batch search results:")
 print(results)
 
@@ -430,7 +431,7 @@ for r in results:
 
 # Find k nearest neighbors
 print("\n  find_nearest (k-NN):")
-nearest = ngram_idx.find_nearest("orangee", k=2)
+nearest = ngram_idx.find_nearest("orangee", limit=2)
 for r in nearest:
     print(f"    [{r.score:.2f}] {r.text}")
 
@@ -553,15 +554,17 @@ names = [f"Customer {i:05d}" for i in range(10_000)]
 
 # Time the batch operation
 start = time.time()
-results = fr.batch_jaro_winkler(names, "Customer 05000")
+results = fr.batch.similarity(names, "Customer 05000", algorithm="jaro_winkler")
 elapsed = time.time() - start
 
 print(f"  Processed {len(names):,} strings in {elapsed:.3f}s")
 print(f"  Throughput: {len(names) / elapsed:,.0f} comparisons/sec")
-print(f"  Best match: [{results[0].score:.2f}] {results[0].text}")
+# Find the best match (results are not sorted, so we need to find the max)
+best = max(results, key=lambda r: r.score)
+print(f"  Best match: [{best.score:.2f}] {best.text}")
 
 # %%
-print("\nfind_best_matches (with algorithm selection):")
+print("\nbatch.best_matches (with algorithm selection):")
 print()
 
 artists = [
@@ -578,7 +581,7 @@ artists = [
 ]
 
 query = "beatles"
-matches = fr.find_best_matches(
+matches = fr.batch.best_matches(
     artists, query, algorithm="jaro_winkler", limit=3, min_similarity=0.3
 )
 
@@ -767,14 +770,14 @@ pairs = [
 
 for a, b in pairs:
     regular = fr.levenshtein(a, b)
-    ci = fr.levenshtein_ci(a, b)
+    ci = fr.levenshtein(a, b, normalize="lowercase")
     print(f"  '{a}' vs '{b}'")
-    print(f"    levenshtein:    {regular} edits")
-    print(f"    levenshtein_ci: {ci} edits")
+    print(f"    levenshtein:                    {regular} edits")
+    print(f"    levenshtein (normalize=lower):  {ci} edits")
     print()
 
-print("  All algorithms have _ci variants:")
-print("    jaro_winkler_similarity_ci, ngram_similarity_ci, damerau_levenshtein_ci, etc.")
+print("  All algorithms support the normalize parameter:")
+print("    jaro_winkler_similarity, ngram_similarity, damerau_levenshtein, etc.")
 
 # %% [markdown]
 # ---
@@ -1127,8 +1130,8 @@ print()
 # Small dataset: direct comparison is fine
 small_data = ["apple", "banana", "cherry", "date", "elderberry"]
 print(f"  Small dataset ({len(small_data)} items):")
-matches = fr.find_best_matches(small_data, "aple", algorithm="jaro_winkler", limit=2)
-print(f"    find_best_matches: {[m.text for m in matches]}")
+matches = fr.batch.best_matches(small_data, "aple", algorithm="jaro_winkler", limit=2)
+print(f"    batch.best_matches: {[m.text for m in matches]}")
 
 # Large dataset: use index
 print(f"\n  Large dataset ({len(catalog):,} items):")
@@ -1307,7 +1310,7 @@ companies = [
 ]
 
 # Find duplicates with normalization
-result = fr.find_duplicates(
+result = fr.batch.deduplicate(
     companies,
     algorithm="jaro_winkler",
     min_similarity=0.85,
@@ -1326,13 +1329,13 @@ print("\nDeduplication Methods:")
 print()
 
 # For large sorted datasets, use SNM (Sorted Neighborhood Method)
-result_snm = fr.find_duplicates(
-    sorted(companies),  # Must be sorted!
-    method="snm",
-    window_size=5,
+# Note: The batch.deduplicate function automatically uses SNM for large datasets (>2000 items).
+# For manual control of SNM with Polars DataFrames, use frp.df_dedupe_snm().
+result_snm = fr.batch.deduplicate(
+    sorted(companies),  # Must be sorted for best SNM results
     min_similarity=0.9,
 )
-print(f"  SNM method: {len(result_snm.groups)} groups")
+print(f"  Deduplication result: {len(result_snm.groups)} groups")
 
 # %% [markdown]
 # ### 7C: Evaluation Metrics
@@ -1429,20 +1432,24 @@ for mode in modes:
 # Every similarity function has a `_ci` suffix variant.
 
 # %%
-print("\nCase-Insensitive Functions (_ci suffix):")
+print("\nCase-Insensitive Comparison (normalize parameter):")
 print()
 
 a, b = "HELLO", "hello"
 print(f"  Comparing '{a}' and '{b}':")
 print()
-print(f"  levenshtein:        {fr.levenshtein(a, b)} edits")
-print(f"  levenshtein_ci:     {fr.levenshtein_ci(a, b)} edits")
+print(f"  levenshtein:                    {fr.levenshtein(a, b)} edits")
+print(f"  levenshtein (normalize=lower):  {fr.levenshtein(a, b, normalize='lowercase')} edits")
 print()
-print(f"  jaro_winkler:       {fr.jaro_winkler_similarity(a, b):.3f}")
-print(f"  jaro_winkler_ci:    {fr.jaro_winkler_similarity_ci(a, b):.3f}")
+print(f"  jaro_winkler:                   {fr.jaro_winkler_similarity(a, b):.3f}")
+print(
+    f"  jaro_winkler (normalize=lower): {fr.jaro_winkler_similarity(a, b, normalize='lowercase'):.3f}"
+)
 print()
-print(f"  ngram_similarity:   {fr.ngram_similarity(a, b):.3f}")
-print(f"  ngram_similarity_ci: {fr.ngram_similarity_ci(a, b):.3f}")
+print(f"  ngram_similarity:                   {fr.ngram_similarity(a, b):.3f}")
+print(
+    f"  ngram_similarity (normalize=lower): {fr.ngram_similarity(a, b, normalize='lowercase'):.3f}"
+)
 
 # %% [markdown]
 # ### Unicode Handling
@@ -1565,13 +1572,12 @@ for m in matches:
 # | Cosine | `cosine_similarity_chars/words/ngrams`, `TfIdfCosine` |
 # | Phonetic | `soundex`, `metaphone` + `_match`, `_similarity` |
 # | RapidFuzz | `partial_ratio`, `token_sort_ratio`, `wratio`, `extract` |
-# | Batch | `batch_jaro_winkler`, `find_best_matches`, `batch_search` |
+# | Batch | `batch.similarity`, `batch.best_matches`, `batch.deduplicate` |
 # | Indices | `BkTree`, `NgramIndex`, `HybridIndex` + `add_with_data`, `get_candidates` |
 # | Schema | `SchemaBuilder`, `SchemaIndex` + `min_field_similarity` |
-# | Dedup | `find_duplicates` with brute_force or SNM methods |
 # | Metrics | `precision`, `recall`, `f_score`, `confusion_matrix` |
 # | Utilities | `normalize_string`, `normalize_pair`, `extract_ngrams` |
-# | Polars | `match_dataframe`, `fuzzy_dedupe_rows`, `.fuzzy` namespace, `FuzzyIndex` |
+# | Polars | `frp.df_join`, `frp.df_dedupe`, `frp.df_match_pairs`, `.fuzzy` namespace |
 #
 # **Why FuzzyRust?**
 #

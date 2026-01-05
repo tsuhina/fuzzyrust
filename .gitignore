@@ -38,6 +38,7 @@ target/doc/
 .pytest_cache/
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 .tox/
 .nox/
@@ -45,6 +46,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .pytype/
+.benchmarks/
 
 # Build artifacts (critical for PyPI packages)
 dist/

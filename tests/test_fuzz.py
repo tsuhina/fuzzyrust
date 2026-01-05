@@ -317,7 +317,7 @@ class TestFuzzIntegration:
         query = "appel"
 
         extract_results = fr.extract(query, choices, limit=3)
-        best_match_results = fr.find_best_matches(choices, query, limit=3)
+        best_match_results = fr.batch.best_matches(choices, query, limit=3)
 
         # Both should find apple as best match
         assert extract_results[0].text == "apple"

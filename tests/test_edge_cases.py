@@ -54,7 +54,7 @@ class TestNullNoneHandling:
     def test_find_best_matches_none_in_list(self):
         """None in choices list should raise TypeError."""
         with pytest.raises(TypeError):
-            fr.find_best_matches(["apple", None, "banana"], "apple")
+            fr.batch.best_matches(["apple", None, "banana"], "apple")
 
 
 class TestEmptyStrings:
@@ -96,7 +96,7 @@ class TestEmptyStrings:
 
     def test_find_best_matches_empty_query(self):
         """Empty query should still work."""
-        matches = fr.find_best_matches(["apple", "banana"], "")
+        matches = fr.batch.best_matches(["apple", "banana"], "")
         assert isinstance(matches, list), "find_best_matches should return a list"
         # Empty query has 0 similarity to any non-empty string
         # Results are returned but with score 0.0 (default min_similarity is 0.0)
@@ -112,7 +112,7 @@ class TestEmptyStrings:
 
     def test_find_best_matches_empty_choices(self):
         """Empty choices list should return empty results."""
-        matches = fr.find_best_matches([], "apple")
+        matches = fr.batch.best_matches([], "apple")
         assert matches == []
 
     def test_bktree_empty_strings(self):
@@ -614,18 +614,18 @@ class TestBoundaryConditionsExtended:
 
     def test_min_similarity_zero(self):
         """min_similarity=0.0 should return all results."""
-        results = fr.find_best_matches(["a", "b", "c"], "x", min_similarity=0.0)
+        results = fr.batch.best_matches(["a", "b", "c"], "x", min_similarity=0.0)
         assert len(results) == 3, f"Expected 3 results with min_similarity=0.0, got {len(results)}"
 
     def test_min_similarity_one(self):
         """min_similarity=1.0 should only return exact matches."""
-        results = fr.find_best_matches(["hello", "hallo", "world"], "hello", min_similarity=1.0)
+        results = fr.batch.best_matches(["hello", "hallo", "world"], "hello", min_similarity=1.0)
         assert len(results) == 1, f"Expected 1 exact match, got {len(results)}"
         assert results[0].text == "hello"
 
     def test_limit_zero(self):
         """limit=0 should return empty list."""
-        results = fr.find_best_matches(["a", "b"], "a", limit=0)
+        results = fr.batch.best_matches(["a", "b"], "a", limit=0)
         assert len(results) == 0, f"Expected 0 results with limit=0, got {len(results)}"
 
     def test_single_character_strings(self):
@@ -634,3 +634,57 @@ class TestBoundaryConditionsExtended:
         assert fr.levenshtein("a", "a") == 0
         assert fr.jaro_winkler_similarity("a", "a") == 1.0
         assert fr.jaro_winkler_similarity("a", "b") == 0.0
+
+
+class TestDocumentedLimitations:
+    """Tests for documented limitations (silent fallbacks)."""
+
+    @pytest.mark.slow
+    def test_lcs_string_long_input_raises_error(self):
+        """lcs_string raises ValidationError for >10K chars."""
+        long_str = "a" * 10001
+        # Raises ValidationError for very long inputs to avoid O(n*m) memory
+        with pytest.raises(fr.ValidationError):
+            fr.lcs_string(long_str, long_str)
+
+    @pytest.mark.slow
+    def test_lcs_length_handles_long_strings(self):
+        """lcs_length should still work for long strings (unlike lcs_string)."""
+        long_str = "a" * 10001
+        # lcs_length uses O(n) space, so should work
+        result = fr.lcs_length(long_str, long_str)
+        assert result == 10001, f"Expected 10001, got {result}"
+
+    def test_ngram_size_clamping_to_32(self):
+        """ngram_similarity clamps n to 32 (documented behavior)."""
+        # If ngram_size > 32, it should be silently clamped to 32
+        result_50 = fr.ngram_similarity("hello world test", "hello world test", ngram_size=50)
+        result_32 = fr.ngram_similarity("hello world test", "hello world test", ngram_size=32)
+        # Both should produce the same result since 50 is clamped to 32
+        assert result_50 == result_32, f"Expected same result, got {result_50} vs {result_32}"
+
+    def test_ngram_size_valid_range(self):
+        """ngram_similarity works correctly for valid n values."""
+        # Test a range of valid ngram sizes
+        for n in [1, 2, 3, 5, 10, 20, 32]:
+            result = fr.ngram_similarity("hello", "hallo", ngram_size=n)
+            assert 0.0 <= result <= 1.0, f"Expected score in [0, 1], got {result} for n={n}"
+
+    def test_double_metaphone_prefixes(self):
+        """Double Metaphone correctly handles VAN/VON/SCH prefixes."""
+        # These prefixes should produce consistent phonetic codes
+        van_result = fr.double_metaphone("VANHORN")
+        von_result = fr.double_metaphone("VONBERG")
+        sch_result = fr.double_metaphone("SCHINDLER")
+
+        # Verify the results are tuples with primary and alternate codes
+        assert isinstance(van_result, tuple) and len(van_result) == 2
+        assert isinstance(von_result, tuple) and len(von_result) == 2
+        assert isinstance(sch_result, tuple) and len(sch_result) == 2
+
+        # VAN and VON should both start with F (V->F in metaphone)
+        assert van_result[0].startswith("F"), f"Expected VAN to start with F, got {van_result[0]}"
+        assert von_result[0].startswith("F"), f"Expected VON to start with F, got {von_result[0]}"
+
+        # SCH should start with X (SCH->X in metaphone)
+        assert sch_result[0].startswith("X"), f"Expected SCH to start with X, got {sch_result[0]}"

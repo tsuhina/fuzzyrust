@@ -53,6 +53,12 @@ impl Default for NgramConfig {
 /// - `n`: Size of n-grams (2 for bigram, 3 for trigram)
 /// - `pad`: Whether to add padding for edge matching
 ///
+/// # N-gram Size Limits
+///
+/// Valid n-gram sizes are in the range 1-32 (inclusive):
+/// - `n = 0` returns 0.0 similarity (invalid, no n-grams can be extracted)
+/// - `n > 32` is **silently clamped to 32** to prevent excessive memory usage
+///
 /// # Complexity
 /// - Time: O(m+n) for n-gram extraction and comparison
 /// - Space: O(m+n) for n-gram sets
@@ -170,7 +176,10 @@ pub fn extract_ngram_set(s: &str, n: usize, pad: bool, pad_char: char) -> AHashS
 }
 
 /// Calculate n-gram similarity (Sørensen-Dice coefficient).
-/// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+///
+/// # N-gram Size
+/// - `n = 0`: Returns 0.0 (invalid)
+/// - `n > 32`: Silently clamped to 32
 #[must_use]
 pub fn ngram_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -> f64 {
     if n == 0 {
@@ -198,7 +207,10 @@ pub fn ngram_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -
 }
 
 /// Jaccard similarity based on n-grams.
-/// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+///
+/// # N-gram Size
+/// - `n = 0`: Returns 0.0 (invalid)
+/// - `n > 32`: Silently clamped to 32
 #[must_use]
 pub fn ngram_jaccard_similarity(a: &str, b: &str, n: usize, pad: bool, pad_char: char) -> f64 {
     if n == 0 {

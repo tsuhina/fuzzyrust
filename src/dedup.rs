@@ -321,23 +321,22 @@ where
     let window_size = window_size.max(1);
 
     // Parallel processing using direct range iteration
-    // We iterate 0..n and for each item check the window ahead.
-
-    // We need to share `indexed_items` across threads. Since it's a read-only Vec, &Vec is Sync.
-    // However, into_par_iter() closures usually require move.
-    // We can use a reference wrapper or just refer to the slice if we're careful.
+    // We iterate 0..n in parallel and for each item check the window ahead sequentially.
+    // NOTE: We intentionally use sequential iteration for the inner window loop to avoid
+    // nested parallelism which causes thread contention and oversubscription in Rayon.
+    // The outer par_iter provides sufficient parallelism across items.
     let indexed_items_ref = &indexed_items;
 
     let valid_matches: Vec<(usize, usize)> = (0..n)
         .into_par_iter()
-        .flat_map(|i| {
+        .flat_map_iter(|i| {
             let end = (i + 1 + window_size).min(n);
             let (orig_idx_i, str_i) = indexed_items_ref[i];
             let sim_fn_ref = &similarity_fn;
             let items_slice = indexed_items_ref;
 
-            // Inner loop: check window
-            (i + 1..end).into_par_iter().filter_map(move |j| {
+            // Inner loop: check window sequentially (avoid nested parallelism)
+            (i + 1..end).filter_map(move |j| {
                 let (orig_idx_j, str_j) = items_slice[j];
                 let similarity = sim_fn_ref(str_i, str_j);
 

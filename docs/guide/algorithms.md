@@ -112,16 +112,16 @@ fr.metaphone("night")   # "NT"
 fr.metaphone_similarity("knight", "night")  # 1.0
 ```
 
-## Case-Insensitive Variants
+## Case-Insensitive Comparison
 
-All algorithms have `_ci` suffix variants for case-insensitive comparison:
+Use the `normalize` parameter for case-insensitive comparison:
 
 ```python
-fr.jaro_winkler("Hello", "HELLO")     # 0.0
-fr.jaro_winkler_ci("Hello", "HELLO")  # 1.0
+fr.jaro_winkler_similarity("Hello", "HELLO")                          # ~0.0
+fr.jaro_winkler_similarity("Hello", "HELLO", normalize="lowercase")   # 1.0
 
-fr.levenshtein("ABC", "abc")     # 3
-fr.levenshtein_ci("ABC", "abc")  # 0
+fr.levenshtein("ABC", "abc")                          # 3
+fr.levenshtein("ABC", "abc", normalize="lowercase")   # 0
 ```
 
 ## Choosing an Algorithm

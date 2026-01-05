@@ -11,10 +11,18 @@ Example usage:
     >>> fr.jaro_winkler_similarity("hello", "hallo")
     0.88
 
-    # Find best matches (returns MatchResult objects)
-    >>> matches = fr.find_best_matches(["apple", "apply", "banana"], "appel")
+    # Batch operations (via batch submodule)
+    >>> from fuzzyrust import batch
+    >>> matches = batch.best_matches(["apple", "apply", "banana"], "appel")
     >>> [(m.text, m.score) for m in matches]
     [('apple', 0.93), ('apply', 0.84)]
+
+    # Polars integration (via polars submodule)
+    >>> from fuzzyrust import polars as frp
+    >>> import polars as pl
+    >>> left = pl.DataFrame({"name": ["Apple Inc"]})
+    >>> right = pl.DataFrame({"company": ["Apple", "Google"]})
+    >>> result = frp.df_join(left, right, left_on="name", right_on="company")
 
     # Use BK-tree for efficient fuzzy search (returns SearchResult objects)
     >>> tree = fr.BkTree()
@@ -30,49 +38,49 @@ from importlib.metadata import version as _get_version
 import fuzzyrust.expr  # noqa: F401
 
 # Import polars subpackage for `from fuzzyrust import polars` style
-from fuzzyrust import polars
+from fuzzyrust import batch, polars
+
+# -----------------------------------------------------------------------------
+# Submodule Access
+# -----------------------------------------------------------------------------
+# Polars functions: fuzzyrust.polars (df_join, series_similarity, etc.)
+# Batch operations: fuzzyrust.batch (similarity, best_matches, deduplicate, etc.)
+# See submodule docstrings for details.
+# -----------------------------------------------------------------------------
 from fuzzyrust._core import (
     AlgorithmComparison,
     AlgorithmError,
-    # Evaluation metrics
     ConfusionMatrixResult,
     DeduplicationResult,
-    # Custom exceptions
+    # --- Exceptions ---
     FuzzyRustError,
     MatchResult,
-    # Schema-based multi-field matching
+    # --- Schema-based multi-field matching ---
     Schema,
     SchemaBuilder,
     SchemaError,
     SchemaIndex,
     SchemaSearchResult,
-    # Result types
+    # --- Result types ---
     SearchResult,
-    # Similarity classes
+    # --- Similarity classes ---
     TfIdfCosine,
     ValidationError,
-    batch_jaro_winkler,
-    # Batch processing
-    batch_levenshtein,
-    batch_similarity,
-    batch_similarity_pairs,
+    # --- Legacy batch functions (use fuzzyrust.batch module instead) ---
+    batch_jaro_winkler,  # noqa: F401
+    batch_levenshtein,  # noqa: F401
+    batch_similarity,  # noqa: F401
     bigram_similarity,
-    bigram_similarity_ci,
-    cdist,
-    # Multi-algorithm comparison
+    # --- Multi-algorithm comparison ---
     compare_algorithms,
     confusion_matrix,
+    # --- Cosine similarity ---
     cosine_similarity_chars,
-    cosine_similarity_chars_ci,
     cosine_similarity_ngrams,
-    cosine_similarity_ngrams_ci,
     cosine_similarity_words,
-    cosine_similarity_words_ci,
     damerau_levenshtein,
     damerau_levenshtein_bounded,
-    damerau_levenshtein_ci,
     damerau_levenshtein_similarity,
-    damerau_levenshtein_similarity_ci,
     double_metaphone,
     double_metaphone_match,
     double_metaphone_similarity,
@@ -80,79 +88,66 @@ from fuzzyrust._core import (
     extract_ngrams,
     extract_one,
     f_score,
-    find_best_matches,
     find_duplicate_pairs,
-    # Deduplication
     find_duplicates,
     hamming,
-    hamming_ci,
     hamming_distance_padded,
     hamming_similarity,
-    hamming_similarity_ci,
     jaro_similarity,
-    jaro_similarity_ci,
     jaro_similarity_grapheme,
     jaro_winkler_similarity,
-    jaro_winkler_similarity_ci,
     jaro_winkler_similarity_grapheme,
+    # --- LCS functions ---
     lcs_length,
-    lcs_length_ci,
     lcs_similarity,
-    lcs_similarity_ci,
     lcs_similarity_max,
     lcs_string,
-    lcs_string_ci,
-    # Distance functions
+    # --- Distance functions ---
     levenshtein,
     levenshtein_bounded,
-    # Case-insensitive variants
-    levenshtein_ci,
-    # Grapheme cluster mode functions
     levenshtein_grapheme,
-    # SIMD-accelerated functions
     levenshtein_simd,
     levenshtein_simd_bounded,
     levenshtein_similarity,
-    levenshtein_similarity_ci,
     levenshtein_similarity_grapheme,
     levenshtein_similarity_simd,
     longest_common_substring,
-    longest_common_substring_ci,
     longest_common_substring_length,
     metaphone,
     metaphone_match,
     metaphone_similarity,
-    metaphone_similarity_ci,
     ngram_jaccard,
-    ngram_jaccard_ci,
     ngram_profile_similarity,
+    # --- N-gram functions ---
     ngram_similarity,
-    ngram_similarity_ci,
     normalize_pair,
-    # Normalization
+    # --- Normalization ---
     normalize_string,
-    # RapidFuzz-compatible convenience functions
+    # --- Optimal String Alignment (restricted Damerau-Levenshtein) ---
+    optimal_string_alignment,
+    optimal_string_alignment_similarity,
     partial_ratio,
+    # --- Evaluation metrics ---
     precision,
     qratio,
     qwratio,
+    # --- RapidFuzz-compatible functions ---
     ratio,
     recall,
+    # --- Phonetic functions ---
     soundex,
     soundex_match,
     soundex_similarity,
-    soundex_similarity_ci,
     token_set_ratio,
     token_sort_ratio,
     trigram_similarity,
-    trigram_similarity_ci,
     wratio,
 )
 from fuzzyrust._core import (
     IndexError as FuzzyIndexError,  # Avoid shadowing built-in IndexError
 )
 from fuzzyrust._core import (
-    # Index classes
+    # --- Index classes ---
     PyBkTree as BkTree,
 )
 from fuzzyrust._core import (
@@ -162,14 +157,14 @@ from fuzzyrust._core import (
     PyNgramIndex as NgramIndex,
 )
 from fuzzyrust._core import (
-    # Sharded index classes
+    # --- Sharded index classes ---
     PyShardedBkTree as ShardedBkTree,
 )
 from fuzzyrust._core import (
     PyShardedNgramIndex as ShardedNgramIndex,
 )
 from fuzzyrust._core import (
-    # Thread-safe index classes
+    # --- Thread-safe index classes ---
     PyThreadSafeBkTree as ThreadSafeBkTree,
 )
 from fuzzyrust._core import (
@@ -178,38 +173,13 @@ from fuzzyrust._core import (
 from fuzzyrust.enums import Algorithm, NormalizationMode
 from fuzzyrust.index import FuzzyIndex
 
-# -----------------------------------------------------------------------------
-# Polars Integration - Batch API (polars_api)
-# -----------------------------------------------------------------------------
-# High-performance batch operations for large datasets.
-# Uses vectorized processing and Sorted Neighborhood Method (SNM).
-# Best for large datasets (100K+ rows) where performance is critical.
-# See: fuzzyrust.polars_api module docstring for details.
-from fuzzyrust.polars_api import (
-    batch_best_match,
-    dedupe_snm,
-    find_similar_pairs,
-    match_records_batch,
-)
-
-# -----------------------------------------------------------------------------
-# Polars Integration - High-Level API (polars_ext)
-# -----------------------------------------------------------------------------
-# User-friendly functions for common fuzzy matching operations.
-# Best for small to medium datasets (< 100K rows) and simple use cases.
-# See: fuzzyrust.polars_ext module docstring for details.
-from fuzzyrust.polars_ext import (
-    dedupe_series,
-    fuzzy_dedupe_rows,
-    fuzzy_join,
-    match_dataframe,
-    match_series,
-)
-
 __version__ = _get_version("fuzzyrust")
 __all__ = [
     # Version
     "__version__",
+    # Submodules (preferred API)
+    "batch",  # Batch operations: batch.similarity(), batch.best_matches(), etc.
+    "polars",  # Polars integration: polars.df_join(), polars.series_similarity(), etc.
     # Custom exceptions
     "FuzzyRustError",
     "ValidationError",
@@ -232,13 +202,13 @@ __all__ = [
     "damerau_levenshtein",
     "damerau_levenshtein_bounded",
     "damerau_levenshtein_similarity",
+    "optimal_string_alignment",
+    "optimal_string_alignment_similarity",
     "jaro_similarity",
     "jaro_winkler_similarity",
     "hamming",
-    "hamming_ci",
     "hamming_distance_padded",
     "hamming_similarity",
-    "hamming_similarity_ci",
     "ngram_similarity",
     "ngram_jaccard",
     "bigram_similarity",
@@ -264,34 +234,14 @@ __all__ = [
     "levenshtein_simd_bounded",
     "levenshtein_similarity_simd",
     "lcs_length",
-    "lcs_length_ci",
     "lcs_string",
-    "lcs_string_ci",
     "lcs_similarity",
     "lcs_similarity_max",
     "longest_common_substring_length",
     "longest_common_substring",
-    "longest_common_substring_ci",
     "cosine_similarity_chars",
     "cosine_similarity_words",
     "cosine_similarity_ngrams",
-    # Case-insensitive variants
-    "levenshtein_ci",
-    "levenshtein_similarity_ci",
-    "damerau_levenshtein_ci",
-    "damerau_levenshtein_similarity_ci",
-    "jaro_similarity_ci",
-    "jaro_winkler_similarity_ci",
-    "ngram_similarity_ci",
-    "ngram_jaccard_ci",
-    "cosine_similarity_chars_ci",
-    "cosine_similarity_words_ci",
-    "cosine_similarity_ngrams_ci",
-    "bigram_similarity_ci",
-    "trigram_similarity_ci",
-    "lcs_similarity_ci",
-    "soundex_similarity_ci",
-    "metaphone_similarity_ci",
     # Normalization
     "normalize_string",
     "normalize_pair",
@@ -305,15 +255,9 @@ __all__ = [
     "qwratio",
     "extract",
     "extract_one",
-    # Batch processing
-    "batch_levenshtein",
-    "batch_jaro_winkler",
-    "batch_similarity_pairs",
-    "cdist",
-    "find_best_matches",
     # Deduplication
-    "find_duplicates",
     "find_duplicate_pairs",
+    "find_duplicates",
     # Evaluation metrics
     "ConfusionMatrixResult",
     "precision",
@@ -338,24 +282,8 @@ __all__ = [
     "Schema",
     "SchemaBuilder",
     "SchemaIndex",
-    # Polars Integration - High-Level API (polars_ext)
-    # User-friendly functions for small/medium datasets
-    "match_series",
-    "dedupe_series",
-    "match_dataframe",
-    "fuzzy_join",
-    "fuzzy_dedupe_rows",
-    # Polars Integration - Batch API (polars_api)
-    # High-performance functions for large datasets (100K+ rows)
-    "batch_similarity",
-    "batch_best_match",
-    "dedupe_snm",
-    "match_records_batch",
-    "find_similar_pairs",
     # Index classes (high-level)
     "FuzzyIndex",
-    # Polars subpackage
-    "polars",
 ]
 
 

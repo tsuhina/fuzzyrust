@@ -244,19 +244,50 @@ pub fn true_damerau_levenshtein(a: &str, b: &str) -> usize {
     d[m + 1][n + 1]
 }
 
-/// Convenience function
+/// Convenience function - uses the "true" Damerau-Levenshtein algorithm
+/// which allows multiple edits on the same substring.
+///
+/// This matches the behavior of jellyfish's `damerau_levenshtein_distance`.
+/// For the restricted (OSA) variant, use `optimal_string_alignment`.
 #[inline]
 #[must_use]
 pub fn damerau_levenshtein(a: &str, b: &str) -> usize {
+    true_damerau_levenshtein(a, b)
+}
+
+/// Optimal String Alignment (OSA) distance - restricted Damerau-Levenshtein.
+///
+/// This is the restricted variant that doesn't allow multiple edits on the
+/// same substring. It's slightly faster than the true algorithm but may
+/// produce different results for certain edge cases.
+///
+/// Example where OSA differs from true Damerau-Levenshtein:
+/// - "CA" -> "ABC": OSA = 3 (sub C->A, sub A->B, ins C), True DL = 2 (transpose CA->AC, ins B)
+#[inline]
+#[must_use]
+pub fn optimal_string_alignment(a: &str, b: &str) -> usize {
     // This never fails because there's no threshold
     damerau_levenshtein_distance_bounded(a, b, None).unwrap_or(0)
 }
 
-/// Normalized similarity (0.0 to 1.0)
+/// Normalized similarity (0.0 to 1.0) using true Damerau-Levenshtein.
 #[inline]
 #[must_use]
 pub fn damerau_levenshtein_similarity(a: &str, b: &str) -> f64 {
-    let dist = damerau_levenshtein(a, b);
+    let dist = true_damerau_levenshtein(a, b);
+    let max_len = a.chars().count().max(b.chars().count());
+    if max_len == 0 {
+        1.0
+    } else {
+        1.0 - (dist as f64 / max_len as f64)
+    }
+}
+
+/// Normalized similarity (0.0 to 1.0) using OSA (restricted Damerau-Levenshtein).
+#[inline]
+#[must_use]
+pub fn optimal_string_alignment_similarity(a: &str, b: &str) -> f64 {
+    let dist = optimal_string_alignment(a, b);
     let max_len = a.chars().count().max(b.chars().count());
     if max_len == 0 {
         1.0
@@ -281,6 +312,22 @@ mod tests {
     fn test_transposition_vs_levenshtein() {
         // Levenshtein would give 2, Damerau gives 1
         assert_eq!(damerau_levenshtein("ca", "ac"), 1);
+    }
+
+    #[test]
+    fn test_true_vs_osa() {
+        // This case shows the difference between true DL and OSA
+        // '00210000' vs '001020000' - true DL = 2, OSA = 3
+        assert_eq!(true_damerau_levenshtein("00210000", "001020000"), 2);
+        assert_eq!(optimal_string_alignment("00210000", "001020000"), 3);
+    }
+
+    #[test]
+    fn test_osa_basic() {
+        assert_eq!(optimal_string_alignment("", ""), 0);
+        assert_eq!(optimal_string_alignment("abc", "abc"), 0);
+        assert_eq!(optimal_string_alignment("ab", "ba"), 1); // transposition
+        assert_eq!(optimal_string_alignment("abc", "acb"), 1); // transposition
     }
 
     #[test]

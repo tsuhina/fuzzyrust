@@ -99,22 +99,16 @@ class TestNormalizeParameter:
         with pytest.raises(fr.ValidationError, match="Unknown normalization mode"):
             fr.levenshtein_similarity("hello", "world", normalize="invalid_mode")
 
-    def test_ci_functions_equivalent_to_normalize_lowercase(self):
-        """_ci functions should be equivalent to base functions with normalize='lowercase'."""
-        # levenshtein_similarity_ci == levenshtein_similarity with normalize="lowercase"
-        assert fr.levenshtein_similarity_ci("Hello", "HELLO") == fr.levenshtein_similarity(
-            "Hello", "HELLO", normalize="lowercase"
-        )
+    def test_normalize_lowercase_gives_expected_results(self):
+        """normalize='lowercase' should make comparisons case-insensitive."""
+        # levenshtein_similarity with normalize="lowercase" treats differently-cased strings as identical
+        assert fr.levenshtein_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
 
-        # jaro_winkler_similarity_ci == jaro_winkler_similarity with normalize="lowercase"
-        assert fr.jaro_winkler_similarity_ci("Hello", "HELLO") == fr.jaro_winkler_similarity(
-            "Hello", "HELLO", normalize="lowercase"
-        )
+        # jaro_winkler_similarity with normalize="lowercase" treats differently-cased strings as identical
+        assert fr.jaro_winkler_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
 
-        # ngram_similarity_ci == ngram_similarity with normalize="lowercase"
-        assert fr.ngram_similarity_ci("Hello", "HELLO") == fr.ngram_similarity(
-            "Hello", "HELLO", normalize="lowercase"
-        )
+        # ngram_similarity with normalize="lowercase" treats differently-cased strings as identical
+        assert fr.ngram_similarity("Hello", "HELLO", normalize="lowercase") == 1.0
 
     def test_normalize_none_is_default(self):
         """normalize=None should give same results as no normalization."""

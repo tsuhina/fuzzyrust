@@ -19,6 +19,7 @@ You have messy order data with typos. You need to match it to your clean custome
 ```python
 import polars as pl
 import fuzzyrust as fr
+from fuzzyrust import polars as frp
 
 # Your clean customer database
 customers = pl.DataFrame({
@@ -34,7 +35,7 @@ orders = pl.DataFrame({
 })
 
 # One line to match them
-matched = fr.fuzzy_join(orders, customers, left_on="company", right_on="name", min_similarity=0.5)
+matched = frp.df_join(orders, customers, left_on="company", right_on="name", min_similarity=0.5)
 
 print(matched)
 # shape: (4, 6)
@@ -48,14 +49,37 @@ print(matched)
 # +---------+---------------+--------+----+-----------------------+-------------+
 ```
 
+## API Overview
+
+FuzzyRust provides three levels of API:
+
+```python
+import fuzzyrust as fr
+from fuzzyrust import batch, polars as frp
+
+# Core: Single pair comparisons
+fr.jaro_winkler_similarity("John", "Jon")  # 0.93
+
+# Batch: Python lists (fr.batch.*)
+batch.similarity(["John", "Jane"], "Jon", algorithm="jaro_winkler")
+batch.best_matches(["apple", "banana"], "aple", limit=1)
+batch.deduplicate(["John", "Jon", "Jane"], min_similarity=0.8)
+
+# Polars: DataFrame operations (fr.polars.*)
+frp.df_join(left_df, right_df, left_on="name", right_on="customer")
+frp.df_dedupe(df, columns=["name", "email"])
+```
+
 ## DataFrame Operations
 
-### fuzzy_join()
+### frp.df_join()
 
 Match records across DataFrames despite typos, abbreviations, and variations:
 
 ```python
-result = fr.fuzzy_join(
+from fuzzyrust import polars as frp
+
+result = frp.df_join(
     left_df, right_df,
     left_on="company",
     right_on="name",
@@ -67,7 +91,7 @@ result = fr.fuzzy_join(
 Multi-column join with per-column algorithms:
 
 ```python
-result = fr.fuzzy_join(
+result = frp.df_join(
     left, right,
     on=[
         ("name", "customer", {"algorithm": "jaro_winkler", "weight": 2.0}),
@@ -77,7 +101,7 @@ result = fr.fuzzy_join(
 )
 ```
 
-### fuzzy_dedupe_rows()
+### frp.df_dedupe()
 
 Find and remove duplicate records using multi-field matching:
 
@@ -88,7 +112,7 @@ customers = pl.DataFrame({
     "phone": ["555-1234", "555-1234", "555-9999", "555-1234"],
 })
 
-result = fr.fuzzy_dedupe_rows(
+result = frp.df_dedupe(
     customers,
     columns=["name", "email", "phone"],
     algorithms={"name": "jaro_winkler", "email": "levenshtein", "phone": "exact_match"},
@@ -101,7 +125,7 @@ result = fr.fuzzy_dedupe_rows(
 unique = result.filter(pl.col("_is_canonical"))
 ```
 
-For exploratory pair-finding (e.g., manual review before merging), use `match_dataframe()` instead.
+For exploratory pair-finding (e.g., manual review before merging), use `frp.df_match_pairs()` instead.
 
 ### .fuzzy Expression Namespace
 
@@ -116,12 +140,12 @@ df.with_columns(
 )
 
 # Filter by similarity
-df.filter(pl.col("name").fuzzy.is_similar("John", threshold=0.8))
+df.filter(pl.col("name").fuzzy.is_similar("John", min_similarity=0.8))
 
 # Find best match from a list
 categories = ["Electronics", "Clothing", "Food"]
 df.with_columns(
-    category=pl.col("query").fuzzy.best_match(categories, min_score=0.6)
+    category=pl.col("query").fuzzy.best_match(categories, min_similarity=0.6)
 )
 
 # Edit distance and phonetic encoding
@@ -142,7 +166,7 @@ index = fr.FuzzyIndex.from_series(targets, algorithm="ngram")
 
 # Batch search
 queries = pl.Series(["Apple", "Microsft"])
-results = index.search_series(queries, min_score=0.6)
+results = index.search_series(queries, min_similarity=0.6)
 
 # Save/load for reuse
 index.save("company_index.pkl")
@@ -185,8 +209,32 @@ fr.levenshtein("kitten", "sitting")             # 3
 fr.damerau_levenshtein("ca", "ac")              # 1
 fr.soundex_match("Robert", "Rupert")            # True
 
-# Case-insensitive variants (all functions have _ci suffix)
-fr.levenshtein_ci("Hello", "HELLO")             # 0
+# Case-insensitive comparison (use normalize parameter)
+fr.levenshtein("Hello", "HELLO", normalize="lowercase")  # 0
+```
+
+## Batch Operations
+
+Process lists efficiently with parallel execution:
+
+```python
+from fuzzyrust import batch
+
+# Compute similarity for multiple strings against a query
+scores = batch.similarity(["John", "Jon", "Jane"], "John", algorithm="jaro_winkler")
+# [1.0, 0.93, 0.78]
+
+# Find best matches
+results = batch.best_matches(["apple", "apply", "banana"], "aple", limit=2)
+
+# Deduplicate a list
+groups = batch.deduplicate(["John Smith", "Jon Smyth", "Jane Doe"], min_similarity=0.8)
+
+# Pairwise similarity between two lists
+scores = batch.pairwise(["John", "Jane"], ["Jon", "Janet"])
+
+# Full similarity matrix
+matrix = batch.similarity_matrix(queries, choices)
 ```
 
 ## Algorithms Available

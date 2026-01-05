@@ -40,7 +40,8 @@ schema = (
 - `jaro` - Similar to Jaro-Winkler without prefix bonus
 - `levenshtein` - Edit distance based
 - `damerau_levenshtein` - Edit distance with transpositions
-- `ngram` - N-gram based similarity
+- `ngram` - N-gram based similarity (trigram, n=3)
+- `jaccard` - Jaccard similarity (n-gram based)
 - `cosine` - Cosine similarity
 
 ## SchemaIndex
@@ -104,7 +105,7 @@ Use multi-field matching in fuzzy joins:
 
 ```python
 import polars as pl
-from fuzzyrust import fuzzy_join
+from fuzzyrust import polars as frp
 
 df1 = pl.DataFrame({
     "first": ["John", "Jane"],
@@ -119,11 +120,11 @@ df2 = pl.DataFrame({
 })
 
 # Multi-column fuzzy join
-result = fuzzy_join(
+result = frp.df_join(
     df1, df2,
     left_on=["first", "last"],
     right_on=["fname", "lname"],
-    threshold=0.8,
+    min_similarity=0.8,
     algorithm="jaro_winkler"
 )
 ```
@@ -140,3 +141,64 @@ result = fuzzy_join(
 3. **Normalize data first** - Uppercase, trim whitespace, standardize formats
 
 4. **Start with higher thresholds** - Easier to lower than raise
+
+## Multi-Field Matching at Scale
+
+### Memory Considerations for SchemaIndex
+
+SchemaIndex stores all records in memory. For large datasets:
+
+| Records | Fields | Avg Field Length | Estimated Memory |
+|---------|--------|------------------|------------------|
+| 100K | 4 | 30 chars | ~200 MB |
+| 1M | 4 | 30 chars | ~2 GB |
+| 10M | 4 | 30 chars | ~20 GB |
+
+### Algorithm Recommendations for Industrial Data
+
+| Field Type | Recommended Algorithm | Why |
+|------------|----------------------|-----|
+| Part Numbers | levenshtein | Exact edit distance for codes |
+| Names/Descriptions | jaro_winkler | Handles typos, prefix bonus |
+| Manufacturer | jaro_winkler or exact | Often standardized |
+| Category | exact or jaccard | Token-based matching |
+
+### Batch Search Pattern
+
+For searching many queries against a large index:
+
+```python
+import fuzzyrust as fr
+
+# Define schema
+schema = (
+    fr.SchemaBuilder()
+    .add_field("name", algorithm="jaro_winkler", weight=2.0)
+    .add_field("part_number", algorithm="levenshtein", weight=3.0)
+    .build()
+)
+
+# Build index once
+index = fr.SchemaIndex(schema)
+for record in records:
+    index.add(record)
+
+# Batch search (single Rust call, parallelized)
+queries = [{"name": "...", "part_number": "..."} for _ in range(1000)]
+all_results = index.batch_search(
+    queries,
+    min_similarity=0.8,
+    limit=5,
+)
+```
+
+### Large-Scale Recommendations
+
+For datasets larger than 100K records:
+
+1. **Use `df_dedupe_snm()` instead of `df_dedupe()`** - O(N log N) vs O(N^2)
+2. **Add blocking keys** - Partition data before comparison
+3. **Process in chunks** - Avoid memory pressure
+4. **Pre-normalize data** - Reduce comparison overhead
+
+See [Large-Scale Fuzzy Matching Guide](large-scale.md) for detailed strategies

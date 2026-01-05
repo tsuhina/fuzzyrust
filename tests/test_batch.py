@@ -1,12 +1,13 @@
 """Tests for batch processing functions.
 
 This module tests the batch similarity computation functions provided by fuzzyrust,
-including batch_levenshtein, batch_jaro_winkler, find_best_matches, and more.
+including batch_levenshtein, batch_jaro_winkler, and the new batch.* API.
 """
 
 import pytest
 
 import fuzzyrust as fr
+from fuzzyrust import batch
 
 
 class TestBatchProcessing:
@@ -30,7 +31,7 @@ class TestBatchProcessing:
 
     def test_find_best_matches(self):
         strings = ["apple", "apply", "banana", "application"]
-        results = fr.find_best_matches(strings, "appel", limit=2, min_similarity=0.0)
+        results = batch.best_matches(strings, "appel", limit=2, min_similarity=0.0)
         assert len(results) == 2
         # Results are now MatchResult objects
         assert results[0].text == "apple"  # Best match
@@ -81,19 +82,19 @@ class TestBatchEdgeCases:
 
     def test_find_best_matches_empty_list(self):
         """Test find_best_matches with empty list."""
-        result = fr.find_best_matches([], "hello")
+        result = batch.best_matches([], "hello")
         assert result == []
 
     def test_find_best_matches_limit_zero(self):
         """Test find_best_matches with limit=0."""
         strings = ["hello", "world"]
-        result = fr.find_best_matches(strings, "hello", limit=0)
+        result = batch.best_matches(strings, "hello", limit=0)
         assert result == []
 
     def test_find_best_matches_min_score_one(self):
         """Test find_best_matches with min_similarity=1.0 (exact matches only)."""
         strings = ["hello", "hallo", "hello"]
-        result = fr.find_best_matches(strings, "hello", min_similarity=1.0)
+        result = batch.best_matches(strings, "hello", min_similarity=1.0)
         # Note: results are deduplicated, so only one "hello" match
         assert len(result) >= 1
         # Results are MatchResult objects
@@ -115,7 +116,7 @@ class TestBatchEdgeCases:
         ]
 
         for algo in algorithms:
-            result = fr.find_best_matches(strings, "test", algorithm=algo, min_similarity=0.0)
+            result = batch.best_matches(strings, "test", algorithm=algo, min_similarity=0.0)
             # With min_similarity=0.0, all 3 strings should be returned
             assert len(result) == 3, f"Expected 3 results for algorithm {algo}, got {len(result)}"
             # Results are MatchResult objects with scores in valid range
@@ -128,31 +129,31 @@ class TestBatchSimilarityPairs:
 
     def test_identical_strings(self):
         """Identical string pairs should have similarity 1.0."""
-        result = fr.batch_similarity_pairs(["hello", "world"], ["hello", "world"], "levenshtein")
+        result = batch.pairwise(["hello", "world"], ["hello", "world"], "levenshtein")
         assert result == [1.0, 1.0], f"Expected [1.0, 1.0], got {result}"
 
     def test_different_strings(self):
         """Different string pairs should have low similarity."""
-        result = fr.batch_similarity_pairs(["hello"], ["world"], "jaro_winkler")
+        result = batch.pairwise(["hello"], ["world"], "jaro_winkler")
         assert len(result) == 1
         assert 0.0 <= result[0] <= 0.5, f"Expected low similarity, got {result[0]}"
 
     def test_empty_lists(self):
         """Empty input lists should return empty result list."""
-        result = fr.batch_similarity_pairs([], [], "levenshtein")
+        result = batch.pairwise([], [], "levenshtein")
         assert result == [], f"Expected empty list, got {result}"
 
     def test_various_algorithms(self):
         """All supported algorithms should work correctly."""
         for algo in ["levenshtein", "jaro", "jaro_winkler", "ngram", "cosine"]:
-            result = fr.batch_similarity_pairs(["test"], ["test"], algo)
+            result = batch.pairwise(["test"], ["test"], algo)
             assert result[0] == 1.0, f"Algorithm {algo} failed for identical strings"
 
     def test_mixed_similarity(self):
         """Test with pairs having different similarity levels."""
         left = ["hello", "world", "test"]
         right = ["hello", "word", "testing"]
-        result = fr.batch_similarity_pairs(left, right, "levenshtein")
+        result = batch.pairwise(left, right, "levenshtein")
 
         assert len(result) == 3
         assert result[0] == 1.0, "First pair (hello, hello) should be 1.0"
@@ -161,7 +162,7 @@ class TestBatchSimilarityPairs:
 
     def test_unicode_strings(self):
         """Test with Unicode strings."""
-        result = fr.batch_similarity_pairs(["cafe", "hello"], ["cafe", "hello"], "jaro_winkler")
+        result = batch.pairwise(["cafe", "hello"], ["cafe", "hello"], "jaro_winkler")
         assert result == [1.0, 1.0]
 
 

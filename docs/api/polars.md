@@ -1,25 +1,25 @@
 # Polars API
 
-## High-Level Functions
+## DataFrame Functions
 
-Import from `fuzzyrust`:
+Import from `fuzzyrust.polars`:
 
 ```python
-from fuzzyrust import fuzzy_join, fuzzy_dedupe_rows, match_dataframe
+from fuzzyrust import polars as frp
 ```
 
-### fuzzy_join
+### df_join
 
 ```python
-fuzzy_join(
+frp.df_join(
     left: pl.DataFrame,
     right: pl.DataFrame,
-    left_on: str | list[str],
-    right_on: str | list[str],
-    threshold: float = 0.8,
+    on: str | list[tuple] | None = None,
+    left_on: str | None = None,
+    right_on: str | None = None,
     algorithm: str = "jaro_winkler",
-    how: str = "inner",
-    suffix: str = "_right"
+    min_similarity: float = 0.8,
+    how: Literal["inner", "left"] = "inner"
 ) -> pl.DataFrame
 ```
 
@@ -28,23 +28,42 @@ Fuzzy join two DataFrames.
 **Parameters:**
 
 - `left`, `right`: DataFrames to join
-- `left_on`, `right_on`: Column name(s) for matching
-- `threshold`: Minimum similarity score
-- `algorithm`: Similarity algorithm
-- `how`: Join type ("inner", "left", "right", "outer")
-- `suffix`: Suffix for duplicate column names
+- `on`: Column specification. Can be:
+    - A string: Same column name in both DataFrames
+    - A list of tuples for multi-column join (see example below)
+- `left_on`, `right_on`: Column names for single-column join (mutually exclusive with `on`)
+- `algorithm`: Default similarity algorithm
+- `min_similarity`: Minimum similarity score
+- `how`: Join type ("inner" or "left")
+
+**Returns:** DataFrame with all columns from both DataFrames plus `fuzzy_score` column.
+
+**Example (multi-column with weights):**
+
+```python
+result = frp.df_join(
+    left, right,
+    on=[
+        ("name", "customer", {"algorithm": "jaro_winkler", "weight": 2.0}),
+        ("city", "location", {"algorithm": "levenshtein", "weight": 1.0}),
+    ],
+    min_similarity=0.7,
+)
+```
 
 ---
 
-### fuzzy_dedupe_rows
+### df_dedupe
 
 ```python
-fuzzy_dedupe_rows(
+frp.df_dedupe(
     df: pl.DataFrame,
-    on: str | list[str],
-    threshold: float = 0.8,
+    columns: list[str],
     algorithm: str = "jaro_winkler",
-    group_col: str = "group_id"
+    min_similarity: float = 0.85,
+    weights: dict[str, float] | None = None,
+    algorithms: dict[str, str] | None = None,
+    keep: Literal["first", "last", "most_complete"] = "first"
 ) -> pl.DataFrame
 ```
 
@@ -53,20 +72,37 @@ Group similar rows using Union-Find clustering.
 **Parameters:**
 
 - `df`: DataFrame to deduplicate
-- `on`: Column(s) to match on
-- `threshold`: Minimum similarity for grouping
-- `algorithm`: Similarity algorithm
-- `group_col`: Name of output group column
+- `columns`: List of column names to match on
+- `algorithm`: Default similarity algorithm
+- `min_similarity`: Minimum similarity for grouping
+- `weights`: Optional dict mapping column names to weights
+- `algorithms`: Optional dict mapping column names to algorithms
+- `keep`: Strategy for selecting canonical row ("first", "last", "most_complete")
+
+**Returns:** Original DataFrame with added columns:
+- `_group_id`: Integer group ID for duplicate clusters (None for unique)
+- `_is_canonical`: True for the row to keep in each group
+
+**Example:**
+```python
+result = frp.df_dedupe(
+    df,
+    columns=["name", "email"],
+    algorithms={"name": "jaro_winkler", "email": "levenshtein"},
+    min_similarity=0.7,
+)
+unique_df = result.filter(pl.col("_is_canonical"))
+```
 
 ---
 
-### match_dataframe
+### df_match_pairs
 
 ```python
-match_dataframe(
+frp.df_match_pairs(
     df: pl.DataFrame,
-    on: str,
-    threshold: float = 0.8,
+    columns: str | list[str],
+    min_similarity: float = 0.8,
     algorithm: str = "jaro_winkler",
     limit: int | None = None
 ) -> pl.DataFrame
@@ -78,81 +114,13 @@ Find all similar pairs within a DataFrame.
 
 ---
 
-### match_series
+### df_dedupe_snm
 
 ```python
-match_series(
-    queries: pl.Series,
-    targets: pl.Series | list[str],
-    threshold: float = 0.8,
-    algorithm: str = "jaro_winkler"
-) -> pl.DataFrame
-```
-
-Match each query against all targets.
-
----
-
-### dedupe_series
-
-```python
-dedupe_series(
-    series: pl.Series,
-    threshold: float = 0.8,
-    algorithm: str = "jaro_winkler"
-) -> pl.DataFrame
-```
-
-Deduplicate a series, returning groups.
-
----
-
-## Batch API
-
-Import from `fuzzyrust.polars_api`:
-
-```python
-from fuzzyrust.polars_api import batch_similarity, batch_best_match, dedupe_snm
-```
-
-### batch_similarity
-
-```python
-batch_similarity(
-    series1: pl.Series,
-    series2: pl.Series,
-    algorithm: str = "jaro_winkler"
-) -> pl.Series
-```
-
-Compute element-wise similarity between two series.
-
----
-
-### batch_best_match
-
-```python
-batch_best_match(
-    queries: pl.Series,
-    targets: list[str] | pl.Series,
-    algorithm: str = "jaro_winkler",
-    threshold: float = 0.0
-) -> pl.DataFrame
-```
-
-Find best match for each query.
-
-**Returns:** DataFrame with `query`, `match`, `score`
-
----
-
-### dedupe_snm
-
-```python
-dedupe_snm(
+frp.df_dedupe_snm(
     df: pl.DataFrame,
-    on: str,
-    threshold: float = 0.8,
+    columns: str | list[str],
+    min_similarity: float = 0.8,
     window_size: int = 5,
     algorithm: str = "jaro_winkler",
     sort_key: str | None = None
@@ -164,17 +132,17 @@ Deduplicate using Sorted Neighborhood Method (O(N log N)).
 **Parameters:**
 
 - `window_size`: Number of neighbors to compare
-- `sort_key`: Column to sort by (default: same as `on`)
+- `sort_key`: Column to sort by (default: same as first column)
 
 ---
 
-### find_similar_pairs
+### df_find_pairs
 
 ```python
-find_similar_pairs(
+frp.df_find_pairs(
     df: pl.DataFrame,
-    on: str,
-    threshold: float = 0.8,
+    columns: str | list[str],
+    min_similarity: float = 0.8,
     algorithm: str = "jaro_winkler",
     method: str = "snm",
     window_size: int = 5
@@ -185,24 +153,88 @@ Find all similar pairs.
 
 **Parameters:**
 
-- `method`: "snm" (O(N log N)) or "full" (O(N²))
+- `method`: "snm" (O(N log N)) or "full" (O(N^2))
 
 ---
 
-### match_records_batch
+### df_match_records
 
 ```python
-match_records_batch(
+frp.df_match_records(
     left: pl.DataFrame,
     right: pl.DataFrame,
     left_on: str,
     right_on: str,
-    threshold: float = 0.8,
+    min_similarity: float = 0.8,
     algorithm: str = "jaro_winkler"
 ) -> pl.DataFrame
 ```
 
 Batch match records from two DataFrames.
+
+---
+
+## Series Functions
+
+### series_similarity
+
+```python
+frp.series_similarity(
+    series1: pl.Series,
+    series2: pl.Series,
+    algorithm: str = "jaro_winkler"
+) -> pl.Series
+```
+
+Compute element-wise similarity between two series.
+
+---
+
+### series_best_match
+
+```python
+frp.series_best_match(
+    queries: pl.Series,
+    targets: list[str],
+    algorithm: str = "jaro_winkler",
+    min_similarity: float = 0.0,
+    limit: int = 1,
+    normalize: str | None = None
+) -> pl.Series
+```
+
+Find best match for each query from a target list.
+
+**Returns:** Utf8 Series with best matching target for each query (None for no match above threshold).
+
+---
+
+### series_match
+
+```python
+frp.series_match(
+    queries: pl.Series,
+    targets: pl.Series | list[str],
+    min_similarity: float = 0.8,
+    algorithm: str = "jaro_winkler"
+) -> pl.DataFrame
+```
+
+Match each query against all targets.
+
+---
+
+### series_dedupe
+
+```python
+frp.series_dedupe(
+    series: pl.Series,
+    min_similarity: float = 0.8,
+    algorithm: str = "jaro_winkler"
+) -> pl.DataFrame
+```
+
+Deduplicate a series, returning groups.
 
 ---
 
@@ -233,12 +265,14 @@ Compute similarity to a target string.
 ```python
 pl.col("name").fuzzy.is_similar(
     target: str,
-    threshold: float = 0.8,
-    algorithm: str = "jaro_winkler"
+    min_similarity: float = 0.8,
+    algorithm: str = "jaro_winkler",
+    ngram_size: int = 3,
+    case_insensitive: bool = False
 ) -> pl.Expr
 ```
 
-Filter rows similar to target.
+Check if values are similar to another value/column above a threshold. Returns a boolean expression.
 
 ---
 
@@ -268,6 +302,35 @@ Compute edit distance to target.
 
 ---
 
+### phonetic
+
+```python
+pl.col("name").fuzzy.phonetic(
+    method: str = "soundex"
+) -> pl.Expr
+```
+
+Generate phonetic encoding. Methods: "soundex", "metaphone".
+
+---
+
+## Old to New API Mapping
+
+| Old Function | New Function |
+|--------------|--------------|
+| `fuzzy_join()` | `frp.df_join()` |
+| `fuzzy_dedupe_rows()` | `frp.df_dedupe()` |
+| `match_dataframe()` | `frp.df_match_pairs()` |
+| `match_series()` | `frp.series_match()` |
+| `dedupe_series()` | `frp.series_dedupe()` |
+| `batch_similarity()` | `frp.series_similarity()` |
+| `batch_best_match()` | `frp.series_best_match()` |
+| `dedupe_snm()` | `frp.df_dedupe_snm()` |
+| `find_similar_pairs()` | `frp.df_find_pairs()` |
+| `match_records_batch()` | `frp.df_match_records()` |
+
+---
+
 ## Algorithms
 
 Available algorithms for all functions:
@@ -280,5 +343,8 @@ Available algorithms for all functions:
 | Damerau-Levenshtein | `"damerau_levenshtein"` |
 | N-gram | `"ngram"` |
 | Cosine | `"cosine"` |
+| Hamming | `"hamming"` |
+| LCS | `"lcs"` |
+| Jaccard | `"jaccard"` |
 | Soundex | `"soundex"` |
 | Metaphone | `"metaphone"` |

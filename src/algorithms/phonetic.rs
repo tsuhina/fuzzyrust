@@ -175,11 +175,23 @@ pub fn soundex_match(a: &str, b: &str) -> bool {
 
 /// Soundex similarity: 1.0 if codes match, 0.0 otherwise.
 /// For partial matching, compare individual code positions.
+///
+/// # Edge Cases
+///
+/// - If both inputs produce empty codes (e.g., both are empty strings or
+///   contain no alphabetic characters), returns 1.0 (both have no phonetic
+///   content, so they're equivalent in that sense).
+/// - If only one input produces an empty code, returns 0.0.
 #[must_use]
 pub fn soundex_similarity(a: &str, b: &str) -> f64 {
     let code_a = soundex(a);
     let code_b = soundex(b);
 
+    // Handle empty codes: if both are empty, they match (no phonetic content)
+    if code_a.is_empty() && code_b.is_empty() {
+        return 1.0;
+    }
+    // If only one is empty, no match
     if code_a.is_empty() || code_b.is_empty() {
         return 0.0;
     }
@@ -382,11 +394,21 @@ pub fn metaphone_match(a: &str, b: &str) -> bool {
 }
 
 /// Metaphone similarity based on code matching.
+///
+/// # Edge Cases
+///
+/// - If both inputs produce empty codes, returns 1.0 (both have no phonetic content).
+/// - If only one input produces an empty code, returns 0.0.
 #[must_use]
 pub fn metaphone_similarity(a: &str, b: &str, max_length: usize) -> f64 {
     let code_a = metaphone(a, max_length);
     let code_b = metaphone(b, max_length);
 
+    // Handle empty codes: if both are empty, they match (no phonetic content)
+    if code_a.is_empty() && code_b.is_empty() {
+        return 1.0;
+    }
+    // If only one is empty, no match
     if code_a.is_empty() || code_b.is_empty() {
         return 0.0;
     }
@@ -493,13 +515,12 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
     let char_at = |pos: usize| -> Option<char> { chars.get(pos).copied() };
 
     // Helper to check if substring matches at position
+    // Optimized: iterates directly over pattern chars without allocating Vec
     let string_at = |pos: usize, patterns: &[&str]| -> bool {
         patterns.iter().any(|&p| {
-            let p_chars: Vec<char> = p.chars().collect();
-            p_chars
-                .iter()
+            p.chars()
                 .enumerate()
-                .all(|(j, &pc)| char_at(pos + j) == Some(pc))
+                .all(|(j, pc)| char_at(pos + j) == Some(pc))
         })
     };
 
@@ -520,7 +541,6 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
         let c = chars[i];
         let next = char_at(i + 1);
         let prev = if i > 0 { char_at(i - 1) } else { None };
-        let _next2 = char_at(i + 2);
 
         // Helper to add codes (respecting max_length)
         let mut add = |p: &str, a: &str| {
@@ -991,11 +1011,21 @@ pub fn double_metaphone_match(a: &str, b: &str) -> bool {
 ///
 /// Returns 1.0 for exact match, 0.0 for no match, or a partial score
 /// based on Jaro-Winkler similarity of the best matching codes.
+///
+/// # Edge Cases
+///
+/// - If both inputs produce empty primary codes, returns 1.0 (both have no phonetic content).
+/// - If only one input produces an empty primary code, returns 0.0.
 #[must_use]
 pub fn double_metaphone_similarity(a: &str, b: &str, max_length: usize) -> f64 {
     let (a_primary, a_alternate) = double_metaphone(a, max_length);
     let (b_primary, b_alternate) = double_metaphone(b, max_length);
 
+    // Handle empty codes: if both primaries are empty, they match (no phonetic content)
+    if a_primary.is_empty() && b_primary.is_empty() {
+        return 1.0;
+    }
+    // If only one is empty, no match
     if a_primary.is_empty() || b_primary.is_empty() {
         return 0.0;
     }
