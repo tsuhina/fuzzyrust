@@ -530,7 +530,7 @@ mod tests {
         // Test that ASCII fast path produces same results as Unicode path
         // These are ASCII strings that will use the fast path
         assert!(approx_eq(jaro_similarity("hello", "hallo"), 0.866));
-        assert!(approx_eq(jaro_similarity("algorithm", "altruistic"), 0.685));
+        assert!(approx_eq(jaro_similarity("algorithm", "altruistic"), 0.618));
 
         // Verify consistency: same result whether using ASCII or Unicode path
         let ascii_result = jaro_similarity("MARTHA", "MARHTA");
@@ -548,7 +548,8 @@ mod tests {
         ));
 
         // Actual Unicode (non-ASCII) strings
-        let unicode_score = jaro_similarity("cafe", "caf\u{00e9}"); // cafe vs cafe (with e-acute)
-        assert!(unicode_score > 0.9); // Should be very similar
+        // "cafe" vs "café" (e-acute) - they share "caf" prefix but differ in final char
+        let unicode_score = jaro_similarity("cafe", "caf\u{00e9}");
+        assert!(approx_eq(unicode_score, 0.833)); // 3/4 matching characters
     }
 }

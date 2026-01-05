@@ -13,15 +13,43 @@
 //!
 //! The restricted variant (`damerau_levenshtein_distance_bounded`) uses O(n) space
 //! and works efficiently for strings of any length.
+//!
+//! For explicit error handling when strings exceed the limit, use
+//! `true_damerau_levenshtein_checked` which returns a `Result`.
 
 use super::EditDistance;
 use ahash::AHashMap;
 use smallvec::SmallVec;
+use std::fmt;
 
 /// Maximum string length for O(m*n) space algorithms.
 /// Strings longer than this will use space-efficient fallback algorithms.
 /// This prevents DoS attacks via excessive memory allocation.
 const MAX_QUADRATIC_STRING_LENGTH: usize = 10_000;
+
+/// Error returned when string length exceeds the safe limit for O(m*n) algorithms.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StringTooLongError {
+    /// Length of the first string
+    pub len_a: usize,
+    /// Length of the second string
+    pub len_b: usize,
+    /// Maximum allowed length
+    pub max_length: usize,
+}
+
+impl fmt::Display for StringTooLongError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "String length exceeds safe limit for O(m*n) algorithm: \
+             len_a={}, len_b={}, max={}",
+            self.len_a, self.len_b, self.max_length
+        )
+    }
+}
+
+impl std::error::Error for StringTooLongError {}
 
 /// Damerau-Levenshtein distance calculator
 ///
@@ -244,6 +272,98 @@ pub fn true_damerau_levenshtein(a: &str, b: &str) -> usize {
     d[m + 1][n + 1]
 }
 
+/// True Damerau-Levenshtein with explicit error handling for long strings.
+///
+/// Unlike `true_damerau_levenshtein` which silently falls back to the OSA variant
+/// for strings longer than 10,000 characters, this function returns an error,
+/// allowing callers to handle the case explicitly.
+///
+/// # Errors
+///
+/// Returns `StringTooLongError` if either string exceeds 10,000 characters.
+///
+/// # Example
+///
+/// ```
+/// use fuzzyrust::algorithms::damerau::{true_damerau_levenshtein_checked, StringTooLongError};
+///
+/// // Normal usage
+/// assert_eq!(true_damerau_levenshtein_checked("hello", "hallo"), Ok(1));
+///
+/// // Handle long strings explicitly
+/// let long_string = "a".repeat(15000);
+/// match true_damerau_levenshtein_checked(&long_string, "test") {
+///     Ok(dist) => println!("Distance: {}", dist),
+///     Err(e) => println!("String too long: {}", e),
+/// }
+/// ```
+pub fn true_damerau_levenshtein_checked(a: &str, b: &str) -> Result<usize, StringTooLongError> {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+
+    let m = a_chars.len();
+    let n = b_chars.len();
+
+    if m == 0 {
+        return Ok(n);
+    }
+    if n == 0 {
+        return Ok(m);
+    }
+
+    // Return error for very long strings instead of silent fallback
+    if m > MAX_QUADRATIC_STRING_LENGTH || n > MAX_QUADRATIC_STRING_LENGTH {
+        return Err(StringTooLongError {
+            len_a: m,
+            len_b: n,
+            max_length: MAX_QUADRATIC_STRING_LENGTH,
+        });
+    }
+
+    let max_dist = m + n;
+
+    // Character position map
+    let mut char_map: AHashMap<char, usize> = AHashMap::new();
+
+    // DP matrix with extra row and column
+    let mut d: Vec<Vec<usize>> = vec![vec![0; n + 2]; m + 2];
+
+    d[0][0] = max_dist;
+    for i in 0..=m {
+        d[i + 1][0] = max_dist;
+        d[i + 1][1] = i;
+    }
+    for j in 0..=n {
+        d[0][j + 1] = max_dist;
+        d[1][j + 1] = j;
+    }
+
+    for i in 1..=m {
+        let mut db = 0usize;
+
+        for j in 1..=n {
+            let i1 = *char_map.get(&b_chars[j - 1]).unwrap_or(&0);
+            let j1 = db;
+
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                db = j;
+                0
+            } else {
+                1
+            };
+
+            d[i + 1][j + 1] = (d[i][j] + cost) // substitution
+                .min(d[i + 1][j] + 1) // insertion
+                .min(d[i][j + 1] + 1) // deletion
+                .min(d[i1][j1] + (i - i1 - 1) + 1 + (j - j1 - 1)); // transposition
+        }
+
+        char_map.insert(a_chars[i - 1], i);
+    }
+
+    Ok(d[m + 1][n + 1])
+}
+
 /// Convenience function - uses the "true" Damerau-Levenshtein algorithm
 /// which allows multiple edits on the same substring.
 ///
@@ -357,5 +477,32 @@ mod tests {
 
         let dl_unbounded = DamerauLevenshtein::new();
         assert_eq!(dl_unbounded.compute("abc", "xyz"), Some(3));
+    }
+
+    #[test]
+    fn test_true_damerau_levenshtein_checked() {
+        // Normal cases should return Ok
+        assert_eq!(true_damerau_levenshtein_checked("hello", "hallo"), Ok(1));
+        assert_eq!(true_damerau_levenshtein_checked("", ""), Ok(0));
+        assert_eq!(true_damerau_levenshtein_checked("abc", ""), Ok(3));
+        assert_eq!(true_damerau_levenshtein_checked("", "abc"), Ok(3));
+        assert_eq!(true_damerau_levenshtein_checked("ab", "ba"), Ok(1)); // transposition
+
+        // Results should match true_damerau_levenshtein for short strings
+        assert_eq!(
+            true_damerau_levenshtein_checked("00210000", "001020000"),
+            Ok(2)
+        );
+    }
+
+    #[test]
+    fn test_string_too_long_error() {
+        let err = StringTooLongError {
+            len_a: 15000,
+            len_b: 100,
+            max_length: 10000,
+        };
+        assert!(err.to_string().contains("15000"));
+        assert!(err.to_string().contains("10000"));
     }
 }

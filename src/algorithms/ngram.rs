@@ -169,10 +169,40 @@ pub fn extract_ngrams(s: &str, n: usize, pad: bool, pad_char: char) -> Vec<Strin
     chars.windows(n).map(|w| w.iter().collect()).collect()
 }
 
-/// Extract n-grams as a set for fast comparison
+/// Extract n-grams as a set for fast comparison.
+///
+/// # Performance
+/// This function builds the set directly from character windows, avoiding
+/// the intermediate `Vec<String>` allocation that `extract_ngrams().into_iter().collect()`
+/// would create.
 #[must_use]
 pub fn extract_ngram_set(s: &str, n: usize, pad: bool, pad_char: char) -> AHashSet<String> {
-    extract_ngrams(s, n, pad, pad_char).into_iter().collect()
+    let n = validate_ngram_size(n);
+    if n == 0 {
+        return AHashSet::new();
+    }
+
+    let chars: Vec<char> = if pad {
+        let char_count = s.chars().count();
+        let mut result = Vec::with_capacity(char_count + 2 * (n - 1));
+        result.extend(std::iter::repeat_n(pad_char, n - 1));
+        result.extend(s.chars());
+        result.extend(std::iter::repeat_n(pad_char, n - 1));
+        result
+    } else {
+        s.chars().collect()
+    };
+
+    if chars.len() < n {
+        return AHashSet::new();
+    }
+
+    // Build set directly from windows - avoids intermediate Vec<String>
+    let mut set = AHashSet::with_capacity(chars.len() - n + 1);
+    for window in chars.windows(n) {
+        set.insert(window.iter().collect());
+    }
+    set
 }
 
 /// Calculate n-gram similarity (Sørensen-Dice coefficient).
@@ -253,6 +283,10 @@ pub fn trigram_similarity(a: &str, b: &str) -> f64 {
 /// Profile-based n-gram similarity for multiset comparison.
 /// Counts n-gram frequencies instead of just presence.
 /// Returns 0.0 if n is 0 (no valid n-grams can be extracted).
+///
+/// # Performance
+/// Builds frequency maps directly from character windows, avoiding
+/// intermediate `Vec<String>` allocation.
 #[must_use]
 pub fn ngram_profile_similarity(a: &str, b: &str, n: usize) -> f64 {
     use ahash::AHashMap;
@@ -261,9 +295,29 @@ pub fn ngram_profile_similarity(a: &str, b: &str, n: usize) -> f64 {
         return 0.0;
     }
 
-    fn build_profile(s: &str, n: usize) -> AHashMap<String, usize> {
-        let mut profile = AHashMap::new();
-        for ngram in extract_ngrams(s, n, true, ' ') {
+    // Build profile directly from character windows - avoids Vec<String> allocation
+    fn build_profile(s: &str, n: usize, pad_char: char) -> AHashMap<String, usize> {
+        let n = validate_ngram_size(n);
+        if n == 0 {
+            return AHashMap::new();
+        }
+
+        let chars: Vec<char> = {
+            let char_count = s.chars().count();
+            let mut result = Vec::with_capacity(char_count + 2 * (n - 1));
+            result.extend(std::iter::repeat_n(pad_char, n - 1));
+            result.extend(s.chars());
+            result.extend(std::iter::repeat_n(pad_char, n - 1));
+            result
+        };
+
+        if chars.len() < n {
+            return AHashMap::new();
+        }
+
+        let mut profile = AHashMap::with_capacity(chars.len() - n + 1);
+        for window in chars.windows(n) {
+            let ngram: String = window.iter().collect();
             *profile.entry(ngram).or_insert(0) += 1;
         }
         profile
@@ -273,8 +327,8 @@ pub fn ngram_profile_similarity(a: &str, b: &str, n: usize) -> f64 {
         return 1.0;
     }
 
-    let a_profile = build_profile(a, n);
-    let b_profile = build_profile(b, n);
+    let a_profile = build_profile(a, n, ' ');
+    let b_profile = build_profile(b, n, ' ');
 
     if a_profile.is_empty() && b_profile.is_empty() {
         return 1.0;

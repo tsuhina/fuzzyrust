@@ -74,6 +74,7 @@ impl Similarity for CosineSimilarity {
 ///
 /// Counts occurrences of each unique item for constructing
 /// term frequency vectors used in cosine similarity calculation.
+#[inline]
 fn build_frequency_map<T, I>(iter: I) -> AHashMap<T, usize>
 where
     T: std::hash::Hash + Eq,
@@ -142,14 +143,21 @@ pub fn cosine_similarity_chars(a: &str, b: &str) -> f64 {
 }
 
 /// Word-level cosine similarity.
+///
+/// # Performance
+/// Pre-lowercases the entire string before splitting to avoid per-word allocations.
 #[must_use]
 pub fn cosine_similarity_words(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
 
-    let map_a = build_frequency_map(a.split_whitespace().map(|s| s.to_lowercase()));
-    let map_b = build_frequency_map(b.split_whitespace().map(|s| s.to_lowercase()));
+    // Pre-lowercase entire strings to avoid per-word String allocations
+    let a_lower = a.to_lowercase();
+    let b_lower = b.to_lowercase();
+
+    let map_a = build_frequency_map(a_lower.split_whitespace());
+    let map_b = build_frequency_map(b_lower.split_whitespace());
 
     cosine_from_maps(&map_a, &map_b)
 }

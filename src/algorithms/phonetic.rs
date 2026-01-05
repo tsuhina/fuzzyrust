@@ -783,7 +783,9 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
             }
             'M' => {
                 add("M", "M");
-                if (string_at(i - 1, &["UMB"]) && (i + 1 == len - 1 || string_at(i + 2, &["ER"])))
+                if (i > 0
+                    && string_at(i - 1, &["UMB"])
+                    && (i + 1 == len - 1 || string_at(i + 2, &["ER"])))
                     || next == Some('M')
                 {
                     i += 1;
@@ -828,7 +830,7 @@ pub fn double_metaphone(s: &str, max_length: usize) -> (String, String) {
                 }
             }
             'S' => {
-                if string_at(i - 1, &["ISL", "YSL"]) {
+                if i > 0 && string_at(i - 1, &["ISL", "YSL"]) {
                     // Silent S (island, carlisle)
                 } else if i == 0 && string_at(i, &["SUGAR"]) {
                     add("X", "S");

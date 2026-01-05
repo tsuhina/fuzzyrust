@@ -51,6 +51,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D clippy::correctness -A clippy::too_many_arguments
 
+      - name: Rust tests
+        run: cargo test --lib
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
